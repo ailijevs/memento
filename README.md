@@ -45,3 +45,4 @@ ECE 49595 - Team 5 (Software Track)
 
 Person 1: Sasha Ilijevski
 Person 2: Amartya Singh
+Person 3: Noddie Mgbodille
