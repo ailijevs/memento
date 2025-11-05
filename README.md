@@ -44,3 +44,4 @@ _Coming soon - project structure will be documented as the codebase is developed
 ECE 49595 - Team 5 (Software Track)
 
 Person 1: Sasha Ilijevski
+Person 2: Amartya Singh
