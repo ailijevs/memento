@@ -47,3 +47,5 @@ ECE 49595 - Team 5 (Software Track)
 - Person 2: Amartya Singh
 - Person 3: Noddie Mgbodille
 - Person 4: Will Ott
+
+MENTRA OS SDK: https://docs.mentraglass.com
