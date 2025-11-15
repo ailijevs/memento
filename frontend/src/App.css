@@ -44,6 +44,16 @@
 
 .connection-card {
   position: relative;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.connection-card:hover {
+  transform: translateY(-2px);
+}
+
+.connection-card:active {
+  transform: translateY(0);
 }
 
 .card-gradient {
@@ -73,15 +83,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: blur(2px);
 }
 
-.avatar-blur {
+.avatar-img {
   width: 100%;
   height: 100%;
-  border-radius: inherit;
-  background: radial-gradient(circle at 35% 35%, #f8dcc1, #c08d67, #332014);
-  filter: blur(3px);
+  object-fit: cover;
 }
 
 .profile-details {
