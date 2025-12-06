@@ -1,25 +1,25 @@
 import { useState } from 'react'
 import '../styles/auth.css'
 
-type LoginProps = {
-  onSignIn: () => void
-  onGoToRegister: () => void
+type RegisterProps = {
+  onGoToLogin: () => void
 }
 
-const LoginPage = ({ onSignIn, onGoToRegister }: LoginProps) => {
+const RegisterPage = ({ onGoToLogin }: RegisterProps) => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    // TODO: wire up real authentication flow
-    onSignIn()
+    // TODO: hook up registration flow
   }
 
   return (
     <div className="auth-shell">
       <div className="auth-card">
         <h1 className="auth-title">Welcome to Memento!</h1>
+
+        <div className="auth-subtitle">Sign Up with us</div>
 
         <form className="auth-form" onSubmit={handleSubmit}>
           <label className="auth-field">
@@ -47,37 +47,14 @@ const LoginPage = ({ onSignIn, onGoToRegister }: LoginProps) => {
           </label>
 
           <button type="submit" className="primary-btn">
-            Sign in
+            Sign up
           </button>
         </form>
 
-        <div className="auth-divider"></div>
-
-        <div className="social-buttons">
-          <button
-            type="button"
-            className="social-btn apple"
-            // TODO: connect Sign in with Apple
-            onClick={() => {}}
-          >
-            <span className="social-icon">A</span>
-            <span>Sign in with Apple</span>
-          </button>
-          <button
-            type="button"
-            className="social-btn google"
-            // TODO: connect Sign in with Google
-            onClick={() => {}}
-          >
-            <span className="social-icon google-icon">G</span>
-            <span>Sign in with Google</span>
-          </button>
-        </div>
-
         <p className="auth-footer">
-          Don&apos;t have an account?{' '}
-          <button type="button" className="link-button" onClick={onGoToRegister}>
-            Sign up
+          Already have an account?{' '}
+          <button type="button" className="link-button" onClick={onGoToLogin}>
+            Sign in
           </button>
         </p>
       </div>
@@ -85,4 +62,4 @@ const LoginPage = ({ onSignIn, onGoToRegister }: LoginProps) => {
   )
 }
 
-export default LoginPage
+export default RegisterPage

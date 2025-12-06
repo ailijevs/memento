@@ -33,6 +33,13 @@
   gap: 1rem;
 }
 
+.auth-subtitle {
+  color: rgba(243, 202, 137, 0.9);
+  font-weight: 600;
+  margin: 0;
+  font-size: 1rem;
+}
+
 .auth-field {
   display: flex;
   flex-direction: column;
