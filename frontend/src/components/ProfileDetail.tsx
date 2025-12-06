@@ -1,27 +1,10 @@
 import { useEffect, useState } from 'react'
 import './ProfileDetail.css'
 import { generateConversationStarters } from '../services/openai'
+import type { Connection } from '../types/connection'
 
 type ProfileProps = {
-  profile: {
-    id: number
-    name: string
-    role: string
-    summary: string
-    matchScore: number
-    location: string
-    sharedInterests: string[]
-    avatar: string
-    detectedPhoto: string
-    professionalSummary: string
-    experience: string[]
-    education: string
-    skills: string[]
-    linkedin?: string
-    twitter?: string
-    instagram?: string
-    conversationStarters: string[]
-  }
+  profile: Connection
   onClose: () => void
 }
 
@@ -200,4 +183,3 @@ const ProfileDetail = ({ profile, onClose }: ProfileProps) => {
 }
 
 export default ProfileDetail
-
