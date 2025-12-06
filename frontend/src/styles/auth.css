@@ -19,6 +19,14 @@
   gap: 1.5rem;
 }
 
+.auth-logo {
+  width: 84px;
+  height: auto;
+  display: block;
+  margin: 0 auto 0.5rem;
+  filter: drop-shadow(0 8px 18px rgba(0, 0, 0, 0.35));
+}
+
 .auth-title {
   margin: 0;
   font-size: clamp(1.8rem, 6vw, 2.2rem);

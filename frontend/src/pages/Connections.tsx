@@ -2,6 +2,23 @@ import { useState } from 'react'
 import ProfileDetail from '../components/ProfileDetail'
 import type { Connection } from '../types/connection'
 
+const DiagonalArrow = () => (
+  <svg
+    className="arrow-icon"
+    viewBox="0 0 24 24"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path
+      d="M6 18 11.5 12.5M12.5 11.5 18 6M14 6h4v4M6 14v4h4"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+)
+
 const connections: Connection[] = [
   {
     id: 1,
@@ -209,12 +226,15 @@ const ConnectionsPage = () => {
             onClick={() => setSelectedProfile(connection)}
           >
             <div className="card-gradient">
-              <div className="card-body">
-                <div className="avatar" aria-hidden="true">
-                  <img
-                    src={connection.avatar}
-                    alt={connection.name}
-                    className="avatar-img"
+            <div className="card-body">
+              <div className="connection-cta" aria-hidden="true">
+                <DiagonalArrow />
+              </div>
+              <div className="avatar" aria-hidden="true">
+                <img
+                  src={connection.avatar}
+                  alt={connection.name}
+                  className="avatar-img"
                   />
                 </div>
 
