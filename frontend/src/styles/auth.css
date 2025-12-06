@@ -180,6 +180,38 @@
   text-decoration: underline;
 }
 
+.code-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+  margin: 0.25rem 0 0.75rem;
+}
+
+.code-input {
+  width: 100%;
+  padding: 0.8rem 0.5rem;
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  border-radius: 12px;
+  border: 1px solid rgba(243, 202, 137, 0.65);
+  background: #0f0f0f;
+  color: #fff;
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.code-input:focus {
+  border-color: #f3ca89;
+  box-shadow: 0 0 0 3px rgba(243, 202, 137, 0.2);
+}
+
+.primary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
 @media (max-width: 480px) {
   .auth-card {
     padding: 2rem 1.5rem;

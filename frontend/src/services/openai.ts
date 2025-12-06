@@ -30,7 +30,7 @@ export async function generateConversationStarters(
     
     if (!apiKey) {
       return [
-        'Please set VITE_OPENAI_API_KEY in your .env file to use AI features',
+        'Please set VITE_OPENAI_API_KEY in your environment to use AI features',
         'Get your API key from: https://platform.openai.com/api-keys'
       ]
     }

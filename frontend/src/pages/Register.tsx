@@ -3,15 +3,17 @@ import '../styles/auth.css'
 
 type RegisterProps = {
   onGoToLogin: () => void
+  onGoToVerify: () => void
 }
 
-const RegisterPage = ({ onGoToLogin }: RegisterProps) => {
+const RegisterPage = ({ onGoToLogin, onGoToVerify }: RegisterProps) => {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     // TODO: hook up registration flow
+    onGoToVerify()
   }
 
   return (
