@@ -90,6 +90,28 @@
   pointer-events: none;
 }
 
+.favorite-btn {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(243, 202, 137, 0.4);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f3ca89;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.favorite-btn:hover {
+  transform: translateY(-1px);
+  background: rgba(243, 202, 137, 0.12);
+}
+
 .arrow-icon {
   width: 20px;
   height: 20px;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import './ProfileDetail.css'
 import { generateConversationStarters } from '../services/openai'
+import { HeartIcon } from './icons'
 import type { Connection } from '../types/connection'
 
 type ProfileProps = {
@@ -45,9 +46,14 @@ const ProfileDetail = ({ profile, onClose }: ProfileProps) => {
   return (
     <div className="profile-overlay" onClick={onClose}>
       <div className="profile-page" onClick={(e) => e.stopPropagation()}>
-        <button className="close-btn" onClick={onClose}>
-          &times;
-        </button>
+        <div className="profile-actions">
+          <button className="favorite-btn" aria-label="Favorite profile">
+            <HeartIcon />
+          </button>
+          <button className="close-btn" onClick={onClose}>
+            &times;
+          </button>
+        </div>
 
         <div className="profile-content">
           <div className="profile-header">

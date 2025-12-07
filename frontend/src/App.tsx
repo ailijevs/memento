@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import './App.css'
 import ConnectionsPage from './pages/Connections'
 import EventsPage from './pages/Events'
+import FavoritesPage from './pages/Favorites'
 import LoginPage from './pages/Login'
 import RegisterPage from './pages/Register'
 import VerifyPage from './pages/Verify'
@@ -16,6 +17,7 @@ const App = () => {
     | 'verify'
     | 'events'
     | 'connections'
+    | 'favorites'
     | 'account'
     | 'resetPassword'
   >('login')
@@ -86,6 +88,7 @@ const App = () => {
         onSelectEvent={handleEventSelected}
         onHome={() => setView('events')}
         onProfile={() => setView('account')}
+        onFavorites={() => setView('favorites')}
         activeNav="home"
       />
     )
@@ -96,6 +99,7 @@ const App = () => {
       <AccountPage
         onHome={() => setView('events')}
         onStartPasswordReset={startPasswordReset}
+        onFavorites={() => setView('favorites')}
       />
     )
   }
@@ -110,10 +114,21 @@ const App = () => {
     )
   }
 
+  if (view === 'favorites') {
+    return (
+      <FavoritesPage
+        onHome={() => setView('events')}
+        onProfile={() => setView('account')}
+        onFavorites={() => setView('favorites')}
+      />
+    )
+  }
+
   return (
     <ConnectionsPage
       onHome={() => setView('events')}
       onProfile={() => setView('account')}
+      onFavorites={() => setView('favorites')}
       activeNav="home"
     />
   )

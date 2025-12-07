@@ -8,6 +8,7 @@ type EventsProps = {
   onSelectEvent: (event: Event) => void
   onHome: () => void
   onProfile: () => void
+  onFavorites?: () => void
   activeNav?: 'home' | 'favorites' | 'history' | 'profile'
 }
 
@@ -74,6 +75,7 @@ const EventsPage = ({
   onHome,
   onProfile,
   activeNav = 'home',
+  onFavorites,
 }: EventsProps) => {
   const [query, setQuery] = useState('')
 
@@ -195,7 +197,12 @@ const EventsPage = ({
         </div>
       </section>
 
-      <BottomNav onHome={onHome} onProfile={onProfile} active={activeNav} />
+      <BottomNav
+        onHome={onHome}
+        onProfile={onProfile}
+        onFavorites={onFavorites}
+        active={activeNav}
+      />
     </div>
   )
 }

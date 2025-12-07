@@ -2,11 +2,12 @@ import { useState } from 'react'
 import ProfileDetail from '../components/ProfileDetail'
 import BottomNav from '../components/BottomNav'
 import type { Connection } from '../types/connection'
-import { DiagonalDoubleArrowIcon } from '../components/icons'
+import { DiagonalDoubleArrowIcon, HeartIcon } from '../components/icons'
 
 type ConnectionsProps = {
   onHome: () => void
   onProfile: () => void
+  onFavorites?: () => void
   activeNav?: 'home' | 'favorites' | 'history' | 'profile'
 }
 
@@ -197,6 +198,7 @@ const ConnectionsPage = ({
   onHome,
   onProfile,
   activeNav = 'home',
+  onFavorites,
 }: ConnectionsProps) => {
   const [selectedProfile, setSelectedProfile] = useState<Connection | null>(
     null
@@ -221,10 +223,18 @@ const ConnectionsPage = ({
             onClick={() => setSelectedProfile(connection)}
           >
             <div className="card-gradient">
-              <div className="card-body">
+            <div className="card-body">
               <div className="connection-cta" aria-hidden="true">
                 <DiagonalDoubleArrowIcon />
               </div>
+              <button
+                type="button"
+                className="favorite-btn"
+                aria-label="Favorite connection"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <HeartIcon />
+              </button>
               <div className="avatar" aria-hidden="true">
                 <img
                   src={connection.avatar}
@@ -267,7 +277,12 @@ const ConnectionsPage = ({
         />
       )}
 
-      <BottomNav onHome={onHome} onProfile={onProfile} active={activeNav} />
+      <BottomNav
+        onHome={onHome}
+        onProfile={onProfile}
+        onFavorites={onFavorites}
+        active={activeNav}
+      />
     </div>
   )
 }

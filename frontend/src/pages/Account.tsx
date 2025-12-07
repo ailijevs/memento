@@ -7,9 +7,14 @@ import type { Profile } from '../types/profile'
 type AccountProps = {
   onHome: () => void
   onStartPasswordReset: () => void
+  onFavorites?: () => void
 }
 
-const AccountPage = ({ onHome, onStartPasswordReset }: AccountProps) => {
+const AccountPage = ({
+  onHome,
+  onStartPasswordReset,
+  onFavorites,
+}: AccountProps) => {
   const [tab, setTab] = useState<'profile' | 'settings'>('profile')
   const isRegisteredWithEmail = true // TODO: drive from real auth source
   const [profile, setProfile] = useState<Profile>({
@@ -219,7 +224,11 @@ const AccountPage = ({ onHome, onStartPasswordReset }: AccountProps) => {
         </section>
       )}
 
-      <BottomNav onHome={onHome} active="profile" />
+      <BottomNav
+        onHome={onHome}
+        active="profile"
+        onFavorites={onFavorites}
+      />
     </div>
   )
 }

@@ -3,11 +3,12 @@ import { HeartIcon, HistoryIcon, HomeIcon, ProfileIcon } from './icons'
 
 type BottomNavProps = {
   onHome: () => void
+  onFavorites?: () => void
   onProfile?: () => void
   active?: 'home' | 'favorites' | 'history' | 'profile'
 }
 
-const BottomNav = ({ onHome, onProfile, active }: BottomNavProps) => {
+const BottomNav = ({ onHome, onFavorites, onProfile, active }: BottomNavProps) => {
   return (
     <nav className="bottom-nav" aria-label="Primary">
       <button
@@ -17,7 +18,14 @@ const BottomNav = ({ onHome, onProfile, active }: BottomNavProps) => {
       >
         <HomeIcon />
       </button>
-      <button type="button" className="nav-item nav-disabled" aria-disabled="true">
+      <button
+        type="button"
+        className={`nav-item ${onFavorites ? '' : 'nav-disabled'} ${
+          active === 'favorites' ? 'active' : ''
+        }`}
+        aria-disabled={!onFavorites}
+        onClick={onFavorites}
+      >
         <HeartIcon />
       </button>
       <button type="button" className="nav-item nav-disabled" aria-disabled="true">
