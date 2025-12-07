@@ -5,10 +5,11 @@ type BottomNavProps = {
   onHome: () => void
   onFavorites?: () => void
   onProfile?: () => void
+  onHistory?: () => void
   active?: 'home' | 'favorites' | 'history' | 'profile'
 }
 
-const BottomNav = ({ onHome, onFavorites, onProfile, active }: BottomNavProps) => {
+const BottomNav = ({ onHome, onFavorites, onProfile, onHistory, active }: BottomNavProps) => {
   return (
     <nav className="bottom-nav" aria-label="Primary">
       <button
@@ -28,7 +29,14 @@ const BottomNav = ({ onHome, onFavorites, onProfile, active }: BottomNavProps) =
       >
         <HeartIcon />
       </button>
-      <button type="button" className="nav-item nav-disabled" aria-disabled="true">
+      <button
+        type="button"
+        className={`nav-item ${onHistory ? '' : 'nav-disabled'} ${
+          active === 'history' ? 'active' : ''
+        }`}
+        aria-disabled={!onHistory}
+        onClick={onHistory}
+      >
         <HistoryIcon />
       </button>
       <button

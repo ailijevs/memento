@@ -2,12 +2,14 @@ import { useState } from 'react'
 import ProfileDetail from '../components/ProfileDetail'
 import BottomNav from '../components/BottomNav'
 import type { Connection } from '../types/connection'
-import { DiagonalDoubleArrowIcon, HeartIcon } from '../components/icons'
+import { BackIcon, DiagonalDoubleArrowIcon, HeartIcon } from '../components/icons'
 
 type ConnectionsProps = {
   onHome: () => void
   onProfile: () => void
   onFavorites?: () => void
+  onHistory?: () => void
+  onBack?: () => void
   activeNav?: 'home' | 'favorites' | 'history' | 'profile'
 }
 
@@ -199,6 +201,8 @@ const ConnectionsPage = ({
   onProfile,
   activeNav = 'home',
   onFavorites,
+  onHistory,
+  onBack,
 }: ConnectionsProps) => {
   const [selectedProfile, setSelectedProfile] = useState<Connection | null>(
     null
@@ -206,7 +210,12 @@ const ConnectionsPage = ({
 
   return (
     <div className="app-shell">
-      <header className="hero">
+      <header className="hero with-back">
+        {onBack && (
+          <button className="back-btn" onClick={onBack} aria-label="Back">
+            <BackIcon />
+          </button>
+        )}
         <p className="eyebrow">Live match from Mentra Glass</p>
         <h1>Memento</h1>
         <p className="hero-subtitle">
@@ -281,6 +290,7 @@ const ConnectionsPage = ({
         onHome={onHome}
         onProfile={onProfile}
         onFavorites={onFavorites}
+        onHistory={onHistory}
         active={activeNav}
       />
     </div>

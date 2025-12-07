@@ -53,32 +53,23 @@
   }
 }
 
-.profile-actions {
+.favorite-btn.ghost {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.profile-actions .favorite-btn {
+  top: 1.25rem;
+  right: 1.25rem;
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  border: 1px solid rgba(243, 202, 137, 0.4);
-  background: rgba(255, 255, 255, 0.05);
+  border: none;
+  background: transparent;
   color: #f3ca89;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: transform 0.15s ease, background 0.2s ease;
 }
 
-.profile-actions .favorite-btn:hover {
+.favorite-btn.ghost:hover {
   transform: translateY(-1px);
-  background: rgba(243, 202, 137, 0.12);
 }
 
 .close-btn {

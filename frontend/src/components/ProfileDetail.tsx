@@ -46,17 +46,15 @@ const ProfileDetail = ({ profile, onClose }: ProfileProps) => {
   return (
     <div className="profile-overlay" onClick={onClose}>
       <div className="profile-page" onClick={(e) => e.stopPropagation()}>
-        <div className="profile-actions">
-          <button className="favorite-btn" aria-label="Favorite profile">
-            <HeartIcon />
-          </button>
-          <button className="close-btn" onClick={onClose}>
-            &times;
-          </button>
-        </div>
+        <button className="close-btn" onClick={onClose}>
+          &times;
+        </button>
 
         <div className="profile-content">
           <div className="profile-header">
+            <button className="favorite-btn ghost" aria-label="Favorite profile">
+              <HeartIcon />
+            </button>
             <div className="photos-container">
               <img
                 src={profile.detectedPhoto}

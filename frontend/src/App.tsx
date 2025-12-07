@@ -3,6 +3,7 @@ import './App.css'
 import ConnectionsPage from './pages/Connections'
 import EventsPage from './pages/Events'
 import FavoritesPage from './pages/Favorites'
+import HistoryPage from './pages/History'
 import LoginPage from './pages/Login'
 import RegisterPage from './pages/Register'
 import VerifyPage from './pages/Verify'
@@ -18,6 +19,7 @@ const App = () => {
     | 'events'
     | 'connections'
     | 'favorites'
+    | 'history'
     | 'account'
     | 'resetPassword'
   >('login')
@@ -89,6 +91,7 @@ const App = () => {
         onHome={() => setView('events')}
         onProfile={() => setView('account')}
         onFavorites={() => setView('favorites')}
+        onHistory={() => setView('history')}
         activeNav="home"
       />
     )
@@ -100,6 +103,7 @@ const App = () => {
         onHome={() => setView('events')}
         onStartPasswordReset={startPasswordReset}
         onFavorites={() => setView('favorites')}
+        onHistory={() => setView('history')}
       />
     )
   }
@@ -120,6 +124,18 @@ const App = () => {
         onHome={() => setView('events')}
         onProfile={() => setView('account')}
         onFavorites={() => setView('favorites')}
+        onHistory={() => setView('history')}
+      />
+    )
+  }
+
+  if (view === 'history') {
+    return (
+      <HistoryPage
+        onHome={() => setView('events')}
+        onProfile={() => setView('account')}
+        onFavorites={() => setView('favorites')}
+        onHistory={() => setView('history')}
       />
     )
   }
@@ -129,6 +145,8 @@ const App = () => {
       onHome={() => setView('events')}
       onProfile={() => setView('account')}
       onFavorites={() => setView('favorites')}
+      onHistory={() => setView('history')}
+      onBack={() => setView('events')}
       activeNav="home"
     />
   )

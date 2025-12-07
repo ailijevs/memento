@@ -28,6 +28,9 @@
 
 .search-bar {
   margin-top: 0.75rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .search-bar input {
@@ -45,6 +48,17 @@
 .search-bar input:focus {
   border-color: #f3ca89;
   box-shadow: 0 0 0 3px rgba(243, 202, 137, 0.2);
+}
+
+.search-bar select {
+  min-width: 180px;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid rgba(243, 202, 137, 0.5);
+  background: #0f0f0f;
+  color: #fff;
+  font-size: 0.95rem;
+  outline: none;
 }
 
 .event-section {
@@ -70,6 +84,7 @@
   color: #f3ca89;
   border: 1px solid rgba(243, 202, 137, 0.25);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .event-list {
@@ -130,11 +145,18 @@
 }
 
 .event-times {
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
+  display: grid;
+  grid-auto-rows: min-content;
+  gap: 0.12rem;
   font-weight: 700;
   color: #f3ca89;
+  align-items: start;
+}
+
+.event-time {
+  display: block;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 .event-time.to {

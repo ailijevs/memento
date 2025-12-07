@@ -8,12 +8,14 @@ type AccountProps = {
   onHome: () => void
   onStartPasswordReset: () => void
   onFavorites?: () => void
+  onHistory?: () => void
 }
 
 const AccountPage = ({
   onHome,
   onStartPasswordReset,
   onFavorites,
+  onHistory,
 }: AccountProps) => {
   const [tab, setTab] = useState<'profile' | 'settings'>('profile')
   const isRegisteredWithEmail = true // TODO: drive from real auth source
@@ -228,6 +230,7 @@ const AccountPage = ({
         onHome={onHome}
         active="profile"
         onFavorites={onFavorites}
+        onHistory={onHistory}
       />
     </div>
   )

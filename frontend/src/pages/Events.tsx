@@ -9,6 +9,7 @@ type EventsProps = {
   onHome: () => void
   onProfile: () => void
   onFavorites?: () => void
+  onHistory?: () => void
   activeNav?: 'home' | 'favorites' | 'history' | 'profile'
 }
 
@@ -75,6 +76,7 @@ const EventsPage = ({
   onHome,
   onProfile,
   activeNav = 'home',
+  onHistory,
   onFavorites,
 }: EventsProps) => {
   const [query, setQuery] = useState('')
@@ -157,7 +159,7 @@ const EventsPage = ({
         <p className="eyebrow">Live today</p>
         <h1>Choose your event</h1>
         <p className="hero-subtitle">
-          Find the room you&apos;re in, then tap to see your connections.
+          Find the room you're in, then tap to recognize people.
         </p>
         <div className="search-bar">
           <input
@@ -201,6 +203,7 @@ const EventsPage = ({
         onHome={onHome}
         onProfile={onProfile}
         onFavorites={onFavorites}
+        onHistory={onHistory}
         active={activeNav}
       />
     </div>

@@ -8,6 +8,7 @@ type FavoritesProps = {
   onHome: () => void
   onProfile: () => void
   onFavorites: () => void
+  onHistory?: () => void
 }
 
 // Mock favorites list for now (could be driven by real likes)
@@ -70,7 +71,7 @@ const favoriteConnections: Connection[] = [
   },
 ]
 
-const FavoritesPage = ({ onHome, onProfile, onFavorites }: FavoritesProps) => {
+const FavoritesPage = ({ onHome, onProfile, onFavorites, onHistory }: FavoritesProps) => {
   const [selectedProfile, setSelectedProfile] = useState<Connection | null>(null)
   const [query, setQuery] = useState('')
 
@@ -161,7 +162,13 @@ const FavoritesPage = ({ onHome, onProfile, onFavorites }: FavoritesProps) => {
         />
       )}
 
-      <BottomNav onHome={onHome} onProfile={onProfile} onFavorites={onFavorites} active="favorites" />
+      <BottomNav
+        onHome={onHome}
+        onProfile={onProfile}
+        onFavorites={onFavorites}
+        onHistory={onHistory}
+        active="favorites"
+      />
     </div>
   )
 }
