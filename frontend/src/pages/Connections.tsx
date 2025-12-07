@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import ProfileDetail from '../components/ProfileDetail'
+import BottomNav from '../components/BottomNav'
 import type { Connection } from '../types/connection'
 
 const DiagonalArrow = () => (
@@ -202,7 +203,11 @@ const connections: Connection[] = [
   },
 ]
 
-const ConnectionsPage = () => {
+type ConnectionsProps = {
+  onHome: () => void
+}
+
+const ConnectionsPage = ({ onHome }: ConnectionsProps) => {
   const [selectedProfile, setSelectedProfile] = useState<Connection | null>(
     null
   )
@@ -271,6 +276,8 @@ const ConnectionsPage = () => {
           onClose={() => setSelectedProfile(null)}
         />
       )}
+
+      <BottomNav onHome={onHome} />
     </div>
   )
 }

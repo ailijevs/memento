@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react'
 import '../styles/events.css'
+import BottomNav from '../components/BottomNav'
 import type { Event } from '../types/event'
 
 type EventsProps = {
   onSelectEvent: (event: Event) => void
+  onHome: () => void
 }
 
 const events: Event[] = [
@@ -81,7 +83,7 @@ const DiagonalArrow = () => (
   </svg>
 )
 
-const EventsPage = ({ onSelectEvent }: EventsProps) => {
+const EventsPage = ({ onSelectEvent, onHome }: EventsProps) => {
   const [query, setQuery] = useState('')
 
   const parseTimeToMinutes = (time: string) => {
@@ -201,6 +203,8 @@ const EventsPage = ({ onSelectEvent }: EventsProps) => {
           ))}
         </div>
       </section>
+
+      <BottomNav onHome={onHome} />
     </div>
   )
 }

@@ -52,10 +52,15 @@ const App = () => {
   }
 
   if (view === 'events') {
-    return <EventsPage onSelectEvent={handleEventSelected} />
+    return (
+      <EventsPage
+        onSelectEvent={handleEventSelected}
+        onHome={() => setView('events')}
+      />
+    )
   }
 
-  return <ConnectionsPage />
+  return <ConnectionsPage onHome={() => setView('events')} />
 }
 
 export default App
