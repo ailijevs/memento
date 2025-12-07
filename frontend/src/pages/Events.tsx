@@ -1,11 +1,14 @@
 import { useMemo, useState } from 'react'
 import '../styles/events.css'
 import BottomNav from '../components/BottomNav'
+import { DiagonalDoubleArrowIcon } from '../components/icons'
 import type { Event } from '../types/event'
 
 type EventsProps = {
   onSelectEvent: (event: Event) => void
   onHome: () => void
+  onProfile: () => void
+  activeNav?: 'home' | 'favorites' | 'history' | 'profile'
 }
 
 const events: Event[] = [
@@ -66,24 +69,12 @@ const events: Event[] = [
   },
 ]
 
-const DiagonalArrow = () => (
-  <svg
-    className="arrow-icon"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path
-      d="M6 18 11.5 12.5M12.5 11.5 18 6M14 6h4v4M6 14v4h4"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
-
-const EventsPage = ({ onSelectEvent, onHome }: EventsProps) => {
+const EventsPage = ({
+  onSelectEvent,
+  onHome,
+  onProfile,
+  activeNav = 'home',
+}: EventsProps) => {
   const [query, setQuery] = useState('')
 
   const parseTimeToMinutes = (time: string) => {
@@ -138,7 +129,7 @@ const EventsPage = ({ onSelectEvent, onHome }: EventsProps) => {
                 )}
               </div>
               <div className="event-cta" aria-hidden="true">
-                <DiagonalArrow />
+                <DiagonalDoubleArrowIcon />
               </div>
             </div>
           </article>
@@ -196,7 +187,7 @@ const EventsPage = ({ onSelectEvent, onHome }: EventsProps) => {
                   <p className="event-location">{event.location}</p>
                 </div>
                 <div className="event-cta" aria-hidden="true">
-                  <DiagonalArrow />
+                  <DiagonalDoubleArrowIcon />
                 </div>
               </div>
             </article>
@@ -204,7 +195,7 @@ const EventsPage = ({ onSelectEvent, onHome }: EventsProps) => {
         </div>
       </section>
 
-      <BottomNav onHome={onHome} />
+      <BottomNav onHome={onHome} onProfile={onProfile} active={activeNav} />
     </div>
   )
 }

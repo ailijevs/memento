@@ -5,12 +5,23 @@ import EventsPage from './pages/Events'
 import LoginPage from './pages/Login'
 import RegisterPage from './pages/Register'
 import VerifyPage from './pages/Verify'
+import AccountPage from './pages/Account'
+import ResetPasswordPage from './pages/ResetPassword'
 import type { Event } from './types/event'
 
 const App = () => {
   const [view, setView] = useState<
-    'login' | 'register' | 'verify' | 'events' | 'connections'
+    | 'login'
+    | 'register'
+    | 'verify'
+    | 'events'
+    | 'connections'
+    | 'account'
+    | 'resetPassword'
   >('login')
+  const [postVerify, setPostVerify] = useState<'events' | 'resetPassword'>(
+    'events'
+  )
 
   useEffect(() => {
     const storedAuth = localStorage.getItem('memento_authed')
@@ -29,6 +40,11 @@ const App = () => {
     setView('connections')
   }
 
+  const startPasswordReset = () => {
+    setPostVerify('resetPassword')
+    setView('verify')
+  }
+
   if (view === 'login') {
     return (
       <LoginPage
@@ -42,13 +58,26 @@ const App = () => {
     return (
       <RegisterPage
         onGoToLogin={() => setView('login')}
-        onGoToVerify={() => setView('verify')}
+        onGoToVerify={() => {
+          setPostVerify('events')
+          setView('verify')
+        }}
       />
     )
   }
 
   if (view === 'verify') {
-    return <VerifyPage onVerified={handleAuthenticated} />
+    return (
+      <VerifyPage
+        onVerified={() => {
+          if (postVerify === 'resetPassword') {
+            setView('resetPassword')
+          } else {
+            handleAuthenticated()
+          }
+        }}
+      />
+    )
   }
 
   if (view === 'events') {
@@ -56,11 +85,38 @@ const App = () => {
       <EventsPage
         onSelectEvent={handleEventSelected}
         onHome={() => setView('events')}
+        onProfile={() => setView('account')}
+        activeNav="home"
       />
     )
   }
 
-  return <ConnectionsPage onHome={() => setView('events')} />
+  if (view === 'account') {
+    return (
+      <AccountPage
+        onHome={() => setView('events')}
+        onStartPasswordReset={startPasswordReset}
+      />
+    )
+  }
+
+  if (view === 'resetPassword') {
+    return (
+      <ResetPasswordPage
+        onResetComplete={() => {
+          setView('account')
+        }}
+      />
+    )
+  }
+
+  return (
+    <ConnectionsPage
+      onHome={() => setView('events')}
+      onProfile={() => setView('account')}
+      activeNav="home"
+    />
+  )
 }
 
 export default App

@@ -23,12 +23,17 @@
   background: transparent;
   border: none;
   cursor: pointer;
-  transition: transform 0.15s ease, color 0.2s ease;
+  transition: transform 0.15s ease, color 0.2s ease, opacity 0.2s ease;
 }
 
 .nav-item:hover {
   transform: translateY(-1px);
   color: #ffdca0;
+}
+
+.nav-item.active {
+  color: #ffdca0;
+  opacity: 1;
 }
 
 .nav-item svg {

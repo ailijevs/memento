@@ -2,23 +2,13 @@ import { useState } from 'react'
 import ProfileDetail from '../components/ProfileDetail'
 import BottomNav from '../components/BottomNav'
 import type { Connection } from '../types/connection'
+import { DiagonalDoubleArrowIcon } from '../components/icons'
 
-const DiagonalArrow = () => (
-  <svg
-    className="arrow-icon"
-    viewBox="0 0 24 24"
-    aria-hidden="true"
-    focusable="false"
-  >
-    <path
-      d="M6 18 11.5 12.5M12.5 11.5 18 6M14 6h4v4M6 14v4h4"
-      stroke="currentColor"
-      strokeWidth="2.2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-)
+type ConnectionsProps = {
+  onHome: () => void
+  onProfile: () => void
+  activeNav?: 'home' | 'favorites' | 'history' | 'profile'
+}
 
 const connections: Connection[] = [
   {
@@ -203,11 +193,11 @@ const connections: Connection[] = [
   },
 ]
 
-type ConnectionsProps = {
-  onHome: () => void
-}
-
-const ConnectionsPage = ({ onHome }: ConnectionsProps) => {
+const ConnectionsPage = ({
+  onHome,
+  onProfile,
+  activeNav = 'home',
+}: ConnectionsProps) => {
   const [selectedProfile, setSelectedProfile] = useState<Connection | null>(
     null
   )
@@ -231,9 +221,9 @@ const ConnectionsPage = ({ onHome }: ConnectionsProps) => {
             onClick={() => setSelectedProfile(connection)}
           >
             <div className="card-gradient">
-            <div className="card-body">
+              <div className="card-body">
               <div className="connection-cta" aria-hidden="true">
-                <DiagonalArrow />
+                <DiagonalDoubleArrowIcon />
               </div>
               <div className="avatar" aria-hidden="true">
                 <img
@@ -277,7 +267,7 @@ const ConnectionsPage = ({ onHome }: ConnectionsProps) => {
         />
       )}
 
-      <BottomNav onHome={onHome} />
+      <BottomNav onHome={onHome} onProfile={onProfile} active={activeNav} />
     </div>
   )
 }
