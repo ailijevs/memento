@@ -9,6 +9,7 @@ type AccountProps = {
   onStartPasswordReset: () => void
   onFavorites?: () => void
   onHistory?: () => void
+  onLogout: () => void
 }
 
 const AccountPage = ({
@@ -16,6 +17,7 @@ const AccountPage = ({
   onStartPasswordReset,
   onFavorites,
   onHistory,
+  onLogout,
 }: AccountProps) => {
   const [tab, setTab] = useState<'profile' | 'settings'>('profile')
   const isRegisteredWithEmail = true // TODO: drive from real auth source
@@ -167,6 +169,17 @@ const AccountPage = ({
             ) : (
               <p className="value">Managed by external provider</p>
             )}
+          </div>
+
+          <div className="settings-group">
+            <p className="label">Session</p>
+            <button
+              type="button"
+              className="primary-btn outline logout-btn"
+              onClick={onLogout}
+            >
+              Log out
+            </button>
           </div>
 
           <div className="settings-group">

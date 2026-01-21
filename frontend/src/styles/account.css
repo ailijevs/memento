@@ -170,6 +170,17 @@
   color: #f3ca89;
 }
 
+.logout-btn {
+  color: #ffb3b3;
+  border-color: rgba(255, 179, 179, 0.6);
+}
+
+.logout-btn:hover {
+  background: rgba(255, 179, 179, 0.08);
+  color: #ffffff;
+  border-color: rgba(255, 179, 179, 0.9);
+}
+
 .privacy-list {
   list-style: none;
   margin: 0;

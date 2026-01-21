@@ -39,6 +39,12 @@ const App = () => {
     setView('events')
   }
 
+  const handleLogout = () => {
+    localStorage.removeItem('memento_authed')
+    localStorage.removeItem('memento_last_event')
+    setView('login')
+  }
+
   const handleEventSelected = (event: Event) => {
     localStorage.setItem('memento_last_event', event.id)
     setView('connections')
@@ -104,6 +110,7 @@ const App = () => {
         onStartPasswordReset={startPasswordReset}
         onFavorites={() => setView('favorites')}
         onHistory={() => setView('history')}
+        onLogout={handleLogout}
       />
     )
   }
