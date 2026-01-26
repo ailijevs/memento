@@ -58,6 +58,7 @@ memento/
 ## Code Development & Review Policy
 - Each PR requires at least one reviewer who was not involved in writing the code.
 - Keep PRs small (ideally 200–300 lines of delta). If a feature grows larger, break it into vertical slices or scaffolding PRs.
+- A PR should not not contain more than one feature of code. Every team member needs to make at least 1-2 PR's per week signifying they have completed that weeks issues unless unforseen circumstances occur.
 - Tests (unit or integration) must cover new logic when feasible; if skipped, add a note explaining the follow-up.
 - Linting and type checks must pass locally before requesting review (`npm run lint`, `npm run typecheck` once those scripts exist).
 - Use meaningful commit messages tying work to tickets or user stories.
