@@ -1,0 +1,110 @@
+# LinkedIn Lookup URLs for Class List
+# Open each URL in Google, find the LinkedIn profile, and add the URL to classlist.json
+
+1. Ryken Adams-Barnes
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Ryken+Adams-Barnes%22+purdue
+
+2. Aryan Banerjee
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Aryan+Banerjee%22+purdue
+
+3. Kassandra Bankson
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Kassandra+Bankson%22+purdue
+
+4. Apostolos Cavounis
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Apostolos+Cavounis%22+purdue
+
+5. Daniel Chen
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Daniel+Chen%22+purdue+ECE
+
+6. Yu-Kuang Chen
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Yu-Kuang+Chen%22+purdue
+
+7. Simon Chou
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Simon+Chou%22+purdue
+
+8. Giovanni De Geronimo
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Giovanni+De+Geronimo%22+purdue
+
+9. Karthik Digavalli
+   https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Karthik+Digavalli%22+purdue
+
+10. Adrien Dubois (TA)
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Adrien+Dubois%22+purdue
+
+11. Stephen France (Instructor)
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Stephen+France%22+purdue
+
+12. Nathan Galinowski
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Nathan+Galinowski%22+purdue
+
+13. Aarushi Gupta (SI Tutor)
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Aarushi+Gupta%22+purdue
+
+14. Sasha Ilijevski
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Sasha+Ilijevski%22+purdue
+
+15. Jacob Jackson
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Jacob+Jackson%22+purdue+ECE
+
+16. Ryan Jordan
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Ryan+Jordan%22+purdue
+
+17. Mythrai Kapidi
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Mythrai+Kapidi%22+purdue
+
+18. Logan Kay
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Logan+Kay%22+purdue
+
+19. Josh Kirby
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Josh+Kirby%22+purdue
+
+20. Akash Kumar
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Akash+Kumar%22+purdue+ECE
+
+21. Ava Lyall
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Ava+Lyall%22+purdue
+
+22. Emerson Maddock
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Emerson+Maddock%22+purdue
+
+23. Aidan Mahaffey
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Aidan+Mahaffey%22+purdue
+
+24. Colin Mcgeary
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Colin+Mcgeary%22+purdue
+
+25. Noddie Mgbodille
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Noddie+Mgbodille%22+purdue
+
+26. Evan Osborne
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Evan+Osborne%22+purdue
+
+27. Will Ott
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Will+Ott%22+purdue
+
+28. Luca Ricci
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Luca+Ricci%22+purdue
+
+29. Trent Seaman
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Trent+Seaman%22+purdue
+
+30. Amartya Singh
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Amartya+Singh%22+purdue
+
+31. Aryan Srivastava
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Aryan+Srivastava%22+purdue
+
+32. Evan Stonestreet
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Evan+Stonestreet%22+purdue
+
+33. Eduard Tanase
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Eduard+Tanase%22+purdue
+
+34. Hilal Tasdemir
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Hilal+Tasdemir%22+purdue
+
+35. Rory Tippery
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Rory+Tippery%22+purdue
+
+36. Noah Wisniewski
+    https://www.google.com/search?q=site%3Alinkedin.com%2Fin+%22Noah+Wisniewski%22+purdue

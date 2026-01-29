@@ -214,3 +214,7 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# HAR files (contain sensitive session data)
+*.har
+data/har_files/
