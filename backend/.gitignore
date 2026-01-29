@@ -218,3 +218,7 @@ __marimo__/
 # HAR files (contain sensitive session data)
 *.har
 data/har_files/
+
+# Intermediate scraped/parsed data (regeneratable)
+data/parsed_profiles.json
+data/scraped_profiles_exa.json
