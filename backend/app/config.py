@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Application Settings
     app_name: str = "Memento API"
     debug: bool = False
+    
+    # External APIs (optional)
+    exa_api_key: str | None = None
 
     class Config:
         env_file = ".env"

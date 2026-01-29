@@ -134,10 +134,26 @@ def upload_photo(client: Client, local_path: Path, storage_path: str) -> str | N
 def create_profile(client: Client, user_id: str, person: dict, photo_url: str | None) -> bool:
     """Create a profile for a user."""
     try:
+        # Use LinkedIn headline if available, otherwise use role or default
+        headline = person.get("headline") or person.get("role") or "Student"
+        
+        # Build bio from experience if available
+        bio = None
+        if person.get("experience"):
+            exp_list = []
+            for exp in person["experience"][:3]:  # Top 3 experiences
+                title = exp.get("title", "")
+                company = exp.get("company", "")
+                if title and company:
+                    exp_list.append(f"{title} at {company}")
+            if exp_list:
+                bio = " | ".join(exp_list)
+        
         profile_data = {
             "user_id": user_id,
             "full_name": person["full_name"],
-            "headline": person.get("role", "Student"),
+            "headline": headline,
+            "bio": bio,
             "linkedin_url": person.get("linkedin_url"),
             "photo_path": photo_url,
             "major": "Electrical and Computer Engineering",  # Default for ECE class
