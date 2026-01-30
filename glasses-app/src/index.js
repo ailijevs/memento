@@ -12,7 +12,7 @@ class MementoApp extends AppServer {
   /**
    * Called when a user starts a session with the app
    */
-  protected async onSession(session, sessionId, userId) {
+  async onSession(session, sessionId, userId) {
     console.log(`New session started: ${sessionId} for user: ${userId}`);
     
     // Welcome message
