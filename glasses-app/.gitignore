@@ -1,0 +1,12 @@
+# Dependencies
+node_modules/
+
+# Environment (contains API keys)
+.env
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store

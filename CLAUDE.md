@@ -24,6 +24,10 @@
 
 ```
 memento-1/
+├── glasses-app/          # MentraOS smart glasses app (Node.js)
+│   ├── src/index.js      # Main app - voice commands, camera, backend calls
+│   ├── package.json      # Dependencies (@mentra/sdk)
+│   └── .env              # Mentra API key (gitignored)
 ├── backend/
 │   ├── app/
 │   │   ├── api/              # FastAPI routers
@@ -154,7 +158,15 @@ SUPABASE_JWT_SECRET=your-jwt-secret
 
 # Optional
 EXA_API_KEY=xxx  # For LinkedIn scraping scripts
+MENTRA_API_KEY=xxx  # For MentraOS glasses app
 DEBUG=false
+```
+
+```bash
+# glasses-app/.env
+MENTRA_API_KEY=your_mentra_api_key
+BACKEND_URL=http://localhost:8000
+PORT=3000
 ```
 
 **Never commit `.env`** - it contains secrets. Use `.env.example` as template.
@@ -224,6 +236,23 @@ python scripts/scrape_linkedin_exa.py --update-classlist
 - Calls Exa.ai to get profile content
 - Extracts headline, experience, education
 - Updates `classlist.json` with scraped data
+
+## Glasses App (MentraOS)
+
+```bash
+cd glasses-app
+npm install    # First time only
+npm start      # Run the app
+npm run dev    # Run with auto-reload
+```
+
+The glasses app connects to MentraOS smart glasses and:
+1. Listens for "identify" voice command
+2. Captures photo from glasses camera
+3. Sends to backend `/recognize` endpoint
+4. Displays matching profile on glasses display
+
+**Requires:** Backend running + AWS Rekognition configured
 
 ## Current Status
 

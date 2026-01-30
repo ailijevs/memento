@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     
     # External APIs (optional)
     exa_api_key: str | None = None
+    mentra_api_key: str | None = None
 
     class Config:
         env_file = ".env"
