@@ -7,6 +7,7 @@ This API provides endpoints for:
 - Event memberships (joining/leaving events)
 - Consent management for privacy controls
 """
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI

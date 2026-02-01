@@ -1,4 +1,5 @@
 """API endpoints for user profiles."""
+
 from typing import Annotated
 from uuid import UUID
 

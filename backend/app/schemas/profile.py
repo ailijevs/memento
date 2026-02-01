@@ -1,4 +1,5 @@
 """Pydantic schemas for user profiles."""
+
 from datetime import datetime
 from uuid import UUID
 

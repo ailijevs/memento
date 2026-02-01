@@ -1,4 +1,5 @@
 """Data Access Layer for event memberships."""
+
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -72,11 +73,7 @@ class MembershipDAL(BaseDAL):
             "role": data.role.value,
         }
 
-        response = (
-            self.client.table(self.TABLE)
-            .insert(insert_data)
-            .execute()
-        )
+        response = self.client.table(self.TABLE).insert(insert_data).execute()
 
         return MembershipResponse(**response.data[0])
 

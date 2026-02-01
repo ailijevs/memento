@@ -1,4 +1,5 @@
 """API endpoints for event memberships."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -18,16 +19,14 @@ router = APIRouter(prefix="/memberships", tags=["memberships"])
 
 
 def get_membership_dal(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)]
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> MembershipDAL:
     """Dependency to get MembershipDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return MembershipDAL(client)
 
 
-def get_consent_dal(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)]
-) -> ConsentDAL:
+def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> ConsentDAL:
     """Dependency to get ConsentDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ConsentDAL(client)

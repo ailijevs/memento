@@ -1,4 +1,5 @@
 """Data Access Layer for events."""
+
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
@@ -74,11 +75,7 @@ class EventDAL(BaseDAL):
         if insert_data.get("ends_at"):
             insert_data["ends_at"] = insert_data["ends_at"].isoformat()
 
-        response = (
-            self.client.table(self.TABLE)
-            .insert(insert_data)
-            .execute()
-        )
+        response = self.client.table(self.TABLE).insert(insert_data).execute()
 
         return EventResponse(**response.data[0])
 

@@ -1,4 +1,5 @@
 """Base Data Access Layer with common functionality."""
+
 from supabase import Client
 
 

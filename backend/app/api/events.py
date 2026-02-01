@@ -1,4 +1,5 @@
 """API endpoints for events."""
+
 from typing import Annotated
 from uuid import UUID
 

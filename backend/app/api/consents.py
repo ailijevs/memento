@@ -1,4 +1,5 @@
 """API endpoints for event consents."""
+
 from typing import Annotated
 from uuid import UUID
 
@@ -12,9 +13,7 @@ from app.schemas import ConsentResponse, ConsentUpdate
 router = APIRouter(prefix="/consents", tags=["consents"])
 
 
-def get_consent_dal(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)]
-) -> ConsentDAL:
+def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> ConsentDAL:
     """Dependency to get ConsentDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ConsentDAL(client)

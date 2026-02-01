@@ -1,4 +1,5 @@
 """Data Access Layer for user profiles."""
+
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
@@ -45,11 +46,7 @@ class ProfileDAL(BaseDAL):
             **data.model_dump(exclude_none=True),
         }
 
-        response = (
-            self.client.table(self.TABLE)
-            .insert(insert_data)
-            .execute()
-        )
+        response = self.client.table(self.TABLE).insert(insert_data).execute()
 
         return ProfileResponse(**response.data[0])
 
@@ -65,10 +62,7 @@ class ProfileDAL(BaseDAL):
             return await self.get_by_user_id(user_id)
 
         response = (
-            self.client.table(self.TABLE)
-            .update(update_data)
-            .eq("user_id", str(user_id))
-            .execute()
+            self.client.table(self.TABLE).update(update_data).eq("user_id", str(user_id)).execute()
         )
 
         if response.data:
@@ -79,12 +73,7 @@ class ProfileDAL(BaseDAL):
         """
         Delete a user's profile.
         """
-        response = (
-            self.client.table(self.TABLE)
-            .delete()
-            .eq("user_id", str(user_id))
-            .execute()
-        )
+        response = self.client.table(self.TABLE).delete().eq("user_id", str(user_id)).execute()
 
         return len(response.data) > 0
 
@@ -94,9 +83,6 @@ class ProfileDAL(BaseDAL):
         Uses the get_event_directory SQL function.
         Only returns profiles where user has consented to display.
         """
-        response = self.client.rpc(
-            "get_event_directory",
-            {"p_event_id": str(event_id)}
-        ).execute()
+        response = self.client.rpc("get_event_directory", {"p_event_id": str(event_id)}).execute()
 
         return [ProfileDirectoryEntry(**row) for row in response.data]

@@ -1,4 +1,5 @@
 """Pydantic schemas for event consents."""
+
 from datetime import datetime
 from uuid import UUID
 

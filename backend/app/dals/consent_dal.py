@@ -1,4 +1,5 @@
 """Data Access Layer for event consents."""
+
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -36,12 +37,7 @@ class ConsentDAL(BaseDAL):
         """
         Get all consent settings for a user across events.
         """
-        response = (
-            self.client.table(self.TABLE)
-            .select("*")
-            .eq("user_id", str(user_id))
-            .execute()
-        )
+        response = self.client.table(self.TABLE).select("*").eq("user_id", str(user_id)).execute()
 
         return [ConsentResponse(**c) for c in response.data]
 
@@ -60,11 +56,7 @@ class ConsentDAL(BaseDAL):
             "consented_at": now if (data.allow_profile_display or data.allow_recognition) else None,
         }
 
-        response = (
-            self.client.table(self.TABLE)
-            .insert(insert_data)
-            .execute()
-        )
+        response = self.client.table(self.TABLE).insert(insert_data).execute()
 
         return ConsentResponse(**response.data[0])
 
@@ -136,11 +128,13 @@ class ConsentDAL(BaseDAL):
 
         response = (
             self.client.table(self.TABLE)
-            .update({
-                "allow_profile_display": False,
-                "allow_recognition": False,
-                "revoked_at": now,
-            })
+            .update(
+                {
+                    "allow_profile_display": False,
+                    "allow_recognition": False,
+                    "revoked_at": now,
+                }
+            )
             .eq("event_id", str(event_id))
             .eq("user_id", str(user_id))
             .execute()

@@ -1,6 +1,7 @@
 """
 Supabase client initialization and dependency injection.
 """
+
 from functools import lru_cache
 
 from app.config import get_settings
