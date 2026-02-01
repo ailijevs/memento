@@ -12,13 +12,13 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.config import get_settings
 from app.api import (
-    profiles_router,
+    consents_router,
     events_router,
     memberships_router,
-    consents_router,
+    profiles_router,
 )
+from app.config import get_settings
 
 
 @asynccontextmanager
@@ -38,24 +38,21 @@ def create_app() -> FastAPI:
 
     app = FastAPI(
         title=settings.app_name,
-        description="""
-        Memento API for event-scoped networking with privacy controls.
-        
-        ## Features
-        - **Profiles**: Manage user profiles with customizable visibility
-        - **Events**: Create and manage networking events
-        - **Memberships**: Join/leave events with role management
-        - **Consents**: Fine-grained privacy controls per event
-        
-        ## Authentication
-        All endpoints require a valid Supabase JWT in the Authorization header.
-        Use `Bearer <token>` format.
-        
-        ## Privacy
-        User profiles are only visible to other users who:
-        1. Share at least one event membership
-        2. Have consent from the profile owner for that event
-        """,
+        description=(
+            "Memento API for event-scoped networking with privacy controls.\n\n"
+            "## Features\n"
+            "- **Profiles**: Manage user profiles with customizable visibility\n"
+            "- **Events**: Create and manage networking events\n"
+            "- **Memberships**: Join/leave events with role management\n"
+            "- **Consents**: Fine-grained privacy controls per event\n\n"
+            "## Authentication\n"
+            "All endpoints require a valid Supabase JWT in the Authorization header. "
+            "Use `Bearer <token>` format.\n\n"
+            "## Privacy\n"
+            "User profiles are only visible to other users who:\n"
+            "1. Share at least one event membership\n"
+            "2. Have consent from the profile owner for that event"
+        ),
         version="1.0.0",
         lifespan=lifespan,
     )
