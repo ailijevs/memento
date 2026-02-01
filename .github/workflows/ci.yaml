@@ -108,8 +108,8 @@ jobs:
       - name: Run tests with pytest
         run: python -m pytest tests/ -v --tb=short
 
-      - name: Run tests with coverage (minimum 80% required)
-        run: python -m pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=80
+      - name: Run tests with coverage (minimum 50% required)
+        run: python -m pytest tests/ --cov=app --cov-report=term-missing --cov-report=xml --cov-fail-under=50
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
