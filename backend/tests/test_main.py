@@ -12,8 +12,19 @@ def client():
     return TestClient(app)
 
 
-def test_root_endpoint_returns_greeting(client):
-    """Root endpoint should return the welcome string."""
+def test_root_endpoint_returns_status(client):
+    """Root endpoint should return status ok."""
     response = client.get("/")
     assert response.status_code == 200
-    assert response.json() == "Hello world, welcome to Memento"
+    data = response.json()
+    assert data["status"] == "ok"
+    assert "service" in data
+
+
+def test_health_endpoint(client):
+    """Health endpoint should return healthy status."""
+    response = client.get("/health")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "healthy"
+    assert "version" in data
