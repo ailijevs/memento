@@ -1,8 +1,6 @@
 """Data Access Layer for user profiles."""
 from uuid import UUID
 
-from supabase import Client
-
 from app.dals.base_dal import BaseDAL
 from app.schemas import (
     ProfileCreate,
@@ -10,6 +8,7 @@ from app.schemas import (
     ProfileResponse,
     ProfileUpdate,
 )
+from supabase import Client
 
 
 class ProfileDAL(BaseDAL):

@@ -2,10 +2,9 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from supabase import Client
-
 from app.dals.base_dal import BaseDAL
 from app.schemas import MembershipCreate, MembershipResponse, MembershipUpdate
+from supabase import Client
 
 
 class MembershipDAL(BaseDAL):

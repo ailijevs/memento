@@ -1,10 +1,9 @@
 """Data Access Layer for events."""
 from uuid import UUID
 
-from supabase import Client
-
 from app.dals.base_dal import BaseDAL
 from app.schemas import EventCreate, EventResponse, EventUpdate
+from supabase import Client
 
 
 class EventDAL(BaseDAL):

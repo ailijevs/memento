@@ -2,9 +2,9 @@
 Supabase client initialization and dependency injection.
 """
 from functools import lru_cache
-from supabase import create_client, Client
 
 from app.config import get_settings
+from supabase import Client, create_client
 
 
 @lru_cache

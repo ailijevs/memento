@@ -2,10 +2,9 @@
 from datetime import datetime, timezone
 from uuid import UUID
 
-from supabase import Client
-
 from app.dals.base_dal import BaseDAL
 from app.schemas import ConsentCreate, ConsentResponse, ConsentUpdate
+from supabase import Client
 
 
 class ConsentDAL(BaseDAL):
