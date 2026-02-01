@@ -214,3 +214,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# HAR files (contain sensitive session data)
+*.har
+data/har_files/
+
+# Intermediate scraped/parsed data (regeneratable)
+data/parsed_profiles.json
+data/scraped_profiles_exa.json

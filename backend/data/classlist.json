@@ -1,0 +1,495 @@
+[
+  {
+    "full_name": "Ryken Adams-Barnes",
+    "email": "radamsba@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/rykenadams",
+    "registered": false,
+    "photo_path": "profile_images/Ryken Adams-Barnes.jpg"
+  },
+  {
+    "full_name": "Aryan Banerjee",
+    "email": "banerj61@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/aryan-banerjee-a72abb216",
+    "registered": false,
+    "photo_path": "profile_images/Aryan Banerjee.jpg",
+    "headline": "B.S Computer Engineering at Purdue University, West Lafayette",
+    "experience": [
+      {
+        "title": "Research Intern",
+        "company": "Actualization AI at Actualization.AI (TBW X25)"
+      },
+      {
+        "title": "Intern",
+        "company": "Actualization.AI"
+      },
+      {
+        "title": "Mathematics Tutor",
+        "company": "Mathnasium - The Math Learning Center"
+      }
+    ],
+    "education": [
+      {
+        "school": "Purdue University, West Lafayette",
+        "degree": null
+      },
+      {
+        "school": "Purdue University pursuing BS in Computer Engineering with a\u2026",
+        "degree": "BS in Computer Engineering with a\u2026"
+      },
+      {
+        "school": "work by University of South Florida's university communications and marketing department on\u2026",
+        "degree": "marketing department on\u2026"
+      }
+    ]
+  },
+  {
+    "full_name": "Kassandra Bankson",
+    "email": "bankson@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/kassandra-bankson",
+    "registered": false,
+    "photo_path": "profile_images/Kassandra Bankson.jpg"
+  },
+  {
+    "full_name": "Apostolos Cavounis",
+    "email": "acavouni@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Daniel Chen",
+    "email": "chen4186@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/danielchen11703",
+    "registered": false,
+    "photo_path": "profile_images/Daniel Chen.jpg"
+  },
+  {
+    "full_name": "Yu-Kuang Chen",
+    "email": "chen5292@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/danielchen11703",
+    "registered": false
+  },
+  {
+    "full_name": "Simon Chou",
+    "email": "chou170@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Giovanni De Geronimo",
+    "email": "gdegeron@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Karthik Digavalli",
+    "email": "kdigava@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Adrien Dubois",
+    "email": "dubois6@purdue.edu",
+    "role": "Teaching Assistant",
+    "linkedin_url": "https://linkedin.com/in/adrien--dubois",
+    "registered": false,
+    "photo_path": "profile_images/Adrien Dubois.jpg"
+  },
+  {
+    "full_name": "Stephen France",
+    "email": "sfrance1@purdue.edu",
+    "role": "Instructor",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Nathan Galinowski",
+    "email": "ngalinow@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/nathan-galinowski-4b38b7386",
+    "registered": false,
+    "photo_path": "profile_images/Nathan Galinowski.jpg"
+  },
+  {
+    "full_name": "Aarushi Gupta",
+    "email": "gupta806@purdue.edu",
+    "role": "SI Tutor",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Sasha Ilijevski",
+    "email": "ailijevs@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Jacob Jackson",
+    "email": "jacks921@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Ryan Jordan",
+    "email": "jorda227@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Mythrai Kapidi",
+    "email": "mkapidi@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/mythrai-kapidi-r3m",
+    "registered": false,
+    "photo_path": "profile_images/Mythrai Kapidi.jpg"
+  },
+  {
+    "full_name": "Logan Kay",
+    "email": "kay21@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/logan-kay29",
+    "registered": false,
+    "photo_path": "profile_images/Logan Kay.jpg"
+  },
+  {
+    "full_name": "Josh Kirby",
+    "email": "kirby39@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Akash Kumar",
+    "email": "kumar556@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/akash-kumar-53494924b",
+    "registered": false,
+    "photo_path": "profile_images/Akash Kumar.jpg",
+    "headline": "Prev @ Amazon Robotics | Computer Engineering @ Purdue University with a concentration in AI",
+    "company": "string",
+    "education": [
+      {
+        "school": "Purdue University College of Engineering",
+        "degree": null
+      }
+    ],
+    "experience": [
+      {
+        "title": "Undergraduate Teaching Assistant",
+        "company": "Purdue University College of Engineering"
+      },
+      {
+        "title": "Formula SAE Electronics Subteam",
+        "company": "Purdue Formula SAE"
+      },
+      {
+        "title": "SDE Co-op",
+        "company": "Amazon Fulfillment Technologies & Robotics"
+      }
+    ]
+  },
+  {
+    "full_name": "Ava Lyall",
+    "email": "alyall@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/ava-lyall-51202624a",
+    "registered": false,
+    "photo_path": "profile_images/Ava Lyall.jpg",
+    "headline": "Honors Computer Engineering Student at Purdue University",
+    "company": "string",
+    "education": [
+      {
+        "school": "Purdue University",
+        "degree": null
+      },
+      {
+        "school": "Purdue University Elmore Family School of Electrical and Computer Engineering",
+        "degree": null
+      }
+    ],
+    "experience": [
+      {
+        "title": "Undergraduate Teaching Assistant",
+        "company": "Purdue University Elmore Family School of Electrical and Computer Engineering"
+      },
+      {
+        "title": "Undergraduate Teaching Assistant for ECE 30864: Software Engineering Tools",
+        "company": "Purdue University. Supported students in mastering industry-standard tools and practices including version control, build automation, testing frameworks, and continuous integration. Responsibilities included assisting in lab, holding office hours, grading assignments, and helping students strengthen their software engineering skills."
+      },
+      {
+        "title": "Undergraduate Researcher",
+        "company": "Purdue University"
+      },
+      {
+        "title": "Research project through the Department of Computer Science",
+        "company": "Purdue University, aimed to develop software that detects plagiarism of source code by computing a similarity score between source code files. This software is being developed for implementation in various computer science courses at Purdue University, with the first being CS 25100 (Data Structures for CS) and CS 25300 (Data Structures for DS). Working in a team of five undergraduate researchers under Dr. Andres Bejarano, Assistant Professor of Practice for the Department of Computer Science. Show less"
+      },
+      {
+        "title": "Sales Associate",
+        "company": "Old Navy"
+      }
+    ]
+  },
+  {
+    "full_name": "Emerson Maddock",
+    "email": "emaddock@purdue.edu",
+    "linkedin_url": null,
+    "registered": false,
+    "photo_path": "profile_images/Emerson Maddock.jpg"
+  },
+  {
+    "full_name": "Aidan Mahaffey",
+    "email": "mahaffea@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Colin Mcgeary",
+    "email": "cmcgeary@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/colin-mcgeary-78279a24a",
+    "registered": false,
+    "photo_path": "profile_images/Colin Mcgeary.jpg",
+    "headline": "Student at Purdue University",
+    "company": "string",
+    "education": [
+      {
+        "school": "Purdue University",
+        "degree": null
+      },
+      {
+        "school": "Purdue University currently working at my internship at Hemlock Semiconductors",
+        "degree": null
+      }
+    ],
+    "experience": [
+      {
+        "title": "Information Technology Technician",
+        "company": "Hemlock Semiconductor"
+      },
+      {
+        "title": "Operations Technology Engineer",
+        "company": "SunChemical"
+      },
+      {
+        "title": "Algorithm Developer",
+        "company": "Purdue Robomasters"
+      },
+      {
+        "title": "High School Diploma",
+        "company": "Forest Lake Area Highschool"
+      },
+      {
+        "title": "\ud83d\udee9\ufe0f Soaring to New Heights: Flight Tests Day",
+        "company": "SA\u00b2TP! \u2708\ufe0f"
+      }
+    ],
+    "about": "I'm a student at Purdue University currently working at my internship at Hemlock Semiconductors"
+  },
+  {
+    "full_name": "Noddie Mgbodille",
+    "email": "nmgbodil@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/noddie-jm",
+    "photo_path": "profile_images/nmgbodil.jpg",
+    "registered": false,
+    "headline": "Fellow at ColorStack",
+    "experience": [
+      {
+        "title": "Fellow",
+        "company": "ColorStack"
+      },
+      {
+        "title": "Undergraduate Teaching Assistant",
+        "company": "Purdue University College of Science"
+      },
+      {
+        "title": "Software Engineer Intern",
+        "company": "Goldman Sachs"
+      },
+      {
+        "title": "I\u2019m happy to share that I\u2019ve been selected to be an ASML Campus Ambassador",
+        "company": "Purdue University!"
+      },
+      {
+        "title": "Many people ask me why I moved from being a quant",
+        "company": "hedge funds and high frequency trading firms to becoming a product manager."
+      }
+    ],
+    "education": [
+      {
+        "school": "Purdue University College of Science",
+        "degree": null
+      },
+      {
+        "school": "Purdue University College of Engineering",
+        "degree": null
+      },
+      {
+        "school": "Purdue University",
+        "degree": "Bachelor's degree"
+      }
+    ]
+  },
+  {
+    "full_name": "Evan Osborne",
+    "email": "osbor105@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/evanosborne1",
+    "registered": false,
+    "photo_path": "profile_images/Evan Osborne.jpg",
+    "headline": "Head of Recruiting @ VulcanForms",
+    "company": "string",
+    "education": [
+      {
+        "school": "University of Massachusetts Amherst",
+        "degree": "Massachusetts Amherst"
+      },
+      {
+        "school": "University of Massachusetts, Amherst",
+        "degree": "Bachelor of Arts (B.A.)"
+      }
+    ],
+    "experience": [
+      {
+        "title": "Manager Of Talent Acquisition",
+        "company": "VulcanForms Inc."
+      },
+      {
+        "title": "Technical Recruiting Lead, AR VR Software Engineering",
+        "company": "Meta"
+      },
+      {
+        "title": "Senior Recruiter",
+        "company": "Snyk"
+      },
+      {
+        "title": "Human Resources Intern",
+        "company": "MassMutual Financial Group"
+      },
+      {
+        "title": "Operations Intern",
+        "company": "MassMutual Financial Group"
+      }
+    ]
+  },
+  {
+    "full_name": "Will Ott",
+    "email": "ott29@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/william-ott-438026245",
+    "registered": false,
+    "photo_path": "profile_images/Will Ott.jpg",
+    "headline": "Student at Purdue University",
+    "experience": [
+      {
+        "title": "Senior Specialist Miscellaneous",
+        "company": "Whirlpool Corporation"
+      }
+    ],
+    "education": [
+      {
+        "school": "Purdue University",
+        "degree": null
+      }
+    ]
+  },
+  {
+    "full_name": "Luca Ricci",
+    "email": "riccil@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Trent Seaman",
+    "email": "seaman7@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Amartya Singh",
+    "email": "singh989@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/amartyasingh27",
+    "registered": false,
+    "photo_path": "profile_images/Amartya Singh.jpg",
+    "headline": "Computer Engineering Student | Seeking Summer 2025 Internship/Co-op | Passionate about Manufacturing, Program Management, Data Analytics | May 2026 Graduation",
+    "company": "string",
+    "education": [
+      {
+        "school": "string"
+      }
+    ],
+    "experience": [
+      {
+        "company": "string"
+      }
+    ]
+  },
+  {
+    "full_name": "Aryan Srivastava",
+    "email": "sriva115@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/aryansrivastava0208",
+    "registered": false,
+    "photo_path": "profile_images/Aryan Srivastava.jpg",
+    "headline": "CompE @ Purdue | Claude Builder Ambassador @ Anthropic | Prev @ PwC, Rolls Royce, Protium",
+    "company": "string",
+    "education": [
+      {
+        "school": "Purdue University Elmore Family School of Electrical and Computer Engineering",
+        "degree": null
+      },
+      {
+        "school": "Purdue University College of Engineering",
+        "degree": "Bachelor of Engineering - BE"
+      }
+    ],
+    "experience": [
+      {
+        "title": "Claude Builder Ambassador",
+        "company": "Anthropic"
+      },
+      {
+        "title": "Undergraduate Teaching Assistant",
+        "company": "Purdue University Elmore Family School of Electrical and Computer Engineering"
+      },
+      {
+        "title": "Technology Consulting Intern",
+        "company": "PwC"
+      }
+    ]
+  },
+  {
+    "full_name": "Evan Stonestreet",
+    "email": "estonest@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/evanstonestreet",
+    "registered": false,
+    "photo_path": "profile_images/Evan Stonestreet.jpg",
+    "headline": "Computer Engineering @ Purdue University | Tech Lead @ Barrelsense | Software Engineer @ Aerovy",
+    "company": "string",
+    "education": [
+      {
+        "school": "string"
+      }
+    ],
+    "experience": [
+      {
+        "company": "string"
+      }
+    ]
+  },
+  {
+    "full_name": "Eduard Tanase",
+    "email": "etanase@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/eduard-tanase",
+    "registered": false,
+    "photo_path": "profile_images/Eduard Tanase.jpg"
+  },
+  {
+    "full_name": "Hilal Tasdemir",
+    "email": "htasdem@purdue.edu",
+    "linkedin_url": "https://linkedin.com/in/hilalbtasdemir",
+    "registered": false,
+    "photo_path": "profile_images/Hilal Tasdemir.jpg"
+  },
+  {
+    "full_name": "Rory Tippery",
+    "email": "rtipper@purdue.edu",
+    "linkedin_url": null,
+    "registered": false
+  },
+  {
+    "full_name": "Noah Wisniewski",
+    "email": null,
+    "linkedin_url": null,
+    "registered": false
+  }
+]
