@@ -4,14 +4,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth import get_current_user, CurrentUser
+from app.auth import CurrentUser, get_current_user
 from app.db import get_supabase_client
-from app.dals import MembershipDAL, ConsentDAL
+from app.dals import ConsentDAL, MembershipDAL
 from app.schemas import (
-    MembershipCreate,
-    MembershipUpdate,
-    MembershipResponse,
     ConsentCreate,
+    MembershipCreate,
+    MembershipResponse,
+    MembershipUpdate,
 )
 
 router = APIRouter(prefix="/memberships", tags=["memberships"])

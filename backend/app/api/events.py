@@ -4,10 +4,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth import get_current_user, CurrentUser
+from app.auth import CurrentUser, get_current_user
 from app.db import get_supabase_client
 from app.dals import EventDAL
-from app.schemas import EventCreate, EventUpdate, EventResponse
+from app.schemas import EventCreate, EventResponse, EventUpdate
 
 router = APIRouter(prefix="/events", tags=["events"])
 

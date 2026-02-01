@@ -4,7 +4,12 @@ from uuid import UUID
 from supabase import Client
 
 from app.dals.base_dal import BaseDAL
-from app.schemas import ProfileCreate, ProfileUpdate, ProfileResponse, ProfileDirectoryEntry
+from app.schemas import (
+    ProfileCreate,
+    ProfileDirectoryEntry,
+    ProfileResponse,
+    ProfileUpdate,
+)
 
 
 class ProfileDAL(BaseDAL):

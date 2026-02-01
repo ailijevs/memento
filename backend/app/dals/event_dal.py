@@ -4,7 +4,7 @@ from uuid import UUID
 from supabase import Client
 
 from app.dals.base_dal import BaseDAL
-from app.schemas import EventCreate, EventUpdate, EventResponse
+from app.schemas import EventCreate, EventResponse, EventUpdate
 
 
 class EventDAL(BaseDAL):

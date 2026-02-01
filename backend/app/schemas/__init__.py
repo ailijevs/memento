@@ -1,44 +1,44 @@
 """Pydantic schemas for request/response validation."""
-from .profile import (
-    ProfileCreate,
-    ProfileUpdate,
-    ProfileResponse,
-    ProfileDirectoryEntry,
+from .consent import (
+    ConsentCreate,
+    ConsentResponse,
+    ConsentUpdate,
 )
 from .event import (
     EventCreate,
-    EventUpdate,
     EventResponse,
+    EventUpdate,
 )
 from .membership import (
     MembershipCreate,
-    MembershipUpdate,
     MembershipResponse,
     MembershipRole,
+    MembershipUpdate,
 )
-from .consent import (
-    ConsentCreate,
-    ConsentUpdate,
-    ConsentResponse,
+from .profile import (
+    ProfileCreate,
+    ProfileDirectoryEntry,
+    ProfileResponse,
+    ProfileUpdate,
 )
 
 __all__ = [
-    # Profile
-    "ProfileCreate",
-    "ProfileUpdate",
-    "ProfileResponse",
-    "ProfileDirectoryEntry",
-    # Event
-    "EventCreate",
-    "EventUpdate",
-    "EventResponse",
-    # Membership
-    "MembershipCreate",
-    "MembershipUpdate",
-    "MembershipResponse",
-    "MembershipRole",
     # Consent
     "ConsentCreate",
-    "ConsentUpdate",
     "ConsentResponse",
+    "ConsentUpdate",
+    # Event
+    "EventCreate",
+    "EventResponse",
+    "EventUpdate",
+    # Membership
+    "MembershipCreate",
+    "MembershipResponse",
+    "MembershipRole",
+    "MembershipUpdate",
+    # Profile
+    "ProfileCreate",
+    "ProfileDirectoryEntry",
+    "ProfileResponse",
+    "ProfileUpdate",
 ]

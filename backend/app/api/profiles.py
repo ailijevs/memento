@@ -4,14 +4,14 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth import get_current_user, CurrentUser
+from app.auth import CurrentUser, get_current_user
 from app.db import get_supabase_client
 from app.dals import ProfileDAL
 from app.schemas import (
     ProfileCreate,
-    ProfileUpdate,
-    ProfileResponse,
     ProfileDirectoryEntry,
+    ProfileResponse,
+    ProfileUpdate,
 )
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])

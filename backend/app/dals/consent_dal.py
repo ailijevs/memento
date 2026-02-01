@@ -5,7 +5,7 @@ from uuid import UUID
 from supabase import Client
 
 from app.dals.base_dal import BaseDAL
-from app.schemas import ConsentCreate, ConsentUpdate, ConsentResponse
+from app.schemas import ConsentCreate, ConsentResponse, ConsentUpdate
 
 
 class ConsentDAL(BaseDAL):

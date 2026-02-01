@@ -5,7 +5,7 @@ from uuid import UUID
 from supabase import Client
 
 from app.dals.base_dal import BaseDAL
-from app.schemas import MembershipCreate, MembershipUpdate, MembershipResponse
+from app.schemas import MembershipCreate, MembershipResponse, MembershipUpdate
 
 
 class MembershipDAL(BaseDAL):
