@@ -12,6 +12,8 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from app.auth.dependencies import CurrentUser, get_current_user, verify_jwt
 from app.auth.schemas import (
     AuthResponse,
+    OAuthCallbackRequest,
+    OAuthUrlResponse,
     SignInRequest,
     SignUpRequest,
     TokenVerifyRequest,
@@ -171,4 +173,140 @@ async def signin(data: SignInRequest) -> AuthResponse:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Sign in failed: {str(e)}",
+        )
+
+
+# =============================================================================
+# OAuth Endpoints (Google & Apple)
+# =============================================================================
+
+import base64
+import hashlib
+import secrets
+from urllib.parse import urlencode
+
+SUPPORTED_OAUTH_PROVIDERS = {"google", "apple"}
+
+
+def generate_pkce_pair() -> tuple[str, str]:
+    """Generate PKCE code_verifier and code_challenge pair."""
+    # Generate a random code_verifier (43-128 characters)
+    code_verifier = secrets.token_urlsafe(32)
+
+    # Create code_challenge using S256 method
+    code_challenge_digest = hashlib.sha256(code_verifier.encode()).digest()
+    code_challenge = base64.urlsafe_b64encode(code_challenge_digest).rstrip(b"=").decode()
+
+    return code_verifier, code_challenge
+
+
+@router.get("/oauth/{provider}", response_model=OAuthUrlResponse)
+async def get_oauth_url(
+    provider: str,
+    redirect_to: str | None = None,
+) -> OAuthUrlResponse:
+    """
+    Get the OAuth authorization URL for the specified provider.
+    Redirect the user to this URL to start the OAuth flow.
+
+    IMPORTANT: Save the returned code_verifier - you must send it back
+    when calling /oauth/callback with the authorization code.
+
+    Supported providers: google, apple
+
+    Args:
+        provider: The OAuth provider (google or apple)
+        redirect_to: Optional URL to redirect to after successful auth.
+    """
+    provider_lower = provider.lower()
+    if provider_lower not in SUPPORTED_OAUTH_PROVIDERS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported provider: {provider}. Supported: {', '.join(SUPPORTED_OAUTH_PROVIDERS)}",
+        )
+
+    settings = get_settings()
+
+    try:
+        # Generate PKCE pair
+        code_verifier, code_challenge = generate_pkce_pair()
+
+        # Build the OAuth URL manually to include our PKCE challenge
+        params = {
+            "provider": provider_lower,
+            "code_challenge": code_challenge,
+            "code_challenge_method": "s256",
+        }
+        if redirect_to:
+            params["redirect_to"] = redirect_to
+
+        oauth_url = f"{settings.supabase_url}/auth/v1/authorize?{urlencode(params)}"
+
+        return OAuthUrlResponse(
+            url=oauth_url,
+            provider=provider_lower,
+            code_verifier=code_verifier,
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"OAuth initialization failed: {str(e)}",
+        )
+
+
+@router.post("/oauth/callback", response_model=AuthResponse)
+async def oauth_callback(data: OAuthCallbackRequest) -> AuthResponse:
+    """
+    Exchange OAuth authorization code for session tokens.
+    Call this after the user is redirected back from the provider with a code.
+
+    You must provide the code_verifier that was returned from the /oauth/{provider} endpoint.
+
+    Works for both Google and Apple OAuth.
+    """
+    import httpx
+
+    settings = get_settings()
+
+    try:
+        # Exchange code for session using Supabase's token endpoint
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{settings.supabase_url}/auth/v1/token?grant_type=pkce",
+                json={
+                    "auth_code": data.code,
+                    "code_verifier": data.code_verifier,
+                },
+                headers={
+                    "apikey": settings.supabase_anon_key,
+                    "Content-Type": "application/json",
+                },
+            )
+
+        if response.status_code != 200:
+            error_detail = response.json().get("error_description", response.text)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Failed to exchange code for session: {error_detail}",
+            )
+
+        token_data = response.json()
+
+        return AuthResponse(
+            user=UserInfo(
+                id=UUID(token_data["user"]["id"]),
+                email=token_data["user"].get("email"),
+            ),
+            access_token=token_data["access_token"],
+            refresh_token=token_data["refresh_token"],
+            expires_in=token_data.get("expires_in", 3600),
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"OAuth callback failed: {str(e)}",
         )

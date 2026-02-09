@@ -4,6 +4,8 @@ from .dependencies import CurrentUser, get_current_user, get_current_user_option
 from .router import router as auth_router
 from .schemas import (
     AuthResponse,
+    OAuthCallbackRequest,
+    OAuthUrlResponse,
     SignInRequest,
     SignUpRequest,
     TokenVerifyRequest,
@@ -14,6 +16,8 @@ from .schemas import (
 __all__ = [
     "AuthResponse",
     "CurrentUser",
+    "OAuthCallbackRequest",
+    "OAuthUrlResponse",
     "SignInRequest",
     "SignUpRequest",
     "auth_router",

@@ -52,3 +52,18 @@ class TokenVerifyResponse(BaseModel):
 
     valid: bool
     user: UserInfo | None = None
+
+
+class OAuthUrlResponse(BaseModel):
+    """Response containing the OAuth authorization URL and code verifier for PKCE."""
+
+    url: str
+    provider: str
+    code_verifier: str  # Client must store this and send it back with the code
+
+
+class OAuthCallbackRequest(BaseModel):
+    """Request body for OAuth callback - exchange code for session."""
+
+    code: str
+    code_verifier: str  # The code_verifier from the initial OAuth URL response
