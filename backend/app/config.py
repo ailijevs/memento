@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     # External APIs (optional)
     exa_api_key: str | None = None
     mentra_api_key: str | None = None
+    openai_api_key: str | None = None  # For resume parsing with AI
 
     class Config:
         env_file = ".env"

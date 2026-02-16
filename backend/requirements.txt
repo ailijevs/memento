@@ -15,6 +15,14 @@ PyJWT>=2.8.0
 # HTTP client (dependency of supabase)
 httpx>=0.26.0
 
+# Resume parsing
+pdfplumber>=0.10.0
+python-docx>=1.1.0
+python-multipart>=0.0.6
+
+# AI extraction (optional - for smarter resume parsing)
+openai>=1.0.0
+
 # Development
 python-dotenv>=1.0.0
 

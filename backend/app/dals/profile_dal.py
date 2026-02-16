@@ -25,17 +25,20 @@ class ProfileDAL(BaseDAL):
         Get a profile by user ID.
         RLS will enforce visibility rules.
         """
-        response = (
-            self.client.table(self.TABLE)
-            .select("*")
-            .eq("user_id", str(user_id))
-            .maybe_single()
-            .execute()
-        )
+        try:
+            response = (
+                self.client.table(self.TABLE)
+                .select("*")
+                .eq("user_id", str(user_id))
+                .execute()
+            )
 
-        if response.data:
-            return ProfileResponse(**response.data)
-        return None
+            if response.data and len(response.data) > 0:
+                return ProfileResponse(**response.data[0])
+            return None
+        except Exception:
+            # Handle case where profile doesn't exist or RLS blocks access
+            return None
 
     async def create(self, user_id: UUID, data: ProfileCreate) -> ProfileResponse:
         """
