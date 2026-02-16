@@ -264,8 +264,12 @@ async def oauth_callback(data: OAuthCallbackRequest) -> AuthResponse:
     You must provide the code_verifier that was returned from the /oauth/{provider} endpoint.
 
     Works for both Google and Apple OAuth.
+
+    Automatically creates a user profile on first sign-in using OAuth metadata.
     """
     import httpx
+
+    from app.db.supabase import get_admin_client
 
     settings = get_settings()
 
@@ -292,10 +296,19 @@ async def oauth_callback(data: OAuthCallbackRequest) -> AuthResponse:
             )
 
         token_data = response.json()
+        user_id = token_data["user"]["id"]
+        user_metadata = token_data["user"].get("user_metadata", {})
+
+        # Auto-create profile if it doesn't exist
+        await _ensure_profile_exists(
+            user_id=user_id,
+            email=token_data["user"].get("email"),
+            user_metadata=user_metadata,
+        )
 
         return AuthResponse(
             user=UserInfo(
-                id=UUID(token_data["user"]["id"]),
+                id=UUID(user_id),
                 email=token_data["user"].get("email"),
             ),
             access_token=token_data["access_token"],
@@ -310,3 +323,66 @@ async def oauth_callback(data: OAuthCallbackRequest) -> AuthResponse:
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"OAuth callback failed: {str(e)}",
         )
+
+
+async def _ensure_profile_exists(
+    user_id: str,
+    email: str | None,
+    user_metadata: dict,
+) -> None:
+    """
+    Check if a profile exists for the user, and create one if not.
+    Uses admin client to bypass RLS during auth flow.
+
+    Extracts name and photo from OAuth provider metadata.
+    """
+    import logging
+
+    from app.db.supabase import get_admin_client
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        admin_client = get_admin_client()
+
+        # Log the metadata we received
+        logger.info(f"OAuth user_metadata for {user_id}: {user_metadata}")
+
+        # Check if profile already exists
+        existing = (
+            admin_client.table("profiles")
+            .select("user_id")
+            .eq("user_id", user_id)
+            .execute()
+        )
+
+        if existing.data and len(existing.data) > 0:
+            # Profile already exists, nothing to do
+            logger.info(f"Profile already exists for user {user_id}")
+            return
+
+        # Extract name from OAuth metadata (Google provides these fields)
+        full_name = (
+            user_metadata.get("full_name")
+            or user_metadata.get("name")
+            or (email.split("@")[0] if email else "Unknown User")
+        )
+
+        # Extract photo URL from OAuth metadata
+        photo_url = user_metadata.get("picture") or user_metadata.get("avatar_url")
+
+        # Create the profile
+        profile_data = {
+            "user_id": user_id,
+            "full_name": full_name,
+            "photo_path": photo_url,
+        }
+
+        logger.info(f"Creating profile for user {user_id}: {profile_data}")
+
+        result = admin_client.table("profiles").insert(profile_data).execute()
+        logger.info(f"Profile created successfully: {result.data}")
+
+    except Exception as e:
+        logger.error(f"Failed to create profile for user {user_id}: {e}")
+        # Don't raise - profile creation failure shouldn't block auth
