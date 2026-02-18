@@ -133,30 +133,3 @@ def _to_rgb(image: Any) -> Any:
         return image.convert("RGB")
 
     return image
-
-
-if __name__ == "__main__":
-    import os
-    from dotenv import load_dotenv
-
-    load_dotenv()
-
-    # import boto3
-
-    # sts = boto3.client("sts")
-    # print(sts.get_caller_identity())
-
-    # import os
-    # print("ACCESS KEY:", os.getenv("AWS_ACCESS_KEY_ID"))
-    # print("SECRET KEY:", os.getenv("AWS_SECRET_ACCESS_KEY"))
-
-    S3_BUCKET = os.getenv("S3_BUCKET_NAME")
-    if S3_BUCKET is None:
-        raise RuntimeError("S3_BUCKET_NAME is required.")
-
-    upload_profile_picture(
-        user_id="ab87fdd7-6941-48c9-904f-d60fdeaa55f5",
-        image=open("data/profile_images/nmgbodil.jpg", "rb"),
-        bucket_name=S3_BUCKET,
-        source="onboarding",
-    )
