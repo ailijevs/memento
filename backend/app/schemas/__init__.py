@@ -16,6 +16,17 @@ from .membership import (
     MembershipRole,
     MembershipUpdate,
 )
+from .linkedin_enrichment import (
+    EducationItem,
+    ExperienceItem,
+    LinkedInEnrichmentRequest,
+    LinkedInEnrichmentResponse,
+)
+from .onboarding import (
+    LinkedInOnboardingRequest,
+    LinkedInOnboardingResponse,
+)
+from .profile_completion import ProfileCompletionResponse
 from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
@@ -37,6 +48,14 @@ __all__ = [
     "MembershipResponse",
     "MembershipRole",
     "MembershipUpdate",
+    # LinkedIn Enrichment
+    "EducationItem",
+    "ExperienceItem",
+    "LinkedInEnrichmentRequest",
+    "LinkedInEnrichmentResponse",
+    "LinkedInOnboardingRequest",
+    "LinkedInOnboardingResponse",
+    "ProfileCompletionResponse",
     # Profile
     "ProfileCreate",
     "ProfileDirectoryEntry",

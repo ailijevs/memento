@@ -193,17 +193,14 @@ using (created_by = auth.uid())
 with check (created_by = auth.uid());
 
 -- ---- EVENT MEMBERSHIPS ----
--- Select: you can see memberships for events you are in
+-- Select: MVP-safe policy to avoid recursive RLS evaluation on this table.
+-- (Can be expanded later with a SECURITY DEFINER helper if cross-member visibility is needed.)
 drop policy if exists "memberships_select_same_event" on public.event_memberships;
 create policy "memberships_select_same_event"
 on public.event_memberships
 for select
 using (
-  exists (
-    select 1 from public.event_memberships m
-    where m.event_id = event_memberships.event_id
-      and m.user_id = auth.uid()
-  )
+  user_id = auth.uid()
 );
 
 -- Insert: you can only insert your own membership (join event)

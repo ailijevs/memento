@@ -12,11 +12,14 @@ class ProfileBase(BaseModel):
     full_name: str = Field(..., min_length=1, max_length=255)
     headline: str | None = Field(None, max_length=255)
     bio: str | None = Field(None, max_length=2000)
+    location: str | None = Field(None, max_length=255)
     company: str | None = Field(None, max_length=255)
     major: str | None = Field(None, max_length=255)
     graduation_year: int | None = Field(None, ge=1900, le=2100)
     linkedin_url: str | None = Field(None, max_length=500)
     photo_path: str | None = Field(None, max_length=500)
+    experiences: list[dict] | None = Field(default_factory=list)
+    education: list[dict] | None = Field(default_factory=list)
 
 
 class ProfileCreate(ProfileBase):
@@ -31,11 +34,14 @@ class ProfileUpdate(BaseModel):
     full_name: str | None = Field(None, min_length=1, max_length=255)
     headline: str | None = Field(None, max_length=255)
     bio: str | None = Field(None, max_length=2000)
+    location: str | None = Field(None, max_length=255)
     company: str | None = Field(None, max_length=255)
     major: str | None = Field(None, max_length=255)
     graduation_year: int | None = Field(None, ge=1900, le=2100)
     linkedin_url: str | None = Field(None, max_length=500)
     photo_path: str | None = Field(None, max_length=500)
+    experiences: list[dict] | None = None
+    education: list[dict] | None = None
 
 
 class ProfileResponse(ProfileBase):
