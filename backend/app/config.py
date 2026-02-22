@@ -25,6 +25,12 @@ class Settings(BaseSettings):
     exa_api_key: str | None = None
     mentra_api_key: str | None = None
 
+    # AWS/S3 Configuration
+    aws_region: str = "us-east-2"
+    s3_bucket_name: str | None = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"
