@@ -19,6 +19,7 @@ from app.schemas import (
     ProfileResponse,
     ProfileUpdate,
 )
+from app.config import get_settings
 from app.services import (
     LinkedInEnrichmentError,
     LinkedInEnrichmentService,
@@ -26,6 +27,7 @@ from app.services import (
     ProfileImageService,
     calculate_profile_completion,
 )
+from app.utils.s3_helpers import upload_profile_picture
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -134,6 +136,7 @@ async def onboard_from_linkedin_url(
     """
     enrichment_service = LinkedInEnrichmentService()
     image_service = ProfileImageService()
+    settings = get_settings()
 
     try:
         enrichment_result = await enrichment_service.enrich_profile(
@@ -157,12 +160,17 @@ async def onboard_from_linkedin_url(
     image_saved = False
     if enrichment.profile_image_url:
         try:
-            photo_path = await image_service.save_profile_image_as_jpeg(
-                enrichment.profile_image_url,
-                current_user.id,
+            raw_image_bytes = await image_service.fetch_image_bytes(enrichment.profile_image_url)
+            if not settings.s3_bucket_name:
+                raise ProfileImageError("S3_BUCKET_NAME must be configured to upload profile pictures.")
+            photo_path = upload_profile_picture(
+                user_id=current_user.id,
+                image=raw_image_bytes,
+                bucket_name=settings.s3_bucket_name,
+                source="linkedin",
             )
             image_saved = True
-        except ProfileImageError:
+        except (ProfileImageError, RuntimeError, ValueError):
             photo_path = None
             image_saved = False
 
