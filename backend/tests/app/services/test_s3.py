@@ -23,6 +23,7 @@ class DummyS3Client:
 
     def __init__(self) -> None:
         self.calls: list[dict] = []
+        self.delete_calls: list[dict] = []
 
     def upload_fileobj(self, fileobj, bucket, key, ExtraArgs):  # noqa: N803
         """Record upload details from boto3-compatible upload call."""
@@ -35,10 +36,16 @@ class DummyS3Client:
             }
         )
 
+    def delete_object(self, Bucket, Key):  # noqa: N803
+        """Record delete details from boto3-compatible delete call."""
+        self.delete_calls.append({"bucket": Bucket, "key": Key})
+
 
 def _png_bytes(mode: str = "RGB") -> bytes:
-    pillow = pytest.importorskip("PIL")
-    image = pillow.Image.new(mode, (3, 3), (10, 20, 30, 255) if "A" in mode else (10, 20, 30))
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    image = Image.new(mode, (3, 3), (10, 20, 30, 255) if "A" in mode else (10, 20, 30))
     out = BytesIO()
     image.save(out, format="PNG")
     return out.getvalue()
@@ -93,24 +100,30 @@ def test_normalize_image_stream_to_jpeg_raises_when_pillow_missing(monkeypatch):
 
 def test_to_rgb_returns_rgb_for_rgba():
     """_to_rgb flattens RGBA input into RGB."""
-    pillow = pytest.importorskip("PIL")
-    rgba = pillow.Image.new("RGBA", (2, 2), (40, 50, 60, 120))
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    rgba = Image.new("RGBA", (2, 2), (40, 50, 60, 120))
     converted = s3._to_rgb(rgba)
     assert converted.mode == "RGB"
 
 
 def test_to_rgb_converts_non_rgb_modes():
     """_to_rgb converts non-RGB modes to RGB."""
-    pillow = pytest.importorskip("PIL")
-    grayscale = pillow.Image.new("L", (2, 2), 200)
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    grayscale = Image.new("L", (2, 2), 200)
     converted = s3._to_rgb(grayscale)
     assert converted.mode == "RGB"
 
 
 def test_to_rgb_returns_original_rgb_image():
     """_to_rgb returns original object when already RGB."""
-    pillow = pytest.importorskip("PIL")
-    rgb = pillow.Image.new("RGB", (2, 2), (1, 2, 3))
+    pytest.importorskip("PIL")
+    from PIL import Image
+
+    rgb = Image.new("RGB", (2, 2), (1, 2, 3))
     converted = s3._to_rgb(rgb)
     assert converted is rgb
 
@@ -208,3 +221,46 @@ def test_upload_profile_picture_uses_default_s3_client(monkeypatch):
 
     assert object_key == "profiles/u123-onboarding.jpg"
     assert len(client.calls) == 1
+
+
+def test_delete_profile_picture_validates_inputs():
+    """delete_profile_picture validates bucket and key inputs."""
+    with pytest.raises(ValueError, match="bucket_name must not be empty"):
+        s3.delete_profile_picture(
+            s3_key="profiles/u1-onboarding.jpg",
+            bucket_name="   ",
+            s3_client=DummyS3Client(),
+        )
+
+    with pytest.raises(ValueError, match="s3_key must not be empty"):
+        s3.delete_profile_picture(
+            s3_key="   ",
+            bucket_name="bucket",
+            s3_client=DummyS3Client(),
+        )
+
+
+def test_delete_profile_picture_deletes_expected_object():
+    """delete_profile_picture calls delete_object with cleaned values."""
+    client = DummyS3Client()
+
+    s3.delete_profile_picture(
+        s3_key=" profiles/u123-linkedin.jpg ",
+        bucket_name=" my-bucket ",
+        s3_client=client,
+    )
+
+    assert client.delete_calls == [{"bucket": "my-bucket", "key": "profiles/u123-linkedin.jpg"}]
+
+
+def test_delete_profile_picture_uses_default_s3_client(monkeypatch):
+    """delete_profile_picture uses _create_s3_client when no client is injected."""
+    client = DummyS3Client()
+    monkeypatch.setattr(s3, "_create_s3_client", lambda: client)
+
+    s3.delete_profile_picture(
+        s3_key="profiles/u123-onboarding.jpg",
+        bucket_name="bucket",
+    )
+
+    assert client.delete_calls == [{"bucket": "bucket", "key": "profiles/u123-onboarding.jpg"}]

@@ -6,6 +6,10 @@ from io import BytesIO
 from typing import Any, BinaryIO, Literal
 from uuid import UUID
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 ProfilePhotoSource = Literal["onboarding", "linkedin"]
 
 _DEFAULT_EXTENSION = ".jpg"
@@ -99,6 +103,35 @@ def upload_profile_picture(
     return object_key
 
 
+def delete_profile_picture(
+    *,
+    s3_key: str,
+    bucket_name: str,
+    s3_client: Any | None = None,
+) -> None:
+    """Delete a profile picture object from S3.
+
+    Args:
+        s3_key: Object key stored in `photo_path`.
+        bucket_name: Source S3 bucket name.
+        s3_client: Optional injected boto3 S3 client for easier testing.
+
+    Raises:
+        ValueError: If bucket name or key is blank.
+        RuntimeError: If boto3 is unavailable and no client is injected.
+    """
+    cleaned_bucket_name = bucket_name.strip()
+    if not cleaned_bucket_name:
+        raise ValueError("bucket_name must not be empty.")
+
+    cleaned_s3_key = s3_key.strip()
+    if not cleaned_s3_key:
+        raise ValueError("s3_key must not be empty.")
+
+    client = s3_client or _create_s3_client()
+    client.delete_object(Bucket=cleaned_bucket_name, Key=cleaned_s3_key)
+
+
 def _read_image_bytes(image: bytes | BinaryIO) -> bytes:
     """Read bytes from either raw bytes or a binary stream."""
     if isinstance(image, bytes):
@@ -133,3 +166,29 @@ def _to_rgb(image: Any) -> Any:
         return image.convert("RGB")
 
     return image
+
+
+if __name__ == "__main__":
+    from app.config import get_settings
+
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        raise RuntimeError("s3_bucket_name is not configured in environment settings.")
+
+    # Uncomment to delete the profile picture.
+    # object_key = "profiles/ab87fdd7-6941-48c9-904f-d60fdeaa55f5-onboarding.jpg"
+    # delete_profile_picture(s3_key=object_key, bucket_name=settings.s3_bucket_name)
+    # print(f"Deleted profile picture: {object_key}")
+
+    # Uncomment to upload the same profile picture key back to S3.
+    from pathlib import Path
+
+    image_path = Path(__file__).resolve().parents[2] / "data/profile_images/nmgbodil.jpg"
+    with image_path.open("rb") as image_file:
+        restored_key = upload_profile_picture(
+            user_id="ab87fdd7-6941-48c9-904f-d60fdeaa55f5",
+            image=image_file,
+            bucket_name=settings.s3_bucket_name,
+            source="onboarding",
+        )
+    print(f"Re-uploaded profile picture: {restored_key}")
