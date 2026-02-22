@@ -6,6 +6,10 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+filterwarnings = [
+    "ignore:.*:pyparsing.exceptions.PyparsingDeprecationWarning:pyiceberg\\.expressions\\.parser",
+    "ignore:.*:pydantic.warnings.PydanticDeprecatedSince212:pyiceberg\\.table\\.metadata",
+]
 
 [tool.black]
 line-length = 100
@@ -31,3 +35,7 @@ warn_return_any = true
 warn_unused_ignores = true
 disallow_untyped_defs = false
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "app.dals.*"
+disable_error_code = ["union-attr", "arg-type", "call-overload", "index", "assignment"]

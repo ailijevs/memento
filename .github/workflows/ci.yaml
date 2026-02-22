@@ -69,7 +69,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run mypy type checking
-        run: mypy app/ --ignore-missing-imports
+        run: mypy --config-file=pyproject.toml app/ tests/
 
   test:
     name: Run Tests
