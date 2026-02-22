@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ProfileBase(BaseModel):
@@ -41,12 +41,11 @@ class ProfileUpdate(BaseModel):
 class ProfileResponse(ProfileBase):
     """Schema for profile responses."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: UUID
     created_at: datetime
     updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ProfileDirectoryEntry(BaseModel):
@@ -61,5 +60,4 @@ class ProfileDirectoryEntry(BaseModel):
     company: str | None = None
     photo_path: str | None = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

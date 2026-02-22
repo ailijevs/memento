@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class MembershipRole(str, Enum):
@@ -37,10 +37,9 @@ class MembershipUpdate(BaseModel):
 class MembershipResponse(MembershipBase):
     """Schema for membership responses."""
 
+    model_config = ConfigDict(from_attributes=True)
+
     event_id: UUID
     user_id: UUID
     checked_in_at: datetime | None = None
     created_at: datetime
-
-    class Config:
-        from_attributes = True
