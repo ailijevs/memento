@@ -3,6 +3,7 @@ FastAPI dependencies for authentication.
 Verifies Supabase JWTs and extracts user information.
 """
 
+from functools import lru_cache
 from typing import Annotated
 from uuid import UUID
 
