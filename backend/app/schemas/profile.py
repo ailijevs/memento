@@ -49,6 +49,10 @@ class ProfileResponse(ProfileBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+    profile_one_liner: str | None = Field(None, max_length=500)
+    profile_summary: str | None = Field(None, max_length=5000)
+    summary_provider: str | None = Field(None, max_length=50)
+    summary_updated_at: datetime | None = None
     user_id: UUID
     created_at: datetime
     updated_at: datetime

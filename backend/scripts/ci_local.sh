@@ -39,7 +39,7 @@ echo "==> isort check"
 isort --check-only --diff app/ tests/
 
 echo "==> black check"
-black --check --diff app/ tests/
+black --check --diff --workers 1 app/ tests/
 
 echo "==> mypy"
 mypy --config-file=pyproject.toml app/ tests/

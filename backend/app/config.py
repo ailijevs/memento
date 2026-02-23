@@ -32,6 +32,9 @@ class Settings(BaseSettings):
     exa_api_key: str | None = None
     mentra_api_key: str | None = None
     pdl_api_key: str | None = None
+    openai_api_key: str | None = None
+    profile_summary_provider: str = "auto"  # auto | dspy | template
+    profile_summary_model: str = "openai/gpt-4o-mini"
 
     # AWS/S3 Configuration
     aws_region: str = "us-east-2"

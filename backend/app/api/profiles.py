@@ -1,5 +1,6 @@
 """API endpoints for user profiles."""
 
+import asyncio
 from typing import Annotated
 from uuid import UUID
 
@@ -25,6 +26,7 @@ from app.services import (
     LinkedInEnrichmentService,
     ProfileImageError,
     ProfileImageService,
+    ProfileSummaryService,
     calculate_profile_completion,
 )
 from app.utils.s3_helpers import upload_profile_picture
@@ -83,7 +85,8 @@ async def create_my_profile(
             detail="Profile already exists. Use PATCH to update.",
         )
 
-    return await dal.create(current_user.id, data)
+    created_profile = await dal.create(current_user.id, data)
+    return await _refresh_generated_profile_summary(dal, created_profile)
 
 
 @router.patch("/me", response_model=ProfileResponse)
@@ -99,7 +102,7 @@ async def update_my_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found. Please create one first.",
         )
-    return profile
+    return await _refresh_generated_profile_summary(dal, profile)
 
 
 @router.post("/enrich-linkedin", response_model=LinkedInEnrichmentResponse)
@@ -220,6 +223,8 @@ async def onboard_from_linkedin_url(
             ),
         )
 
+    saved_profile = await _refresh_generated_profile_summary(dal, saved_profile)
+
     return LinkedInOnboardingResponse(
         profile=saved_profile,
         enrichment=enrichment,
@@ -283,3 +288,27 @@ def _parse_graduation_year(end_date: str | None) -> int | None:
         if 1900 <= year <= 2100:
             return year
     return None
+
+
+async def _refresh_generated_profile_summary(
+    dal: ProfileDAL,
+    profile: ProfileResponse,
+) -> ProfileResponse:
+    """Regenerate AI/profile summaries whenever profile data changes."""
+    summary_service = ProfileSummaryService()
+    try:
+        generated = await asyncio.to_thread(summary_service.generate, profile)
+        updated = await dal.update_generated_summary(
+            profile.user_id,
+            profile_one_liner=generated.one_liner,
+            profile_summary=generated.summary,
+            summary_provider=generated.provider,
+        )
+        return updated or profile
+    except Exception as exc:
+        if get_settings().profile_summary_provider.strip().lower() == "dspy":
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Profile summary generation failed: {exc}",
+            )
+        return profile
