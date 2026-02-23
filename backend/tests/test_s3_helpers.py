@@ -1,7 +1,6 @@
 """Tests for shared S3 helper functions."""
 
 from io import BytesIO
-from types import SimpleNamespace
 
 from PIL import Image
 

@@ -25,7 +25,15 @@ def test_map_exa_payload_extracts_core_fields():
                 "author": "Jane Doe",
                 "image": "https://media.example.com/jane.png",
                 "summary": "Backend engineer building distributed systems.",
-                "text": """Jane Doe\nSoftware Engineer at Acme\nSan Francisco, California, United States\nExperience\nSoftware Engineer at Acme\nEducation\nPurdue University""",
+                "text": (
+                    "Jane Doe\n"
+                    "Software Engineer at Acme\n"
+                    "San Francisco, California, United States\n"
+                    "Experience\n"
+                    "Software Engineer at Acme\n"
+                    "Education\n"
+                    "Purdue University"
+                ),
             }
         ]
     }

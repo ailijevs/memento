@@ -162,7 +162,9 @@ async def onboard_from_linkedin_url(
         try:
             raw_image_bytes = await image_service.fetch_image_bytes(enrichment.profile_image_url)
             if not settings.s3_bucket_name:
-                raise ProfileImageError("S3_BUCKET_NAME must be configured to upload profile pictures.")
+                raise ProfileImageError(
+                    "S3_BUCKET_NAME must be configured to upload profile pictures."
+                )
             photo_path = upload_profile_picture(
                 user_id=current_user.id,
                 image=raw_image_bytes,
@@ -185,7 +187,9 @@ async def onboard_from_linkedin_url(
                 location=enrichment.location,
                 company=first_experience.company if first_experience else None,
                 major=first_education.field_of_study if first_education else None,
-                graduation_year=_parse_graduation_year(first_education.end_date if first_education else None),
+                graduation_year=_parse_graduation_year(
+                    first_education.end_date if first_education else None
+                ),
                 linkedin_url=enrichment.linkedin_url,
                 photo_path=photo_path or existing.photo_path,
                 experiences=[item.model_dump() for item in enrichment.experiences],
@@ -193,7 +197,9 @@ async def onboard_from_linkedin_url(
             ),
         )
         if saved_profile is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile update failed.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile update failed."
+            )
     else:
         saved_profile = await dal.create(
             current_user.id,
@@ -204,7 +210,9 @@ async def onboard_from_linkedin_url(
                 location=enrichment.location,
                 company=first_experience.company if first_experience else None,
                 major=first_education.field_of_study if first_education else None,
-                graduation_year=_parse_graduation_year(first_education.end_date if first_education else None),
+                graduation_year=_parse_graduation_year(
+                    first_education.end_date if first_education else None
+                ),
                 linkedin_url=enrichment.linkedin_url,
                 photo_path=photo_path,
                 experiences=[item.model_dump() for item in enrichment.experiences],

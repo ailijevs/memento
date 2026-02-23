@@ -78,7 +78,10 @@ class LinkedInEnrichmentService:
         settings = get_settings()
         if not settings.pdl_api_key:
             raise LinkedInEnrichmentError(
-                "PDL API key missing. Set PDL_API_KEY in backend/.env before calling this endpoint.",
+                (
+                    "PDL API key missing. Set PDL_API_KEY in backend/.env "
+                    "before calling this endpoint."
+                ),
                 status_code=503,
             )
 
@@ -91,7 +94,9 @@ class LinkedInEnrichmentService:
         headers = {"X-Api-Key": settings.pdl_api_key}
 
         async with httpx.AsyncClient(timeout=25.0) as client:
-            response = await client.get(f"{PDL_API_BASE}/person/enrich", params=params, headers=headers)
+            response = await client.get(
+                f"{PDL_API_BASE}/person/enrich", params=params, headers=headers
+            )
 
         if response.status_code == 200:
             payload = response.json()
@@ -120,7 +125,10 @@ class LinkedInEnrichmentService:
         settings = get_settings()
         if not settings.exa_api_key:
             raise LinkedInEnrichmentError(
-                "Exa API key missing. Set EXA_API_KEY in backend/.env before calling this endpoint.",
+                (
+                    "Exa API key missing. Set EXA_API_KEY in backend/.env "
+                    "before calling this endpoint."
+                ),
                 status_code=503,
             )
 
@@ -153,7 +161,9 @@ class LinkedInEnrichmentService:
         body = response.json()
         results = body.get("results", [])
         if not results:
-            raise LinkedInEnrichmentError("No enrichment result found for this LinkedIn URL.", status_code=404)
+            raise LinkedInEnrichmentError(
+                "No enrichment result found for this LinkedIn URL.", status_code=404
+            )
 
         return self._map_exa_payload(body, linkedin_url)
 
@@ -167,7 +177,16 @@ class LinkedInEnrichmentService:
             locality = profile_data.get("locality")
             region = profile_data.get("region")
             country = profile_data.get("country")
-            location = ", ".join([part for part in [locality, region, country] if isinstance(part, str) and part.strip()]) or None
+            location = (
+                ", ".join(
+                    [
+                        part
+                        for part in [locality, region, country]
+                        if isinstance(part, str) and part.strip()
+                    ]
+                )
+                or None
+            )
 
         experiences: list[dict[str, Any]] = []
         for item in profile_data.get("experience", []) or []:
@@ -198,13 +217,19 @@ class LinkedInEnrichmentService:
             degree = degrees[0] if isinstance(degrees, list) and degrees else item.get("degree")
             majors = item.get("majors")
             field_of_study = majors[0] if isinstance(majors, list) and majors else item.get("major")
-            school = LinkedInEnrichmentService._as_text(item.get("school"), keys=["name"]) or LinkedInEnrichmentService._as_text(item.get("school_name")) or LinkedInEnrichmentService._as_text(item.get("name"))
+            school = (
+                LinkedInEnrichmentService._as_text(item.get("school"), keys=["name"])
+                or LinkedInEnrichmentService._as_text(item.get("school_name"))
+                or LinkedInEnrichmentService._as_text(item.get("name"))
+            )
 
             education.append(
                 {
                     "school": school,
                     "degree": LinkedInEnrichmentService._as_text(degree, keys=["name"]),
-                    "field_of_study": LinkedInEnrichmentService._as_text(field_of_study, keys=["name"]),
+                    "field_of_study": LinkedInEnrichmentService._as_text(
+                        field_of_study, keys=["name"]
+                    ),
                     "start_date": item.get("start_date"),
                     "end_date": item.get("end_date"),
                 }
@@ -212,8 +237,7 @@ class LinkedInEnrichmentService:
 
         profile_image_url = (
             profile_data.get("profile_pic_url")
-            or
-            profile_data.get("linkedin_profile_photo_url")
+            or profile_data.get("linkedin_profile_photo_url")
             or profile_data.get("image_url")
             or profile_data.get("photo_url")
         )
@@ -223,7 +247,9 @@ class LinkedInEnrichmentService:
             or LinkedInEnrichmentService._as_text(profile_data.get("name")),
             "bio": LinkedInEnrichmentService._as_text(profile_data.get("summary"))
             or LinkedInEnrichmentService._as_text(profile_data.get("bio")),
-            "headline": LinkedInEnrichmentService._as_text(profile_data.get("job_title"), keys=["name"])
+            "headline": LinkedInEnrichmentService._as_text(
+                profile_data.get("job_title"), keys=["name"]
+            )
             or LinkedInEnrichmentService._as_text(profile_data.get("headline")),
             "location": location,
             "experiences": experiences,
@@ -252,7 +278,7 @@ class LinkedInEnrichmentService:
                     return text
             return None
         if isinstance(value, dict):
-            for key in (keys or ["name", "title", "value"]):
+            for key in keys or ["name", "title", "value"]:
                 if key in value:
                     text = LinkedInEnrichmentService._as_text(value.get(key), keys=keys)
                     if text:
@@ -271,7 +297,9 @@ class LinkedInEnrichmentService:
         text = row.get("text") or ""
         summary = row.get("summary")
 
-        name = row.get("author") or LinkedInEnrichmentService._extract_name_from_title(row.get("title"))
+        name = row.get("author") or LinkedInEnrichmentService._extract_name_from_title(
+            row.get("title")
+        )
         headline = LinkedInEnrichmentService._extract_headline(text)
         location = LinkedInEnrichmentService._extract_location(text)
 
@@ -299,7 +327,11 @@ class LinkedInEnrichmentService:
     def _extract_bio(text: str) -> str | None:
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         for line in lines:
-            if len(line) > 40 and "experience" not in line.lower() and "education" not in line.lower():
+            if (
+                len(line) > 40
+                and "experience" not in line.lower()
+                and "education" not in line.lower()
+            ):
                 return line
         return None
 
@@ -346,7 +378,10 @@ class LinkedInEnrichmentService:
         education: list[dict[str, Any]] = []
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         for line in lines:
-            if any(token in line for token in ["University", "College", "Institute"]) and len(education) < 5:
+            if (
+                any(token in line for token in ["University", "College", "Institute"])
+                and len(education) < 5
+            ):
                 education.append(
                     {
                         "school": line,
