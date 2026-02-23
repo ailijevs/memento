@@ -1,5 +1,6 @@
 """Data Access Layer for user profiles."""
 
+from datetime import datetime, timezone
 from uuid import UUID
 
 from postgrest.exceptions import APIError
@@ -94,3 +95,25 @@ class ProfileDAL(BaseDAL):
         response = self.client.rpc("get_event_directory", {"p_event_id": str(event_id)}).execute()
 
         return [ProfileDirectoryEntry(**row) for row in response.data]
+
+    async def update_generated_summary(
+        self,
+        user_id: UUID,
+        *,
+        profile_one_liner: str,
+        profile_summary: str,
+        summary_provider: str,
+    ) -> ProfileResponse | None:
+        """Persist generated profile summary fields."""
+        update_data = {
+            "profile_one_liner": profile_one_liner,
+            "profile_summary": profile_summary,
+            "summary_provider": summary_provider,
+            "summary_updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        response = (
+            self.client.table(self.TABLE).update(update_data).eq("user_id", str(user_id)).execute()
+        )
+        if response.data:
+            return ProfileResponse(**response.data[0])
+        return None
