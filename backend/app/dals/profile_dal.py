@@ -2,6 +2,8 @@
 
 from uuid import UUID
 
+from postgrest.exceptions import APIError
+
 from app.dals.base_dal import BaseDAL
 from app.schemas import (
     ProfileCreate,
@@ -25,15 +27,21 @@ class ProfileDAL(BaseDAL):
         Get a profile by user ID.
         RLS will enforce visibility rules.
         """
-        response = (
-            self.client.table(self.TABLE)
-            .select("*")
-            .eq("user_id", str(user_id))
-            .maybe_single()
-            .execute()
-        )
+        try:
+            response = (
+                self.client.table(self.TABLE)
+                .select("*")
+                .eq("user_id", str(user_id))
+                .maybe_single()
+                .execute()
+            )
+        except APIError as exc:
+            # postgrest-py may raise a 204 "Missing response" when no row exists.
+            if str(exc.code) == "204":
+                return None
+            raise
 
-        if response.data:
+        if response and response.data:
             return ProfileResponse(**response.data)
         return None
 
