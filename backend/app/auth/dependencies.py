@@ -9,7 +9,7 @@ from uuid import UUID
 import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.config import get_settings
 
@@ -20,12 +20,11 @@ security = HTTPBearer(auto_error=False)
 class CurrentUser(BaseModel):
     """Represents the currently authenticated user."""
 
+    model_config = ConfigDict(frozen=True)
+
     id: UUID
     email: str | None = None
     access_token: str
-
-    class Config:
-        frozen = True
 
 
 def verify_jwt(token: str) -> dict:
