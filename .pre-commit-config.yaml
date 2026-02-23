@@ -7,22 +7,33 @@
 
 repos:
   - repo: https://github.com/pycqa/isort
-    rev: 5.13.2
+    rev: 7.0.0
     hooks:
       - id: isort
         files: ^backend/
-        args: ["--settings-path", "backend/pyproject.toml"]
+        pass_filenames: false
+        args: ["--check-only", "--settings-path", "backend/pyproject.toml", "backend/app/", "backend/tests/"]
 
   - repo: https://github.com/psf/black
-    rev: 24.1.1
+    rev: 26.1.0
     hooks:
       - id: black
         files: ^backend/
-        args: ["--config", "backend/pyproject.toml"]
+        pass_filenames: false
+        args: ["--check", "backend/app/", "backend/tests/"]
 
   - repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
+    rev: 7.3.0
     hooks:
       - id: flake8
-        files: ^backend/
-        args: ["--config", "backend/.flake8"]
+        files: "^backend/app/"
+        args: ["backend/app/", "backend/tests/", "--config", "backend/.flake8"]
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (local venv)
+        language: system
+        entry: backend/.venv/bin/mypy --config-file=backend/pyproject.toml
+        pass_filenames: false
+        args: ["backend/app/", "backend/tests/"]
