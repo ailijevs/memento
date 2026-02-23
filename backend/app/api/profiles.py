@@ -6,6 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import CurrentUser, get_current_user
+from app.config import get_settings
 from app.dals import ProfileDAL
 from app.db import get_supabase_client
 from app.schemas import (
@@ -19,7 +20,6 @@ from app.schemas import (
     ProfileResponse,
     ProfileUpdate,
 )
-from app.config import get_settings
 from app.services import (
     LinkedInEnrichmentError,
     LinkedInEnrichmentService,

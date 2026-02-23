@@ -1,6 +1,7 @@
 """Tests for shared S3 helper functions."""
 
 from io import BytesIO
+from typing import Any
 
 from PIL import Image
 
@@ -11,9 +12,15 @@ class FakeS3Client:
     """Simple stub client for verifying upload args."""
 
     def __init__(self) -> None:
-        self.calls = []
+        self.calls: list[dict[str, Any]] = []
 
-    def upload_fileobj(self, fileobj, bucket, key, ExtraArgs=None):  # noqa: N803
+    def upload_fileobj(
+        self,
+        fileobj: Any,
+        bucket: str,
+        key: str,
+        ExtraArgs: dict[str, str] | None = None,  # noqa: N803
+    ) -> None:
         self.calls.append(
             {
                 "body": fileobj.read(),

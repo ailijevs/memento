@@ -170,7 +170,8 @@ class LinkedInEnrichmentService:
     @staticmethod
     def _map_pdl_payload(payload: dict[str, Any], linkedin_url: str) -> dict[str, Any]:
         """Map People Data Labs payload into a stable internal enrichment shape."""
-        profile_data = payload.get("data") if isinstance(payload.get("data"), dict) else payload
+        raw_data = payload.get("data")
+        profile_data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else payload
 
         location = profile_data.get("location_name")
         if not isinstance(location, str) or not location.strip():

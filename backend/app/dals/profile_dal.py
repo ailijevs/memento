@@ -2,6 +2,8 @@
 
 from uuid import UUID
 
+from postgrest.exceptions import APIError
+
 from app.dals.base_dal import BaseDAL
 from app.schemas import (
     ProfileCreate,
@@ -9,7 +11,6 @@ from app.schemas import (
     ProfileResponse,
     ProfileUpdate,
 )
-from postgrest.exceptions import APIError
 from supabase import Client
 
 

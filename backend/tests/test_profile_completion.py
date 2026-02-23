@@ -1,14 +1,15 @@
 """Tests for profile completion calculation."""
 
 from datetime import datetime, timezone
+from typing import Any
 from uuid import uuid4
 
 from app.schemas.profile import ProfileResponse
 from app.services.profile_completion import calculate_profile_completion
 
 
-def _make_profile(**overrides) -> ProfileResponse:
-    base = {
+def _make_profile(**overrides: Any) -> ProfileResponse:
+    base: dict[str, Any] = {
         "user_id": uuid4(),
         "full_name": "Test User",
         "headline": "Engineer",

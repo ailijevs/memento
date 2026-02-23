@@ -3,8 +3,8 @@
 from pydantic import BaseModel, Field
 
 from .linkedin_enrichment import LinkedInEnrichmentResponse
-from .profile_completion import ProfileCompletionResponse
 from .profile import ProfileResponse
+from .profile_completion import ProfileCompletionResponse
 
 
 class LinkedInOnboardingRequest(BaseModel):

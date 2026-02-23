@@ -4,7 +4,7 @@ Verifies Supabase JWTs and extracts user information.
 """
 
 from functools import lru_cache
-from typing import Annotated
+from typing import Annotated, Any
 from uuid import UUID
 
 import jwt
@@ -36,7 +36,7 @@ def get_jwk_client() -> jwt.PyJWKClient:
     return jwt.PyJWKClient(jwks_url)
 
 
-def verify_jwt(token: str) -> dict:
+def verify_jwt(token: str) -> dict[str, Any]:
     """
     Verify and decode a Supabase JWT.
 
@@ -63,6 +63,12 @@ def verify_jwt(token: str) -> dict:
                 algorithms=["HS256"],
                 audience="authenticated",
             )
+            if not isinstance(payload, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token payload format",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             return payload
 
         # Modern Supabase flow (asymmetric JWTs, e.g. ES256/RS256)
@@ -75,6 +81,12 @@ def verify_jwt(token: str) -> dict:
                 audience="authenticated",
                 issuer=f"{settings.supabase_url.rstrip('/')}/auth/v1",
             )
+            if not isinstance(payload, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token payload format",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
             return payload
 
         raise HTTPException(
