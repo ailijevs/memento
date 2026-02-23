@@ -1,19 +1,35 @@
 """API endpoints for user profiles."""
 
+import asyncio
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import CurrentUser, get_current_user
+from app.config import get_settings
 from app.dals import ProfileDAL
 from app.db import get_supabase_client
 from app.schemas import (
+    LinkedInEnrichmentRequest,
+    LinkedInEnrichmentResponse,
+    LinkedInOnboardingRequest,
+    LinkedInOnboardingResponse,
+    ProfileCompletionResponse,
     ProfileCreate,
     ProfileDirectoryEntry,
     ProfileResponse,
     ProfileUpdate,
 )
+from app.services import (
+    LinkedInEnrichmentError,
+    LinkedInEnrichmentService,
+    ProfileImageError,
+    ProfileImageService,
+    ProfileSummaryService,
+    calculate_profile_completion,
+)
+from app.utils.s3_helpers import upload_profile_picture
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -39,6 +55,21 @@ async def get_my_profile(
     return profile
 
 
+@router.get("/me/completion", response_model=ProfileCompletionResponse)
+async def get_my_profile_completion(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> ProfileCompletionResponse:
+    """Get completion state for the current user's profile."""
+    profile = await dal.get_by_user_id(current_user.id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found. Please create one first.",
+        )
+    return calculate_profile_completion(profile)
+
+
 @router.post("/me", response_model=ProfileResponse, status_code=status.HTTP_201_CREATED)
 async def create_my_profile(
     data: ProfileCreate,
@@ -54,7 +85,8 @@ async def create_my_profile(
             detail="Profile already exists. Use PATCH to update.",
         )
 
-    return await dal.create(current_user.id, data)
+    created_profile = await dal.create(current_user.id, data)
+    return await _refresh_generated_profile_summary(dal, created_profile)
 
 
 @router.patch("/me", response_model=ProfileResponse)
@@ -70,7 +102,135 @@ async def update_my_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found. Please create one first.",
         )
-    return profile
+    return await _refresh_generated_profile_summary(dal, profile)
+
+
+@router.post("/enrich-linkedin", response_model=LinkedInEnrichmentResponse)
+async def enrich_linkedin_profile(
+    data: LinkedInEnrichmentRequest,
+    _: Annotated[CurrentUser, Depends(get_current_user)],
+) -> LinkedInEnrichmentResponse:
+    """
+    Enrich profile data from a LinkedIn URL using configured third-party providers.
+    Requires authentication to avoid exposing this as an anonymous open proxy.
+    """
+    service = LinkedInEnrichmentService()
+
+    try:
+        result = await service.enrich_profile(
+            linkedin_url=data.linkedin_url,
+            provider=data.provider,
+        )
+    except LinkedInEnrichmentError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+
+    return LinkedInEnrichmentResponse(**result)
+
+
+@router.post("/onboard-from-linkedin-url", response_model=LinkedInOnboardingResponse)
+async def onboard_from_linkedin_url(
+    data: LinkedInOnboardingRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> LinkedInOnboardingResponse:
+    """
+    End-to-end onboarding from LinkedIn URL:
+    enrich profile data, save profile image JPEG, then create/update profile.
+    """
+    enrichment_service = LinkedInEnrichmentService()
+    image_service = ProfileImageService()
+    settings = get_settings()
+
+    try:
+        enrichment_result = await enrichment_service.enrich_profile(
+            linkedin_url=data.linkedin_url,
+            provider=data.provider,
+        )
+    except LinkedInEnrichmentError as exc:
+        raise HTTPException(status_code=exc.status_code, detail=exc.message)
+
+    enrichment = LinkedInEnrichmentResponse(**enrichment_result)
+    if not enrichment.full_name:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Unable to extract full name from LinkedIn URL.",
+        )
+
+    first_experience = enrichment.experiences[0] if enrichment.experiences else None
+    first_education = enrichment.education[0] if enrichment.education else None
+
+    photo_path: str | None = None
+    image_saved = False
+    if enrichment.profile_image_url:
+        try:
+            raw_image_bytes = await image_service.fetch_image_bytes(enrichment.profile_image_url)
+            if not settings.s3_bucket_name:
+                raise ProfileImageError(
+                    "S3_BUCKET_NAME must be configured to upload profile pictures."
+                )
+            photo_path = upload_profile_picture(
+                user_id=current_user.id,
+                image=raw_image_bytes,
+                bucket_name=settings.s3_bucket_name,
+                source="linkedin",
+            )
+            image_saved = True
+        except (ProfileImageError, RuntimeError, ValueError):
+            photo_path = None
+            image_saved = False
+
+    existing = await dal.get_by_user_id(current_user.id)
+    if existing:
+        saved_profile = await dal.update(
+            current_user.id,
+            ProfileUpdate(
+                full_name=enrichment.full_name,
+                headline=enrichment.headline,
+                bio=enrichment.bio,
+                location=enrichment.location,
+                company=first_experience.company if first_experience else None,
+                major=first_education.field_of_study if first_education else None,
+                graduation_year=_parse_graduation_year(
+                    first_education.end_date if first_education else None
+                ),
+                linkedin_url=enrichment.linkedin_url,
+                photo_path=photo_path or existing.photo_path,
+                experiences=[item.model_dump() for item in enrichment.experiences],
+                education=[item.model_dump() for item in enrichment.education],
+            ),
+        )
+        if saved_profile is None:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile update failed."
+            )
+    else:
+        saved_profile = await dal.create(
+            current_user.id,
+            ProfileCreate(
+                full_name=enrichment.full_name,
+                headline=enrichment.headline,
+                bio=enrichment.bio,
+                location=enrichment.location,
+                company=first_experience.company if first_experience else None,
+                major=first_education.field_of_study if first_education else None,
+                graduation_year=_parse_graduation_year(
+                    first_education.end_date if first_education else None
+                ),
+                linkedin_url=enrichment.linkedin_url,
+                photo_path=photo_path,
+                experiences=[item.model_dump() for item in enrichment.experiences],
+                education=[item.model_dump() for item in enrichment.education],
+            ),
+        )
+
+    saved_profile = await _refresh_generated_profile_summary(dal, saved_profile)
+
+    return LinkedInOnboardingResponse(
+        profile=saved_profile,
+        enrichment=enrichment,
+        completion=calculate_profile_completion(saved_profile),
+        image_saved=image_saved,
+    )
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
@@ -116,3 +276,39 @@ async def get_event_directory(
     Uses the get_event_directory SQL function.
     """
     return await dal.get_event_directory(event_id)
+
+
+def _parse_graduation_year(end_date: str | None) -> int | None:
+    """Best-effort parser for YYYY or YYYY-MM date strings."""
+    if not end_date:
+        return None
+    cleaned = end_date.strip()
+    if len(cleaned) >= 4 and cleaned[:4].isdigit():
+        year = int(cleaned[:4])
+        if 1900 <= year <= 2100:
+            return year
+    return None
+
+
+async def _refresh_generated_profile_summary(
+    dal: ProfileDAL,
+    profile: ProfileResponse,
+) -> ProfileResponse:
+    """Regenerate AI/profile summaries whenever profile data changes."""
+    summary_service = ProfileSummaryService()
+    try:
+        generated = await asyncio.to_thread(summary_service.generate, profile)
+        updated = await dal.update_generated_summary(
+            profile.user_id,
+            profile_one_liner=generated.one_liner,
+            profile_summary=generated.summary,
+            summary_provider=generated.provider,
+        )
+        return updated or profile
+    except Exception as exc:
+        if get_settings().profile_summary_provider.strip().lower() == "dspy":
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Profile summary generation failed: {exc}",
+            )
+        return profile

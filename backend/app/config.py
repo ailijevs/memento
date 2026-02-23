@@ -15,6 +15,7 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        extra="ignore",
     )
 
     # Supabase Configuration
@@ -30,6 +31,10 @@ class Settings(BaseSettings):
     # External APIs (optional)
     exa_api_key: str | None = None
     mentra_api_key: str | None = None
+    pdl_api_key: str | None = None
+    openai_api_key: str | None = None
+    profile_summary_provider: str = "auto"  # auto | dspy | template
+    profile_summary_model: str = "openai/gpt-4o-mini"
 
     # AWS/S3 Configuration
     aws_region: str = "us-east-2"

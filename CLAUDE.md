@@ -15,10 +15,10 @@
 |-------|------------|---------|
 | Backend | FastAPI (Python 3.11+) | REST API |
 | Database | Supabase (PostgreSQL) | User data, events, consents |
-| Auth | Supabase Auth | JWT-based authentication |
+| Auth | Supabase Auth | JWT-based authentication (ES256/RS256 via JWKS, HS256 fallback) |
 | Storage | Supabase Storage | Profile photos |
 | Face Recognition | AWS Rekognition | Face indexing and matching |
-| Data Scraping | Exa.ai API | LinkedIn profile extraction |
+| Data Enrichment | PDL + Exa.ai | LinkedIn profile enrichment (provider fallback) |
 
 ## Project Structure
 
@@ -31,16 +31,17 @@ memento-1/
 ├── backend/
 │   ├── app/
 │   │   ├── api/              # FastAPI routers
-│   │   │   ├── profiles.py   # GET/PUT user profiles
+│   │   │   ├── profiles.py   # Profile CRUD + LinkedIn onboarding + completion status
 │   │   │   ├── events.py     # CRUD events
 │   │   │   ├── memberships.py # Join/leave events
 │   │   │   └── consents.py   # Privacy consent management
 │   │   ├── auth/
-│   │   │   └── dependencies.py # Auth middleware (get_current_user)
+│   │   │   └── dependencies.py # Auth middleware (Supabase JWKS verification)
 │   │   ├── dals/             # Data Access Layers (DB queries)
 │   │   ├── db/
 │   │   │   └── supabase.py   # Supabase client initialization
 │   │   ├── schemas/          # Pydantic request/response models
+│   │   ├── services/         # LinkedIn enrichment, image processing, completion logic
 │   │   ├── config.py         # Settings loaded from .env
 │   │   └── main.py           # FastAPI app entry point
 │   ├── data/
@@ -53,7 +54,8 @@ memento-1/
 │   │   └── scrape_linkedin_exa.py     # Fetches full profiles via Exa.ai
 │   ├── supabase/
 │   │   └── migrations/
-│   │       └── 001_initial_schema.sql # Schema + RLS policies
+│   │       ├── 001_initial_schema.sql # Base schema + RLS policies
+│   │       └── 002_profile_enrichment_fields.sql # location + experiences + education
 │   ├── tests/
 │   ├── requirements.txt
 │   └── .env                  # Local config (gitignored)
@@ -98,9 +100,14 @@ profiles
 ├── full_name
 ├── headline
 ├── bio
+├── location
 ├── company
+├── major
+├── graduation_year
 ├── linkedin_url
 ├── photo_path (Supabase Storage URL)
+├── experiences (jsonb)
+├── education (jsonb)
 └── created_at, updated_at
 
 events
@@ -136,9 +143,13 @@ This is enforced at the database level - the API cannot bypass it.
 | Method | Endpoint | Purpose |
 |--------|----------|---------|
 | GET | `/profiles/me` | Get current user's profile |
-| PUT | `/profiles/me` | Update current user's profile |
+| POST | `/profiles/me` | Create current user's profile |
+| PATCH | `/profiles/me` | Update current user's profile |
+| GET | `/profiles/me/completion` | Get required-field completion status |
+| POST | `/profiles/enrich-linkedin` | Enrich LinkedIn URL (no persistence) |
+| POST | `/profiles/onboard-from-linkedin-url` | Enrich + persist profile + completion |
 | GET | `/profiles/{user_id}` | Get another user's profile (RLS enforced) |
-| GET | `/events` | List events user is member of |
+| GET | `/events` | List events user is member of (if implemented in current branch) |
 | POST | `/events` | Create new event |
 | POST | `/events/{id}/join` | Join an event |
 | GET | `/events/{id}/members` | List event members |
@@ -157,7 +168,8 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 SUPABASE_JWT_SECRET=your-jwt-secret
 
 # Optional
-EXA_API_KEY=xxx  # For LinkedIn scraping scripts
+PDL_API_KEY=xxx  # Primary LinkedIn enrichment provider
+EXA_API_KEY=xxx  # Fallback enrichment provider
 MENTRA_API_KEY=xxx  # For MentraOS glasses app
 DEBUG=false
 ```
@@ -188,21 +200,21 @@ Smart Glasses → Image → /recognize endpoint
                     Return profile to glasses
 ```
 
-### Test Data Pipeline (Current)
+### LinkedIn Onboarding Pipeline (Current)
 ```
-LinkedIn Profile → HAR file capture → parse_linkedin_profiles.py
+Authenticated user + LinkedIn URL → /profiles/onboard-from-linkedin-url
                                               ↓
-                                      Extract LinkedIn URL
+                                  LinkedInEnrichmentService(provider=auto)
                                               ↓
-                                      scrape_linkedin_exa.py
+                                 PDL lookup → fallback to Exa if needed
                                               ↓
-                                      Fetch headline, experience, education
+                          Normalize name/location/bio/experiences/education
                                               ↓
-                                      Update classlist.json
+                  ProfileImageService downloads avatar URL, converts to JPEG
                                               ↓
-                                      seed_database.py
+                         Upsert into public.profiles (including JSON fields)
                                               ↓
-                                      Supabase (profiles + Storage)
+                 Return onboarding payload + completion (missing_fields list)
 ```
 
 ## Scripts Reference
@@ -259,10 +271,18 @@ The glasses app connects to MentraOS smart glasses and:
 ### Completed ✅
 - Supabase schema with RLS policies
 - FastAPI project structure with routers
-- LinkedIn data extraction pipeline
+- LinkedIn URL onboarding pipeline (`/profiles/onboard-from-linkedin-url`)
+- LinkedIn enrichment endpoint (`/profiles/enrich-linkedin`)
+- Completion endpoint (`/profiles/me/completion`) for required fields:
+  - `name`, `location`, `experiences`, `profile_pic`, `education`, `bio`
+- Profiles schema extended with `location`, `experiences`, `education` (migration 002)
+- Supabase ES256/RS256 auth support via JWKS (HS256 fallback retained)
+- PDL payload normalization for nested objects (experience/education mappings)
+- DAL stability fixes for PostgREST 204 / empty response behavior
+- RLS recursion fix applied to `event_memberships` select policy
 - Database seeding with 20 test users
 - Profile photos uploaded to Storage
-- 20 LinkedIn URLs, 8 with full experience data
+- Live end-to-end onboarding test executed successfully against real LinkedIn URL
 
 ### Blocked ⏳
 - AWS Rekognition access (waiting on approval)
@@ -304,10 +324,19 @@ git push -u origin feature/your-feature
 ## Troubleshooting
 
 ### "Extra inputs are not permitted" error
-Add new env vars to `app/config.py` Settings class.
+`app/config.py` now uses `extra = "ignore"`, but explicit settings fields are still preferred for discoverability.
+
+### "Invalid token: The specified alg value is not allowed"
+Supabase may issue asymmetric JWTs (`ES256`/`RS256`). Current backend supports these via JWKS in `app/auth/dependencies.py`.
 
 ### Supabase connection fails
 Check `.env` has correct `SUPABASE_URL` and keys (should start with `eyJ`).
+
+### Internal Server Error on onboarding/completion
+Check:
+1. Migrations `001` and `002` were both run.
+2. `event_memberships` select policy is the non-recursive variant (`user_id = auth.uid()`).
+3. Backend server was restarted after code changes.
 
 ### HAR parser returns wrong profile
 It might extract the logged-in user instead of visited profile. The parser uses the HAR filename as a hint - name files like `{Person Name}.har`.
