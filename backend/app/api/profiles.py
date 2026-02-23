@@ -227,7 +227,7 @@ async def upload_resume(
         if resume_data.major:
             update_data["major"] = resume_data.major
         if resume_data.graduation_year:
-            update_data["graduation_year"] = resume_data.graduation_year
+            update_data["graduation_year"] = str(resume_data.graduation_year)
 
         if update_data:
             admin_client.table("profiles").update(update_data).eq(

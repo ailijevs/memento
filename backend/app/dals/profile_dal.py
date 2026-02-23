@@ -27,10 +27,7 @@ class ProfileDAL(BaseDAL):
         """
         try:
             response = (
-                self.client.table(self.TABLE)
-                .select("*")
-                .eq("user_id", str(user_id))
-                .execute()
+                self.client.table(self.TABLE).select("*").eq("user_id", str(user_id)).execute()
             )
 
             if response.data and len(response.data) > 0:

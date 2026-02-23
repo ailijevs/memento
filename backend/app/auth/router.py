@@ -3,7 +3,11 @@ Authentication API router.
 Provides endpoints for signup, signin, session validation, and token verification.
 """
 
+import base64
+import hashlib
+import secrets
 from typing import Annotated
+from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
@@ -180,11 +184,6 @@ async def signin(data: SignInRequest) -> AuthResponse:
 # OAuth Endpoints (Google & Apple)
 # =============================================================================
 
-import base64
-import hashlib
-import secrets
-from urllib.parse import urlencode
-
 SUPPORTED_OAUTH_PROVIDERS = {"google", "apple"}
 
 
@@ -222,7 +221,10 @@ async def get_oauth_url(
     if provider_lower not in SUPPORTED_OAUTH_PROVIDERS:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Unsupported provider: {provider}. Supported: {', '.join(SUPPORTED_OAUTH_PROVIDERS)}",
+            detail=(
+                f"Unsupported provider: {provider}. "
+                f"Supported: {', '.join(SUPPORTED_OAUTH_PROVIDERS)}"
+            ),
         )
 
     settings = get_settings()
@@ -268,8 +270,6 @@ async def oauth_callback(data: OAuthCallbackRequest) -> AuthResponse:
     Automatically creates a user profile on first sign-in using OAuth metadata.
     """
     import httpx
-
-    from app.db.supabase import get_admin_client
 
     settings = get_settings()
 
@@ -349,12 +349,7 @@ async def _ensure_profile_exists(
         logger.info(f"OAuth user_metadata for {user_id}: {user_metadata}")
 
         # Check if profile already exists
-        existing = (
-            admin_client.table("profiles")
-            .select("user_id")
-            .eq("user_id", user_id)
-            .execute()
-        )
+        existing = admin_client.table("profiles").select("user_id").eq("user_id", user_id).execute()
 
         if existing.data and len(existing.data) > 0:
             # Profile already exists, nothing to do

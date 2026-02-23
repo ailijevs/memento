@@ -3,7 +3,6 @@ Resume parsing service.
 Extracts structured data from PDF and DOCX resumes.
 """
 
-import io
 import json
 import logging
 import re
@@ -65,10 +64,13 @@ class ResumeParser:
 
     def _extract_text_from_pdf(self, file: BinaryIO) -> str:
         """Extract text from a PDF file."""
+        import io
+
         import pdfplumber
 
         text_parts = []
-        with pdfplumber.open(file) as pdf:
+        raw = file.read()
+        with pdfplumber.open(io.BytesIO(raw)) as pdf:
             for page in pdf.pages:
                 page_text = page.extract_text()
                 if page_text:
@@ -96,9 +98,7 @@ class ResumeParser:
             data.email = email_match.group()
 
         # Extract phone
-        phone_match = re.search(
-            r"(\+?1?[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", text
-        )
+        phone_match = re.search(r"(\+?1?[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}", text)
         if phone_match:
             data.phone = phone_match.group()
 
@@ -142,7 +142,8 @@ class ResumeParser:
         # Extract company (look for "at" or common company patterns)
         company_patterns = [
             r"(?:at|@)\s+([A-Z][A-Za-z\s&]+(?:Inc|LLC|Corp|Company)?)",
-            r"([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)\s*[-–]\s*(?:Intern|Engineer|Developer|Analyst)",
+            r"([A-Z][A-Za-z]+(?:\s+[A-Z][A-Za-z]+)*)"
+            r"\s*[-–]\s*(?:Intern|Engineer|Developer|Analyst)",
         ]
         for pattern in company_patterns:
             match = re.search(pattern, text)
@@ -166,24 +167,24 @@ class ResumeParser:
 
         client = OpenAI(api_key=self.openai_api_key)
 
-        prompt = f"""Extract the following information from this resume. Return a JSON object with these fields:
-- full_name: The person's full name
-- headline: A short professional headline (e.g., "Software Engineer at Google")
-- bio: A brief 1-2 sentence professional summary
-- company: Current or most recent company
-- major: Field of study/major
-- graduation_year: Year of graduation (as integer)
-- location: City, State or City, Country
-- email: Email address
-- phone: Phone number
-- skills: Array of top 5 technical skills
-
-If a field cannot be determined, use null.
-
-Resume text:
-{text[:4000]}
-
-Return only valid JSON, no markdown or explanation."""
+        prompt = (
+            "Extract the following information from this resume."
+            " Return a JSON object with these fields:\n"
+            "- full_name: The person's full name\n"
+            "- headline: A short professional headline"
+            ' (e.g., "Software Engineer at Google")\n'
+            "- bio: A brief 1-2 sentence professional summary\n"
+            "- company: Current or most recent company\n"
+            "- major: Field of study/major\n"
+            "- graduation_year: Year of graduation (as integer)\n"
+            "- location: City, State or City, Country\n"
+            "- email: Email address\n"
+            "- phone: Phone number\n"
+            "- skills: Array of top 5 technical skills\n\n"
+            "If a field cannot be determined, use null.\n\n"
+            f"Resume text:\n{text[:4000]}\n\n"
+            "Return only valid JSON, no markdown or explanation."
+        )
 
         try:
             response = client.chat.completions.create(
@@ -193,7 +194,8 @@ Return only valid JSON, no markdown or explanation."""
             )
 
             result_text = response.choices[0].message.content
-            # Clean up potential markdown formatting
+            if result_text is None:
+                return self._parse_with_patterns(text)
             result_text = result_text.strip()
             if result_text.startswith("```"):
                 result_text = re.sub(r"```json?\n?", "", result_text)
