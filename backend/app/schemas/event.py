@@ -44,10 +44,10 @@ class EventCreate(EventBase):
 class EventUpdate(BaseModel):
     """Schema for updating an event. All fields optional."""
 
-    name: str | None = Field(None, min_length=1, max_length=255)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
-    location: str | None = Field(None, max_length=500)
+    location: str | None = Field(default=None, max_length=500)
     is_active: bool | None = None
     indexing_status: EventProcessingStatus | None = None
     cleanup_status: EventProcessingStatus | None = None

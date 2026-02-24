@@ -7,6 +7,7 @@ from .consent import (
 )
 from .event import (
     EventCreate,
+    EventProcessingStatus,
     EventResponse,
     EventUpdate,
 )
@@ -41,6 +42,7 @@ __all__ = [
     "ConsentUpdate",
     # Event
     "EventCreate",
+    "EventProcessingStatus",
     "EventResponse",
     "EventUpdate",
     # Membership
