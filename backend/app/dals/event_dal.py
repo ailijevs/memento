@@ -135,15 +135,18 @@ class EventDAL(BaseDAL):
 
         return [EventResponse(**event) for event in response.data]
 
-    async def get_events_pending_indexing(self) -> list[EventResponse]:
+    async def get_events_pending_indexing(self, window_minutes: int = 20) -> list[EventResponse]:
         """
         Get events that should be indexed soon.
 
         Returns events where:
-        - starts_at <= now + 20 minutes
+        - starts_at <= now + `window_minutes`
         - indexing_status is pending or failed
         """
-        threshold = (datetime.now(timezone.utc) + timedelta(minutes=20)).isoformat()
+        if window_minutes < 0:
+            raise ValueError("window_minutes must be >= 0")
+
+        threshold = (datetime.now(timezone.utc) + timedelta(minutes=window_minutes)).isoformat()
         response = (
             self.client.table(self.TABLE)
             .select("*")
