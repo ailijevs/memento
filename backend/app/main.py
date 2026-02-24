@@ -19,6 +19,7 @@ from app.api import (
     memberships_router,
     profiles_router,
 )
+from app.auth import auth_router
 from app.config import get_settings
 
 
@@ -72,6 +73,7 @@ def create_app() -> FastAPI:
     )
 
     # Register routers
+    app.include_router(auth_router, prefix="/api/v1")
     app.include_router(profiles_router, prefix="/api/v1")
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(memberships_router, prefix="/api/v1")
