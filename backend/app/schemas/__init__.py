@@ -33,6 +33,19 @@ from .profile import (
     ProfileUpdate,
 )
 from .profile_completion import ProfileCompletionResponse
+from .recognition import (
+    BoundingBox,
+    CollectionStatsResponse,
+    DetectedFace,
+    DetectFacesRequest,
+    DetectFacesResponse,
+    FaceDeleteResponse,
+    FaceIndexRequest,
+    FaceIndexResponse,
+    FaceMatch,
+    FrameDetectionRequest,
+    FrameDetectionResponse,
+)
 
 __all__ = [
     # Consent
@@ -61,4 +74,16 @@ __all__ = [
     "ProfileDirectoryEntry",
     "ProfileResponse",
     "ProfileUpdate",
+    # Recognition
+    "BoundingBox",
+    "CollectionStatsResponse",
+    "DetectedFace",
+    "DetectFacesRequest",
+    "DetectFacesResponse",
+    "FaceDeleteResponse",
+    "FaceIndexRequest",
+    "FaceIndexResponse",
+    "FaceMatch",
+    "FrameDetectionRequest",
+    "FrameDetectionResponse",
 ]

@@ -42,6 +42,11 @@ class Settings(BaseSettings):
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
 
+    # AWS Rekognition Configuration
+    rekognition_collection_id: str = "memento-faces"
+    rekognition_face_match_threshold: float = 80.0
+    rekognition_max_faces: int = 10
+
 
 @lru_cache
 def get_settings() -> Settings:
