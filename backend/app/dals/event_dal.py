@@ -141,7 +141,7 @@ class EventDAL(BaseDAL):
 
         Returns events where:
         - starts_at <= now + `window_minutes`
-        - indexing_status is pending or failed
+        - indexing_status is pending
         """
         if window_minutes < 0:
             raise ValueError("window_minutes must be >= 0")
@@ -151,7 +151,7 @@ class EventDAL(BaseDAL):
             self.client.table(self.TABLE)
             .select("*")
             .lte("starts_at", threshold)
-            .in_("indexing_status", ["pending", "failed"])
+            .eq("indexing_status", "pending")
             .order("starts_at", desc=False)
             .execute()
         )
