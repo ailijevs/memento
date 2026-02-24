@@ -5,6 +5,9 @@ from __future__ import annotations
 from typing import Any, cast
 
 from botocore.exceptions import ClientError
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 class RekognitionService:

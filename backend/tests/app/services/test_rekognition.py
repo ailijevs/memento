@@ -128,7 +128,7 @@ def test_rekognition_service_uses_default_client_factory(monkeypatch):
     """Service uses boto3 client when no client is injected."""
     client = DummyRekognitionClient()
     fake_boto3 = SimpleNamespace(
-        client=lambda service_name: client if service_name == "rekognition" else None
+        client=lambda service_name, **kwargs: client if service_name == "rekognition" else None
     )
     monkeypatch.setitem(sys.modules, "boto3", fake_boto3)
 
