@@ -1,5 +1,6 @@
 """Data Access Layer for events."""
 
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
@@ -128,6 +129,26 @@ class EventDAL(BaseDAL):
             self.client.table(self.TABLE)
             .select("*")
             .eq("is_active", True)
+            .order("starts_at", desc=False)
+            .execute()
+        )
+
+        return [EventResponse(**event) for event in response.data]
+
+    async def get_events_pending_indexing(self) -> list[EventResponse]:
+        """
+        Get events that should be indexed soon.
+
+        Returns events where:
+        - starts_at <= now + 20 minutes
+        - indexing_status is pending or failed
+        """
+        threshold = (datetime.now(timezone.utc) + timedelta(minutes=20)).isoformat()
+        response = (
+            self.client.table(self.TABLE)
+            .select("*")
+            .lte("starts_at", threshold)
+            .in_("indexing_status", ["pending", "failed"])
             .order("starts_at", desc=False)
             .execute()
         )
