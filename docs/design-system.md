@@ -4,6 +4,16 @@
 
 ---
 
+## Current Status (Phase 1 Complete)
+
+- **Welcome page** — Aurora particle system with protagonist "you" particle, proximity-based recognition, name labels, and connections. Glass-style CTA, Instrument Serif title, two-line tagline.
+- **Auth flow** — Login and signup pages with ambient `NetworkField` background, Supabase OAuth integration.
+- **Onboarding / Dashboard** — Page shells in place, design system applied.
+- **Glasses app** — MentraOS webview streaming, shows frontend via ngrok.
+- **Design tokens** — Typography, color opacity system, component patterns documented below.
+
+---
+
 ## Design Philosophy
 
 ### The Three Principles (Apple HIG)
