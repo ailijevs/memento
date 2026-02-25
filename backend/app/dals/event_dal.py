@@ -150,6 +150,7 @@ class EventDAL(BaseDAL):
         response = (
             self.client.table(self.TABLE)
             .select("*")
+            .eq("is_active", True)
             .lte("starts_at", threshold)
             .eq("indexing_status", "pending")
             .order("starts_at", desc=False)
