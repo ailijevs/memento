@@ -1,0 +1,65 @@
+name: Deploy Event Indexer Lambda
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/lambdas/event_indexer/handler.py'
+      - 'backend/lambdas/event_indexer/requirements.txt'
+      - 'backend/app/config.py'
+      - 'backend/app/db/supabase.py'
+      - 'backend/app/dals/base_dal.py'
+      - 'backend/app/dals/consent_dal.py'
+      - 'backend/app/dals/event_dal.py'
+      - 'backend/app/dals/profile_dal.py'
+      - 'backend/app/services/rekognition.py'
+      - 'backend/app/schemas/__init__.py'
+      - 'backend/app/schemas/consent.py'
+      - 'backend/app/schemas/event.py'
+      - 'backend/app/schemas/profile.py'
+      - '.github/workflows/lambda-event-indexer.yaml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create build directory
+        run: mkdir build
+
+      - name: Install Lambda dependencies
+        run: |
+          pip install -r backend/lambdas/event_indexer/requirements.txt -t build/
+
+      - name: Copy application code
+        run: |
+          cp -r backend/app build/app
+          cp backend/lambdas/event_indexer/handler.py build/
+
+      - name: Create deployment zip
+        run: |
+          cd build
+          zip -r ../lambda.zip .
+          cd ..
+
+      - name: Deploy to AWS Lambda
+        run: |
+          aws lambda update-function-code \
+            --function-name memento-event-indexer \
+            --zip-file fileb://lambda.zip
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
