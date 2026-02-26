@@ -18,6 +18,7 @@ import {
   MapPin,
   Sparkles,
 } from "lucide-react";
+import { Aurora } from "@/components/aurora";
 
 type OnboardingStep = "linkedin" | "preview";
 
@@ -70,7 +71,20 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col px-6 overflow-hidden">
+    <div
+      className="relative flex min-h-dvh flex-col px-6 overflow-hidden"
+      style={{
+        background: [
+          "radial-gradient(ellipse 80% 50% at 50% 25%, oklch(0.09 0.05 275) 0%, transparent 100%)",
+          "radial-gradient(ellipse 50% 40% at 70% 60%, oklch(0.07 0.03 240) 0%, transparent 100%)",
+          "oklch(0.04 0.005 270)",
+        ].join(", "),
+      }}
+    >
+      <div className="absolute inset-0">
+        <Aurora className="h-full w-full" mode="focused" />
+      </div>
+
       {/* Content — centered */}
       <div className="relative z-10 my-auto w-full">
         <div className="animate-fade-up mb-10">
@@ -109,7 +123,11 @@ export default function OnboardingPage() {
 
           <button
             type="submit"
-            className="btn-gradient mt-2 flex h-[56px] w-full items-center justify-center gap-2.5 rounded-[16px] text-body font-semibold"
+            className="mt-2 flex h-[56px] w-full items-center justify-center gap-2.5 rounded-[16px] text-body font-semibold text-white/90 transition-all active:scale-[0.98] active:bg-white/[0.08]"
+            style={{
+              background: "oklch(1 0 0 / 5%)",
+              boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 20%), 0 0 30px oklch(0.4 0.12 275 / 12%)",
+            }}
             disabled={loading}
           >
             {loading ? (
@@ -140,15 +158,19 @@ function ProfilePreview({
   onContinue: () => void;
 }) {
   return (
-    <div className="relative flex min-h-dvh flex-col px-6 pt-12 pb-8 overflow-hidden">
-      {/* Gradient accent behind the card */}
-      <div
-        className="absolute left-1/2 top-[30%] h-[300px] w-[300px] -translate-x-1/2 rounded-full opacity-15"
-        style={{
-          background: "radial-gradient(circle, oklch(0.5 0.2 270) 0%, transparent 70%)",
-          filter: "blur(80px)",
-        }}
-      />
+    <div
+      className="relative flex min-h-dvh flex-col px-6 pt-12 pb-8 overflow-hidden"
+      style={{
+        background: [
+          "radial-gradient(ellipse 80% 50% at 50% 25%, oklch(0.09 0.05 275) 0%, transparent 100%)",
+          "radial-gradient(ellipse 50% 40% at 70% 60%, oklch(0.07 0.03 240) 0%, transparent 100%)",
+          "oklch(0.04 0.005 270)",
+        ].join(", "),
+      }}
+    >
+      <div className="absolute inset-0">
+        <Aurora className="h-full w-full" mode="focused" />
+      </div>
 
       {/* Header */}
       <div className="animate-fade-up relative z-10 mb-8">
@@ -278,7 +300,11 @@ function ProfilePreview({
       {/* Bottom action */}
       <div className="animate-fade-up delay-600 relative z-10 pt-6">
         <button
-          className="btn-gradient h-[56px] w-full rounded-[16px] text-body font-semibold"
+          className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-body font-semibold text-white/90 transition-all active:scale-[0.98] active:bg-white/[0.08]"
+          style={{
+            background: "oklch(1 0 0 / 5%)",
+            boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 20%), 0 0 30px oklch(0.4 0.12 275 / 12%)",
+          }}
           onClick={onContinue}
         >
           Continue
