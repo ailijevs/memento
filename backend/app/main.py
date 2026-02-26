@@ -8,6 +8,7 @@ This API provides endpoints for:
 - Consent management for privacy controls
 """
 
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -21,6 +22,8 @@ from app.api import (
 )
 from app.auth import auth_router
 from app.config import get_settings
+
+VERSION = os.getenv("VERSION", "dev")
 
 
 @asynccontextmanager
@@ -90,7 +93,7 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": settings.app_name,
-            "version": "1.0.0",
+            "version": VERSION,
         }
 
     return app
