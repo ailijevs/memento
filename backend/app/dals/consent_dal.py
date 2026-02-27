@@ -41,6 +41,20 @@ class ConsentDAL(BaseDAL):
 
         return [ConsentResponse(**c) for c in response.data]
 
+    async def get_event_recognition_users(self, event_id: UUID) -> list[UUID]:
+        """
+        Get user IDs for event members who allow recognition.
+        """
+        response = (
+            self.client.table(self.TABLE)
+            .select("user_id")
+            .eq("event_id", str(event_id))
+            .eq("allow_recognition", True)
+            .execute()
+        )
+
+        return [UUID(row["user_id"]) for row in response.data]
+
     async def create(self, user_id: UUID, data: ConsentCreate) -> ConsentResponse:
         """
         Create consent settings for an event.

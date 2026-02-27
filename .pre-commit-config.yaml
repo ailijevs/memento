@@ -12,7 +12,7 @@ repos:
       - id: isort
         files: ^backend/
         pass_filenames: false
-        args: ["--check-only", "--settings-path", "backend/pyproject.toml", "backend/app/", "backend/tests/"]
+        args: ["--check-only", "--settings-path", "backend/pyproject.toml", "backend/app/", "backend/lambdas/", "backend/tests/"]
 
   - repo: https://github.com/psf/black
     rev: 26.1.0
@@ -20,14 +20,14 @@ repos:
       - id: black
         files: ^backend/
         pass_filenames: false
-        args: ["--check", "backend/app/", "backend/tests/"]
+        args: ["--check", "backend/app/", "backend/lambdas/", "backend/tests/"]
 
   - repo: https://github.com/pycqa/flake8
     rev: 7.3.0
     hooks:
       - id: flake8
-        files: "^backend/app/"
-        args: ["backend/app/", "backend/tests/", "--config", "backend/.flake8"]
+        files: "^backend/(app|lambdas)/"
+        args: ["backend/app/", "backend/lambdas/", "backend/tests/", "--config", "backend/.flake8"]
 
   - repo: local
     hooks:
@@ -36,4 +36,4 @@ repos:
         language: system
         entry: backend/.venv/bin/mypy --config-file=backend/pyproject.toml
         pass_filenames: false
-        args: ["backend/app/", "backend/tests/"]
+        args: ["backend/app/", "backend/lambdas/", "backend/tests/"]
