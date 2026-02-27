@@ -14,7 +14,7 @@ const FIELDS = [
     autoComplete: "email",
     color: [100, 75, 240] as const,
     glow: "rgba(100,75,240,0.45)",
-    pos: { left: 24, top: 40 },
+    pos: { left: 24, top: 50 },
     float: "float-2 15s ease-in-out infinite",
   },
   {
@@ -25,7 +25,7 @@ const FIELDS = [
     autoComplete: "current-password",
     color: [70, 110, 230] as const,
     glow: "rgba(70,110,230,0.45)",
-    pos: { left: 68, top: 52 },
+    pos: { left: 68, top: 63 },
     float: "float-3 14s ease-in-out infinite",
   },
 ];
@@ -158,7 +158,7 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
       password: values[1],
     });
     if (error) { setError(error.message); setLoading(false); return; }
-    router.push("/onboarding");
+    router.replace("/onboarding");
     router.refresh();
   }
 
@@ -202,7 +202,7 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
         <div
           ref={dotRef}
           className="absolute left-1/2 -translate-x-1/2"
-          style={{ top: "14%", opacity: showYouDot ? 1 : 0, transition: "opacity 0.3s ease" }}
+          style={{ top: "22%", opacity: showYouDot ? 1 : 0, transition: "opacity 0.3s ease" }}
         >
           <div className="relative flex flex-col items-center">
             <div
@@ -300,7 +300,7 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
         <div
           className="absolute left-1/2"
           style={{
-            top: "72%",
+            top: "80%",
             width: "84%",
             transform: "translate(-50%, -50%)",
             animation: "fade-in 0.4s cubic-bezier(0.16,1,0.3,1) 350ms both",
@@ -368,7 +368,7 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
         </div>
 
         {/* Progress dots */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2" style={{ top: "86%" }}>
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2" style={{ top: "93%" }}>
           {FIELDS.map((field, i) => {
             const [fcr, fcg, fcb] = field.color;
             return (
@@ -387,10 +387,24 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
           })}
         </div>
 
+      </div>
+
+      {/* Submit button — fades in when all fields filled */}
+      <div className="relative z-10 px-6 pb-3" style={{ opacity: allFilled ? 1 : 0, transition: "opacity 0.3s ease", pointerEvents: allFilled ? "auto" : "none" }}>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="flex h-[56px] w-full items-center justify-center gap-2 rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98]"
+          style={{
+            background: "oklch(1 0 0 / 6%)",
+            boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 25%), 0 0 30px oklch(0.4 0.12 275 / 15%)",
+          }}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-white/60" /> : "Sign In"}
+        </button>
         {error && (
-          <div className="absolute left-1/2 -translate-x-1/2 text-center text-[13px] text-red-400/80" style={{ top: "92%" }}>
-            {error}
-          </div>
+          <p className="mt-2 text-center text-[13px] text-red-400/80">{error}</p>
         )}
       </div>
 

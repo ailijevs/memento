@@ -143,8 +143,8 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
         baseRadius: 1.2 + Math.random() * 0.6,
         radius: preRecognized ? 2.8 : 1.2 + Math.random() * 0.6,
         color,
-        alpha: preRecognized ? (focused ? 0.5 : 0.85) : 0.08 + Math.random() * 0.06,
-        targetAlpha: preRecognized ? (focused ? 0.5 : 0.85) : 0.08 + Math.random() * 0.06,
+        alpha: preRecognized ? (focused ? 0.5 : 0.85) : 0.22 + Math.random() * 0.10,
+        targetAlpha: preRecognized ? (focused ? 0.5 : 0.85) : 0.22 + Math.random() * 0.10,
         recognized: preRecognized,
         recognizedAt: preRecognized ? -RECOGNITION_LIFETIME * 0.3 : 0,
         isUser: false,
@@ -281,7 +281,7 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
           if (p.isUser) continue;
           if (p.recognized && p.recognizedAt > 0 && now - p.recognizedAt > RECOGNITION_LIFETIME && recCount > MIN_RECOGNIZED) {
             p.recognized = false;
-            p.targetAlpha = 0.08 + Math.random() * 0.06;
+            p.targetAlpha = 0.22 + Math.random() * 0.10;
             p.recognizedAt = 0;
             recCount--;
           }
@@ -379,30 +379,40 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
         ctx!.fill();
       }
 
-      // Draw user particle
-      const userPulse = 0.5 + 0.5 * Math.sin(now * 0.003);
-      const ringRadius = (focused ? 6 : 8) + userPulse * (focused ? 2 : 3);
+      // Draw user particle (full mode only — focused mode has its own focal dot)
+      if (!focused) {
+        const userPulse = 0.5 + 0.5 * Math.sin(now * 0.003);
+        const ringRadius = 8 + userPulse * 3;
 
-      ctx!.fillStyle = `rgba(255, 255, 255, ${0.03 + userPulse * 0.02})`;
-      ctx!.beginPath();
-      ctx!.arc(user.x, user.y, focused ? 16 : 22, 0, Math.PI * 2);
-      ctx!.fill();
+        ctx!.fillStyle = `rgba(255, 255, 255, ${0.03 + userPulse * 0.02})`;
+        ctx!.beginPath();
+        ctx!.arc(user.x, user.y, 22, 0, Math.PI * 2);
+        ctx!.fill();
 
-      ctx!.fillStyle = `rgba(255, 255, 255, ${0.08 + userPulse * 0.04})`;
-      ctx!.beginPath();
-      ctx!.arc(user.x, user.y, focused ? 7 : 10, 0, Math.PI * 2);
-      ctx!.fill();
+        ctx!.fillStyle = `rgba(255, 255, 255, ${0.08 + userPulse * 0.04})`;
+        ctx!.beginPath();
+        ctx!.arc(user.x, user.y, 10, 0, Math.PI * 2);
+        ctx!.fill();
 
-      ctx!.strokeStyle = `rgba(255, 255, 255, ${0.15 + userPulse * 0.1})`;
-      ctx!.lineWidth = 0.8;
-      ctx!.beginPath();
-      ctx!.arc(user.x, user.y, ringRadius, 0, Math.PI * 2);
-      ctx!.stroke();
+        ctx!.strokeStyle = `rgba(255, 255, 255, ${0.15 + userPulse * 0.1})`;
+        ctx!.lineWidth = 0.8;
+        ctx!.beginPath();
+        ctx!.arc(user.x, user.y, ringRadius, 0, Math.PI * 2);
+        ctx!.stroke();
 
-      ctx!.fillStyle = "rgba(255, 255, 255, 0.95)";
-      ctx!.beginPath();
-      ctx!.arc(user.x, user.y, user.radius, 0, Math.PI * 2);
-      ctx!.fill();
+        ctx!.fillStyle = "rgba(255, 255, 255, 0.95)";
+        ctx!.beginPath();
+        ctx!.arc(user.x, user.y, user.radius, 0, Math.PI * 2);
+        ctx!.fill();
+
+        // "You" label
+        ctx!.save();
+        ctx!.font = "600 9px system-ui, -apple-system, sans-serif";
+        ctx!.letterSpacing = "2px";
+        ctx!.fillStyle = "rgba(255,255,255,0.28)";
+        ctx!.fillText("YOU", user.x + 11, user.y - 10);
+        ctx!.restore();
+      }
 
       // Labels
       ctx!.font = "500 10.5px system-ui, -apple-system, sans-serif";

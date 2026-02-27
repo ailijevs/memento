@@ -14,7 +14,7 @@ const FIELDS = [
     autoComplete: "name",
     color: [155, 80, 255] as const,
     glow: "rgba(155,80,255,0.45)",
-    pos: { left: 22, top: 36 },
+    pos: { left: 22, top: 48 },
     float: "float-1 14s ease-in-out infinite",
   },
   {
@@ -25,7 +25,7 @@ const FIELDS = [
     autoComplete: "email",
     color: [100, 75, 240] as const,
     glow: "rgba(100,75,240,0.45)",
-    pos: { left: 72, top: 33 },
+    pos: { left: 72, top: 44 },
     float: "float-2 16s ease-in-out infinite",
   },
   {
@@ -36,7 +36,7 @@ const FIELDS = [
     autoComplete: "new-password",
     color: [70, 110, 230] as const,
     glow: "rgba(70,110,230,0.45)",
-    pos: { left: 30, top: 56 },
+    pos: { left: 30, top: 65 },
     float: "float-3 13s ease-in-out infinite",
     minLength: 6,
   },
@@ -49,7 +49,7 @@ function displayValue(val: string, type: string) {
   return val;
 }
 
-export function SignupContent({ onBack, showYouDot = true }: { onBack: () => void; showYouDot?: boolean }) {
+export function SignupContent({ onBack, onGoLogin, showYouDot = true }: { onBack: () => void; onGoLogin?: () => void; showYouDot?: boolean }) {
   const router = useRouter();
   const [values, setValues] = useState(["", "", ""]);
   const [activeIdx, setActiveIdx] = useState<number>(0);
@@ -174,7 +174,7 @@ export function SignupContent({ onBack, showYouDot = true }: { onBack: () => voi
       options: { data: { full_name: values[0] } },
     });
     if (error) { setError(error.message); setLoading(false); return; }
-    router.push("/onboarding");
+    router.replace("/onboarding");
     router.refresh();
   }
 
@@ -218,7 +218,7 @@ export function SignupContent({ onBack, showYouDot = true }: { onBack: () => voi
         <div
           ref={dotRef}
           className="absolute left-1/2 -translate-x-1/2"
-          style={{ top: "12%", opacity: showYouDot ? 1 : 0, transition: "opacity 0.3s ease" }}
+          style={{ top: "22%", opacity: showYouDot ? 1 : 0, transition: "opacity 0.3s ease" }}
         >
           <div className="relative flex flex-col items-center">
             <div
@@ -316,7 +316,7 @@ export function SignupContent({ onBack, showYouDot = true }: { onBack: () => voi
         <div
           className="absolute left-1/2"
           style={{
-            top: "74%",
+            top: "82%",
             width: "84%",
             transform: "translate(-50%, -50%)",
             animation: "fade-in 0.4s cubic-bezier(0.16,1,0.3,1) 350ms both",
@@ -385,7 +385,7 @@ export function SignupContent({ onBack, showYouDot = true }: { onBack: () => voi
         </div>
 
         {/* Progress dots */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2" style={{ top: "88%" }}>
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2" style={{ top: "94%" }}>
           {FIELDS.map((field, i) => {
             const [fcr, fcg, fcb] = field.color;
             return (
@@ -404,10 +404,24 @@ export function SignupContent({ onBack, showYouDot = true }: { onBack: () => voi
           })}
         </div>
 
+      </div>
+
+      {/* Submit button — fades in when all fields filled */}
+      <div className="relative z-10 px-6 pb-3" style={{ opacity: allFilled ? 1 : 0, transition: "opacity 0.3s ease", pointerEvents: allFilled ? "auto" : "none" }}>
+        <button
+          type="button"
+          onClick={handleSubmit}
+          disabled={loading}
+          className="flex h-[56px] w-full items-center justify-center gap-2 rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98]"
+          style={{
+            background: "oklch(1 0 0 / 6%)",
+            boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 25%), 0 0 30px oklch(0.4 0.12 275 / 15%)",
+          }}
+        >
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-white/60" /> : "Create Account"}
+        </button>
         {error && (
-          <div className="absolute left-1/2 -translate-x-1/2 text-center text-[13px] text-red-400/80" style={{ top: "94%" }}>
-            {error}
-          </div>
+          <p className="mt-2 text-center text-[13px] text-red-400/80">{error}</p>
         )}
       </div>
 
@@ -429,7 +443,7 @@ export function SignupContent({ onBack, showYouDot = true }: { onBack: () => voi
         </button>
         <p className="mt-5 text-center text-[12px] text-white/18">
           Already have an account?{" "}
-          <button onClick={onBack} className="font-semibold text-white/35 active:text-white/60">
+          <button onClick={onGoLogin ?? onBack} className="font-semibold text-white/35 active:text-white/60">
             Sign in
           </button>
         </p>

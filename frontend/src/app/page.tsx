@@ -9,6 +9,7 @@ type Screen = "welcome" | "signup" | "login";
 
 export default function App() {
   const [screen, setScreen] = useState<Screen>("welcome");
+  const [prevScreen, setPrevScreen] = useState<Screen>("welcome");
   const [contentVisible, setContentVisible] = useState(true);
 
   // Galaxy zoom state
@@ -16,6 +17,7 @@ export default function App() {
   const [zoomIn, setZoomIn] = useState(false);
   const [blurClearing, setBlurClearing] = useState(false);
   const navigatingRef = useRef(false);
+  const screenRef = useRef<Screen>("welcome");
 
   const userPosRef = useRef({ x: 50, y: 35 });
   const handleUserPosition = useCallback((xPct: number, yPct: number) => {
@@ -40,6 +42,8 @@ export default function App() {
 
     // At peak zoom (~500ms): swap content, snap scale back (hidden by blur), begin clearing
     setTimeout(() => {
+      setPrevScreen(screenRef.current);
+      screenRef.current = dest;
       setScreen(dest);
       window.history.pushState(null, "", `/${dest}`);
       setZoomIn(false);       // scale snaps to 1 instantly — invisible under blur
@@ -60,12 +64,15 @@ export default function App() {
     navigatingRef.current = true;
     setContentVisible(false);
     setTimeout(() => {
-      setScreen("welcome");
-      window.history.pushState(null, "", "/");
+      const target = prevScreen;
+      setPrevScreen("welcome");
+      screenRef.current = target;
+      setScreen(target);
+      window.history.pushState(null, "", target === "welcome" ? "/" : `/${target}`);
       setContentVisible(true);
       navigatingRef.current = false;
     }, 220);
-  }, []);
+  }, [prevScreen]);
 
   const isAuth = screen !== "welcome";
 
@@ -89,17 +96,7 @@ export default function App() {
     : {};
 
   return (
-    <div
-      className="relative flex min-h-dvh flex-col overflow-hidden"
-      style={{
-        background: [
-          "radial-gradient(ellipse 90% 50% at 50% 38%, oklch(0.11 0.06 275) 0%, transparent 100%)",
-          "radial-gradient(ellipse 50% 35% at 68% 52%, oklch(0.08 0.04 240) 0%, transparent 100%)",
-          "radial-gradient(ellipse 40% 30% at 30% 60%, oklch(0.06 0.03 260) 0%, transparent 100%)",
-          "oklch(0.04 0.005 270)",
-        ].join(", "),
-      }}
-    >
+    <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Galaxy zoom wrapper — entire scene zooms into the "You" particle */}
       <div className="absolute inset-0 flex flex-col" style={zoomWrapStyle}>
         {/* Aurora — fades to 18% on auth screens */}
@@ -121,7 +118,7 @@ export default function App() {
         >
           {screen === "welcome" && <WelcomeScreen onNavigate={navigateTo} />}
           {screen === "signup" && (
-            <SignupContent onBack={navigateBack} showYouDot />
+            <SignupContent onBack={navigateBack} onGoLogin={() => navigateTo("login")} showYouDot />
           )}
           {screen === "login" && (
             <LoginContent
