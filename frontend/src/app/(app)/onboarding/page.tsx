@@ -158,8 +158,26 @@ export default function OnboardingPage() {
   }, []);
 
   async function handleSubmit() {
-    // TODO: restore real import once branches are merged
-    router.push("/onboarding/name");
+    if (isResume) {
+      setError("Resume import coming soon — use LinkedIn for now.");
+      return;
+    }
+    setError(null);
+    setLoading(true);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError("Session expired. Please sign in again."); setLoading(false); return; }
+      api.setToken(session.access_token);
+      const result = await api.onboardFromLinkedIn(linkedinUrl);
+      setProfile(result.profile);
+      setCompletion(result.completion);
+      setStep("preview");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to import profile");
+    } finally {
+      setLoading(false);
+    }
   }
 
   if (step === "preview" && profile && completion) {
