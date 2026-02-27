@@ -158,26 +158,8 @@ export default function OnboardingPage() {
   }, []);
 
   async function handleSubmit() {
-    if (isResume) {
-      setError("Resume import coming soon — use LinkedIn for now.");
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    try {
-      const supabase = createClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) { setError("Session expired. Please sign in again."); setLoading(false); return; }
-      api.setToken(session.access_token);
-      const result = await api.onboardFromLinkedIn(linkedinUrl);
-      setProfile(result.profile);
-      setCompletion(result.completion);
-      setStep("preview");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to import profile");
-    } finally {
-      setLoading(false);
-    }
+    // TODO: restore real import once branches are merged
+    router.push("/onboarding/name");
   }
 
   if (step === "preview" && profile && completion) {
@@ -186,7 +168,7 @@ export default function OnboardingPage() {
         profile={profile}
         completion={completion}
         onBack={() => setStep("import")}
-        onContinue={() => router.push("/dashboard")}
+        onContinue={() => router.push("/onboarding/name")}
       />
     );
   }
@@ -225,7 +207,7 @@ export default function OnboardingPage() {
       {/* Page header */}
       <div className="relative z-10 px-6 pb-4">
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/22">
-          Step 1 of 2
+          Step 1 of 8
         </p>
         <h1
           className="text-white"
@@ -551,6 +533,9 @@ function ProfilePreview({
 
       {/* Header */}
       <div className="animate-fade-up relative z-10 mb-8">
+        <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/22">
+          Step 2 of 8
+        </p>
         <h1 className="text-large-title text-white">Looking good</h1>
         <p className="text-callout mt-2 text-white/40">
           This is how you&apos;ll appear to others

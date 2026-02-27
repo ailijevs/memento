@@ -68,8 +68,8 @@ const RECOGNITION_GAP = 1400;
 
 interface AuroraProps {
   className?: string;
-  /** "full" = welcome page (viewfinder, HUD, recognition). "focused" = inner pages (user + connections only). */
-  mode?: "full" | "focused";
+  /** "full" = welcome page (viewfinder, HUD, recognition). "focused" = inner pages (subtle, 20 particles). "ambient" = onboarding (70 particles, no HUD). */
+  mode?: "full" | "focused" | "ambient";
   /** Reports user particle position as percentage (0-1) of the canvas. Called each frame. */
   onUserPosition?: (xPct: number, yPct: number) => void;
 }
@@ -81,7 +81,7 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
   onUserPositionRef.current = onUserPosition;
 
   const isFocused = mode === "focused";
-  const PARTICLE_COUNT = isFocused ? 20 : 70;
+  const PARTICLE_COUNT = isFocused ? 20 : 70; // ambient + full both get 70
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -91,6 +91,7 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
 
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const focused = mode === "focused";
+    const ambient = mode === "ambient";
 
     function resize() {
       canvas!.width = Math.round(canvas!.clientWidth * dpr);
@@ -130,7 +131,7 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
         ? 30 + Math.random() * 100
         : 20 + Math.pow(Math.random(), 0.5) * 300;
       const color = COLORS[Math.floor(Math.random() * COLORS.length)];
-      const preRecognized = focused ? true : i <= MIN_RECOGNIZED;
+      const preRecognized = (focused || ambient) ? true : i <= MIN_RECOGNIZED;
 
       particles.push({
         angle,
@@ -143,8 +144,8 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
         baseRadius: 1.2 + Math.random() * 0.6,
         radius: preRecognized ? 2.8 : 1.2 + Math.random() * 0.6,
         color,
-        alpha: preRecognized ? (focused ? 0.5 : 0.85) : 0.22 + Math.random() * 0.10,
-        targetAlpha: preRecognized ? (focused ? 0.5 : 0.85) : 0.22 + Math.random() * 0.10,
+        alpha: preRecognized ? (focused ? 0.5 : ambient ? 0.65 : 0.85) : 0.22 + Math.random() * 0.10,
+        targetAlpha: preRecognized ? (focused ? 0.5 : ambient ? 0.65 : 0.85) : 0.22 + Math.random() * 0.10,
         recognized: preRecognized,
         recognizedAt: preRecognized ? -RECOGNITION_LIFETIME * 0.3 : 0,
         isUser: false,
@@ -204,7 +205,7 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
       const width = W();
       const height = H();
       const centerX = width / 2;
-      const centerY = focused ? height * 0.42 : height * 0.35;
+      const centerY = focused ? height * 0.42 : ambient ? height * 0.40 : height * 0.35;
 
       ctx!.clearRect(0, 0, width, height);
 
@@ -253,12 +254,21 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
       }
 
       if (!seeded) {
-        seedInitialLabels(now);
+        if (ambient) {
+          // Seed name tags on every ~10th particle — visible immediately, no floating phase
+          const rec = particles.filter(p => p.recognized && !p.isUser);
+          const step = Math.max(1, Math.floor(rec.length / 6));
+          for (let i = 0; i < rec.length; i += step) {
+            tags.push({ text: nextName(), particle: rec[i], createdAt: now - LABEL_DURATION - 300 });
+          }
+        } else {
+          seedInitialLabels(now);
+        }
         seeded = true;
       }
 
       // Recognition (full mode only)
-      if (!focused) {
+      if (!focused && !ambient) {
         if (now - lastRecognition > RECOGNITION_GAP) {
           const meetSq = MEETING_DIST * MEETING_DIST;
           let closest: Particle | null = null;
@@ -379,8 +389,8 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
         ctx!.fill();
       }
 
-      // Draw user particle (full mode only — focused mode has its own focal dot)
-      if (!focused) {
+      // Draw user particle (full mode only)
+      if (!focused && !ambient) {
         const userPulse = 0.5 + 0.5 * Math.sin(now * 0.003);
         const ringRadius = 8 + userPulse * 3;
 
@@ -414,9 +424,9 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
         ctx!.restore();
       }
 
-      // Labels
-      ctx!.font = "500 10.5px system-ui, -apple-system, sans-serif";
-      for (let i = labels.length - 1; i >= 0; i--) {
+      // Labels (full + focused only)
+      if (!ambient) ctx!.font = "500 10.5px system-ui, -apple-system, sans-serif";
+      for (let i = labels.length - 1; !ambient && i >= 0; i--) {
         const lbl = labels[i];
         const elapsed = now - lbl.startTime;
         if (elapsed < 0) continue;
@@ -436,7 +446,7 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
         const age = now - tag.createdAt;
         if (age < LABEL_DURATION) continue;
         const fadeIn = Math.min(1, (age - LABEL_DURATION) / 800);
-        ctx!.fillStyle = `rgba(255,255,255,${fadeIn * (focused ? 0.3 : 0.25)})`;
+        ctx!.fillStyle = `rgba(255,255,255,${fadeIn * (focused ? 0.30 : ambient ? 0.32 : 0.25)})`;
         ctx!.fillText(tag.text, tag.particle.x + 6, tag.particle.y - 5);
       }
 
@@ -453,7 +463,7 @@ export function Aurora({ className = "", mode = "full", onUserPosition }: Aurora
       ctx!.fillRect(0, 0, width, height);
 
       // Viewfinder + HUD (full mode only)
-      if (!focused) {
+      if (!focused && !ambient) {
         const vfW = Math.min(width * 0.82, 340);
         const vfH = vfW * (10 / 17);
         const vfX = (width - vfW) / 2;
