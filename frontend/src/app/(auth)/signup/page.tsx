@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, ChevronLeft } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 import { Aurora } from "@/components/aurora";
 
 const FIELDS = [
@@ -54,7 +54,15 @@ function displayValue(val: string, type: string) {
 export default function SignupPage() {
   const router = useRouter();
   const [values, setValues] = useState(["", "", ""]);
-  const [activeIdx, setActiveIdx] = useState<number | null>(null);
+  const [activeIdx, setActiveIdx] = useState<number>(0);
+
+  // Continue the zoom from wherever the "You" dot was on the welcome page
+  const [enterOrigin] = useState<string>(() => {
+    if (typeof window === "undefined") return "50% 35%";
+    const stored = sessionStorage.getItem("zoomOrigin");
+    if (stored) { sessionStorage.removeItem("zoomOrigin"); return stored; }
+    return "50% 35%";
+  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
@@ -63,7 +71,6 @@ export default function SignupPage() {
   const dotRef = useRef<HTMLDivElement>(null);
   const nodeRefs = useRef<(HTMLDivElement | null)[]>([null, null, null]);
   const inputRef = useRef<HTMLInputElement>(null);
-  const ctaRef = useRef<HTMLDivElement>(null);
 
   const valuesRef = useRef(values);
   valuesRef.current = values;
@@ -71,15 +78,14 @@ export default function SignupPage() {
   activeIdxRef.current = activeIdx;
 
   const allFilled = values.every((v) => v.length > 0);
-  const filledCount = values.filter((v) => v.length > 0).length;
-  const showCta = allFilled && activeIdx === null;
+  const isLastField = activeIdx === FIELDS.length - 1;
 
+  // Auto-focus on mount and on field change
   useEffect(() => {
-    if (activeIdx !== null) {
-      requestAnimationFrame(() => inputRef.current?.focus());
-    }
+    requestAnimationFrame(() => inputRef.current?.focus());
   }, [activeIdx]);
 
+  // Canvas constellation lines
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -136,25 +142,6 @@ export default function SignupPage() {
         ctx!.lineTo(nx, ny);
         ctx!.stroke();
       }
-
-      const cta = ctaRef.current;
-      if (cta) {
-        const ctaDot = cta.querySelector("[data-dot]");
-        if (ctaDot) {
-          const dr = ctaDot.getBoundingClientRect();
-          const tx = dr.left + dr.width / 2 - cRect.left;
-          const ty = dr.top + dr.height / 2 - cRect.top;
-          const grad = ctx!.createLinearGradient(cx, cy, tx, ty);
-          grad.addColorStop(0, "rgba(255,255,255,0.12)");
-          grad.addColorStop(1, "rgba(255,255,255,0.03)");
-          ctx!.strokeStyle = grad;
-          ctx!.lineWidth = 1.2;
-          ctx!.beginPath();
-          ctx!.moveTo(cx, cy);
-          ctx!.lineTo(tx, ty);
-          ctx!.stroke();
-        }
-      }
     }
 
     raf = requestAnimationFrame(draw);
@@ -167,34 +154,27 @@ export default function SignupPage() {
   const handleNodePointerDown = useCallback(
     (e: React.PointerEvent, idx: number) => {
       e.preventDefault();
-      setActiveIdx((prev) => (prev === idx ? null : idx));
+      setActiveIdx(idx);
     },
     [],
   );
 
-  const handleInputBlur = useCallback(() => {
-    setActiveIdx(null);
-  }, []);
-
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === "Enter" && activeIdx !== null) {
+      if (e.key === "Enter") {
         e.preventDefault();
-        for (let offset = 1; offset <= FIELDS.length; offset++) {
-          const nextIdx = (activeIdx + offset) % FIELDS.length;
-          if (values[nextIdx].length === 0) {
-            setActiveIdx(nextIdx);
-            return;
-          }
+        if (activeIdx < FIELDS.length - 1) {
+          setActiveIdx(activeIdx + 1);
+        } else if (allFilled) {
+          handleSubmit();
         }
-        setActiveIdx(null);
       }
       if (e.key === "Escape") {
-        setActiveIdx(null);
         inputRef.current?.blur();
       }
     },
-    [activeIdx, values],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeIdx, allFilled],
   );
 
   const setValue = useCallback((idx: number, val: string) => {
@@ -233,12 +213,14 @@ export default function SignupPage() {
     }
   }
 
-  const activeField = activeIdx !== null ? FIELDS[activeIdx] : null;
+  const activeField = FIELDS[activeIdx];
+  const [cr, cg, cb] = activeField.color;
 
   return (
     <div
-      className="relative flex min-h-dvh flex-col overflow-hidden"
+      className="animate-page-in relative flex min-h-dvh flex-col overflow-hidden"
       style={{
+        transformOrigin: enterOrigin,
         background: [
           "radial-gradient(ellipse 80% 50% at 50% 20%, oklch(0.12 0.08 275) 0%, transparent 100%)",
           "radial-gradient(ellipse 50% 35% at 65% 50%, oklch(0.08 0.04 240) 0%, transparent 100%)",
@@ -297,25 +279,11 @@ export default function SignupPage() {
           </div>
         </div>
 
-        {/* Hint */}
-        <div
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 text-center"
-          style={{
-            top: "25%",
-            opacity: activeIdx === null && filledCount === 0 ? 1 : 0,
-            transition: "opacity 0.4s ease",
-          }}
-        >
-          <p className="text-[12px] tracking-[0.06em] text-white/25">
-            Tap a node to begin
-          </p>
-        </div>
-
-        {/* Field nodes — always in position, never move */}
+        {/* Field nodes */}
         {FIELDS.map((field, i) => {
           const isActive = activeIdx === i;
           const isFilled = values[i].length > 0;
-          const [cr, cg, cb] = field.color;
+          const [fcr, fcg, fcb] = field.color;
 
           return (
             <div
@@ -339,19 +307,19 @@ export default function SignupPage() {
                   style={{
                     padding: "8px 16px 8px 10px",
                     background: isActive
-                      ? `rgba(${cr},${cg},${cb}, 0.12)`
+                      ? `rgba(${fcr},${fcg},${fcb}, 0.12)`
                       : isFilled
                         ? "rgba(255,255,255,0.03)"
                         : "rgba(255,255,255,0.015)",
                     border: isActive
-                      ? `1.5px solid rgba(${cr},${cg},${cb}, 0.35)`
+                      ? `1.5px solid rgba(${fcr},${fcg},${fcb}, 0.35)`
                       : isFilled
                         ? "1.5px solid rgba(255,255,255,0.06)"
                         : "1.5px solid rgba(255,255,255,0.04)",
                     transition:
                       "background 0.3s, border-color 0.3s, box-shadow 0.3s",
                     boxShadow: isActive
-                      ? `0 0 28px rgba(${cr},${cg},${cb}, 0.15)`
+                      ? `0 0 28px rgba(${fcr},${fcg},${fcb}, 0.15)`
                       : "none",
                   }}
                 >
@@ -360,7 +328,7 @@ export default function SignupPage() {
                     <div
                       className="absolute -inset-1.5 rounded-full"
                       style={{
-                        border: `1.5px solid rgba(${cr},${cg},${cb}, ${isActive ? 0.6 : isFilled ? 0.3 : 0.12})`,
+                        border: `1.5px solid rgba(${fcr},${fcg},${fcb}, ${isActive ? 0.6 : isFilled ? 0.3 : 0.12})`,
                         transform: isActive ? "scale(1.3)" : "scale(1)",
                         transition: "all 0.3s ease",
                       }}
@@ -377,11 +345,11 @@ export default function SignupPage() {
                     <div
                       className="h-3 w-3 rounded-full"
                       style={{
-                        background: `rgba(${cr},${cg},${cb}, ${isActive || isFilled ? 1 : 0.65})`,
+                        background: `rgba(${fcr},${fcg},${fcb}, ${isActive || isFilled ? 1 : 0.65})`,
                         boxShadow:
                           isActive || isFilled
                             ? `0 0 12px ${field.glow}`
-                            : `0 0 6px rgba(${cr},${cg},${cb}, 0.3)`,
+                            : `0 0 6px rgba(${fcr},${fcg},${fcb}, 0.3)`,
                         transition: "all 0.3s ease",
                       }}
                     />
@@ -393,7 +361,7 @@ export default function SignupPage() {
                     style={{
                       fontSize: 13,
                       color: isActive
-                        ? `rgba(${cr},${cg},${cb}, 0.9)`
+                        ? `rgba(${fcr},${fcg},${fcb}, 0.9)`
                         : isFilled
                           ? "rgba(255,255,255,0.50)"
                           : "rgba(255,255,255,0.28)",
@@ -420,12 +388,12 @@ export default function SignupPage() {
                         cx="7"
                         cy="7"
                         r="6"
-                        stroke={`rgba(${cr},${cg},${cb}, 0.4)`}
+                        stroke={`rgba(${fcr},${fcg},${fcb}, 0.4)`}
                         strokeWidth="1.2"
                       />
                       <path
                         d="M4.5 7L6.2 8.7L9.5 5.3"
-                        stroke={`rgba(${cr},${cg},${cb}, 0.6)`}
+                        stroke={`rgba(${fcr},${fcg},${fcb}, 0.6)`}
                         strokeWidth="1.3"
                         strokeLinecap="round"
                         strokeLinejoin="round"
@@ -438,29 +406,22 @@ export default function SignupPage() {
           );
         })}
 
-        {/* Input panel — fixed position, fades in when a node is tapped */}
+        {/* Input panel — always visible */}
         <div
           className="absolute left-1/2"
           style={{
             top: "74%",
             width: "84%",
-            transform: `translate(-50%, ${activeField ? "-50%" : "-40%"})`,
-            opacity: activeField ? 1 : 0,
-            pointerEvents: activeField ? "auto" : "none",
-            transition:
-              "opacity 0.25s cubic-bezier(0.16,1,0.3,1), transform 0.25s cubic-bezier(0.16,1,0.3,1)",
+            transform: "translate(-50%, -50%)",
+            animation: "fade-in 0.4s cubic-bezier(0.16,1,0.3,1) 350ms both",
           }}
         >
           <div
             className="overflow-hidden rounded-2xl"
             style={{
               background: "rgba(255,255,255,0.04)",
-              border: activeField
-                ? `1px solid rgba(${activeField.color.join(",")}, 0.15)`
-                : "1px solid rgba(255,255,255,0.05)",
-              boxShadow: activeField
-                ? `0 0 40px rgba(${activeField.color.join(",")}, 0.06)`
-                : "none",
+              border: `1px solid rgba(${cr},${cg},${cb}, 0.15)`,
+              boxShadow: `0 0 40px rgba(${cr},${cg},${cb}, 0.06)`,
               transition: "border-color 0.3s, box-shadow 0.3s",
             }}
           >
@@ -468,47 +429,73 @@ export default function SignupPage() {
               <div
                 className="h-2 w-2 rounded-full"
                 style={{
-                  background: activeField
-                    ? `rgba(${activeField.color.join(",")}, 0.7)`
-                    : "rgba(255,255,255,0.2)",
-                  boxShadow: activeField
-                    ? `0 0 6px ${activeField.glow}`
-                    : "none",
+                  background: `rgba(${cr},${cg},${cb}, 0.7)`,
+                  boxShadow: `0 0 6px ${activeField.glow}`,
                   transition: "all 0.3s",
                 }}
               />
               <span
                 className="text-[10px] font-semibold uppercase tracking-[0.14em]"
                 style={{
-                  color: activeField
-                    ? `rgba(${activeField.color.join(",")}, 0.5)`
-                    : "rgba(255,255,255,0.2)",
+                  color: `rgba(${cr},${cg},${cb}, 0.5)`,
                   transition: "color 0.3s",
                 }}
               >
-                {activeField?.label ?? ""}
+                {activeField.label}
+              </span>
+              <span
+                className="ml-auto text-[10px] tracking-[0.06em]"
+                style={{ color: "rgba(255,255,255,0.14)" }}
+              >
+                {activeIdx + 1} / {FIELDS.length}
               </span>
             </div>
-            <div className="px-4 pb-3.5">
+            <div className="flex items-center px-4 pb-3.5">
               <input
                 ref={inputRef}
-                type={activeField?.type ?? "text"}
-                placeholder={activeField?.placeholder ?? ""}
-                autoComplete={activeField?.autoComplete ?? "off"}
-                minLength={activeField?.key === "password" ? 6 : undefined}
-                value={activeIdx !== null ? values[activeIdx] : ""}
-                onChange={(e) =>
-                  activeIdx !== null && setValue(activeIdx, e.target.value)
-                }
-                onBlur={handleInputBlur}
+                type={activeField.type}
+                placeholder={activeField.placeholder}
+                autoComplete={activeField.autoComplete}
+                minLength={activeField.key === "password" ? 6 : undefined}
+                value={values[activeIdx]}
+                onChange={(e) => setValue(activeIdx, e.target.value)}
                 onKeyDown={handleInputKeyDown}
-                className="w-full bg-transparent text-[16px] text-white outline-none placeholder:text-white/15"
+                className="flex-1 bg-transparent text-[16px] text-white outline-none placeholder:text-white/15"
                 style={{
-                  caretColor: activeField
-                    ? `rgba(${activeField.color.join(",")}, 0.7)`
-                    : undefined,
+                  caretColor: `rgba(${cr},${cg},${cb}, 0.7)`,
                 }}
               />
+              {/* Next / Submit arrow */}
+              <button
+                type="button"
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  if (activeIdx < FIELDS.length - 1) {
+                    setActiveIdx(activeIdx + 1);
+                  } else if (allFilled) {
+                    handleSubmit();
+                  }
+                }}
+                className="ml-2 shrink-0 flex h-7 w-7 items-center justify-center rounded-full transition-all active:scale-90"
+                style={{
+                  background: `rgba(${cr},${cg},${cb}, ${isLastField && allFilled ? 0.22 : 0.07})`,
+                  border: `1px solid rgba(${cr},${cg},${cb}, ${isLastField && allFilled ? 0.45 : 0.18})`,
+                  boxShadow: isLastField && allFilled ? `0 0 12px rgba(${cr},${cg},${cb}, 0.2)` : "none",
+                  transition: "all 0.3s cubic-bezier(0.16,1,0.3,1)",
+                }}
+              >
+                {loading ? (
+                  <Loader2
+                    className="h-3.5 w-3.5 animate-spin"
+                    style={{ color: `rgba(${cr},${cg},${cb}, 0.7)` }}
+                  />
+                ) : (
+                  <ChevronRight
+                    className="h-3.5 w-3.5"
+                    style={{ color: `rgba(${cr},${cg},${cb}, 0.75)` }}
+                  />
+                )}
+              </button>
             </div>
           </div>
         </div>
@@ -519,7 +506,7 @@ export default function SignupPage() {
           style={{ top: "88%" }}
         >
           {FIELDS.map((field, i) => {
-            const [cr, cg, cb] = field.color;
+            const [fcr, fcg, fcb] = field.color;
             return (
               <div
                 key={field.key}
@@ -529,9 +516,9 @@ export default function SignupPage() {
                   height: 6,
                   background:
                     values[i].length > 0
-                      ? `rgba(${cr},${cg},${cb}, 0.7)`
+                      ? `rgba(${fcr},${fcg},${fcb}, 0.7)`
                       : activeIdx === i
-                        ? `rgba(${cr},${cg},${cb}, 0.35)`
+                        ? `rgba(${fcr},${fcg},${fcb}, 0.35)`
                         : "rgba(255,255,255,0.10)",
                   borderRadius: 3,
                   transition: "all 0.3s cubic-bezier(0.16,1,0.3,1)",
@@ -540,59 +527,6 @@ export default function SignupPage() {
             );
           })}
         </div>
-
-        {/* CTA — appears when all filled and nothing active */}
-        {showCta && (
-          <div
-            ref={ctaRef}
-            className="absolute left-1/2"
-            style={{
-              top: "74%",
-              transform: "translate(-50%, -50%)",
-            }}
-          >
-            <div
-              style={{
-                animation:
-                  "node-materialize 0.5s cubic-bezier(0.16, 1, 0.3, 1) both",
-              }}
-            >
-              <div
-                className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 rounded-full"
-                style={{
-                  border: "1.5px solid rgba(255,255,255,0.35)",
-                  animation: "recognition-ring 1.4s ease-out forwards",
-                }}
-              />
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={loading}
-                className="flex items-center gap-3 rounded-2xl px-7 py-3.5 transition-all active:scale-[0.96]"
-                style={{
-                  background: "rgba(255,255,255,0.07)",
-                  border: "1px solid rgba(255,255,255,0.15)",
-                  boxShadow:
-                    "0 0 30px rgba(255,255,255,0.08), inset 0 0 0 1px rgba(255,255,255,0.04)",
-                }}
-              >
-                <div data-dot className="relative shrink-0">
-                  <div
-                    className="absolute -inset-1.5 rounded-full"
-                    style={{ border: "1.5px solid rgba(255,255,255,0.2)" }}
-                  />
-                  <div className="h-3 w-3 rounded-full bg-white/85 shadow-[0_0_14px_rgba(255,255,255,0.4)]" />
-                </div>
-                <span className="text-[15px] font-semibold text-white/85">
-                  {loading ? "Creating…" : "Create Account"}
-                </span>
-                {loading && (
-                  <Loader2 className="h-4 w-4 animate-spin text-white/50" />
-                )}
-              </button>
-            </div>
-          </div>
-        )}
 
         {error && (
           <div
