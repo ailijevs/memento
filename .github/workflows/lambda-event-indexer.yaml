@@ -50,11 +50,12 @@ jobs:
           $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
       - name: Build Docker image
+        working-directory: backend
         run: |
           docker build \
             --platform linux/amd64 \
             -t $ECR_REPOSITORY \
-            -f backend/lambdas/event_indexer/Dockerfile \
+            -f lambdas/event_indexer/Dockerfile \
             .
 
       - name: Tag image
