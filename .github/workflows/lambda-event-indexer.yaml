@@ -26,40 +26,49 @@ jobs:
 
     permissions:
       contents: read
+    
+    env:
+      AWS_REGION: us-east-2
+      ECR_REPOSITORY: memento-event-indexer
+      AWS_ACCOUNT_ID: 335721753390
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          python-version: '3.11'
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      - name: Create build directory
-        run: mkdir build
-
-      - name: Install Lambda dependencies
+      - name: Login to ECR
         run: |
-          pip install -r backend/lambdas/event_indexer/requirements.txt -t build/
+          aws ecr get-login-password --region $AWS_REGION | \
+          docker login --username AWS --password-stdin \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
 
-      - name: Copy application code
+      - name: Build Docker image
         run: |
-          cp -r backend/app build/app
-          cp backend/lambdas/event_indexer/handler.py build/
+          docker build \
+            --platform linux/amd64 \
+            -t $ECR_REPOSITORY \
+            -f backend/lambdas/event_indexer/Dockerfile \
+            .
 
-      - name: Create deployment zip
+      - name: Tag image
         run: |
-          cd build
-          zip -r ../lambda.zip .
-          cd ..
+          docker tag $ECR_REPOSITORY:latest \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
 
-      - name: Deploy to AWS Lambda
+      - name: Push image
+        run: |
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+
+      - name: Update Lambda to use new image
         run: |
           aws lambda update-function-code \
             --function-name memento-event-indexer \
-            --zip-file fileb://lambda.zip
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
+            --image-uri $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
