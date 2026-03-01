@@ -11,6 +11,7 @@ from .profile_summary import (
     ProfileSummaryResult,
     ProfileSummaryService,
 )
+from .rekognition import RekognitionService
 
 __all__ = [
     "LinkedInEnrichmentError",
@@ -21,4 +22,5 @@ __all__ = [
     "ProfileSummaryError",
     "ProfileSummaryResult",
     "ProfileSummaryService",
+    "RekognitionService",
 ]
