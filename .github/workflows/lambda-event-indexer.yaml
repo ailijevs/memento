@@ -1,0 +1,75 @@
+name: Deploy Event Indexer Lambda
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/lambdas/event_indexer/handler.py'
+      - 'backend/lambdas/event_indexer/requirements.txt'
+      - 'backend/app/config.py'
+      - 'backend/app/db/supabase.py'
+      - 'backend/app/dals/base_dal.py'
+      - 'backend/app/dals/consent_dal.py'
+      - 'backend/app/dals/event_dal.py'
+      - 'backend/app/dals/profile_dal.py'
+      - 'backend/app/services/rekognition.py'
+      - 'backend/app/schemas/__init__.py'
+      - 'backend/app/schemas/consent.py'
+      - 'backend/app/schemas/event.py'
+      - 'backend/app/schemas/profile.py'
+      - '.github/workflows/lambda-event-indexer.yaml'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+    
+    env:
+      AWS_REGION: us-east-2
+      ECR_REPOSITORY: memento-event-indexer
+      AWS_ACCOUNT_ID: 335721753390
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | \
+          docker login --username AWS --password-stdin \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+
+      - name: Build Docker image
+        working-directory: backend
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t $ECR_REPOSITORY \
+            -f lambdas/event_indexer/Dockerfile \
+            .
+
+      - name: Tag image
+        run: |
+          docker tag $ECR_REPOSITORY:latest \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+
+      - name: Push image
+        run: |
+          docker push \
+          $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest
+
+      - name: Update Lambda to use new image
+        run: |
+          aws lambda update-function-code \
+            --function-name memento-event-indexer \
+            --image-uri $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPOSITORY:latest

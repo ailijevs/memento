@@ -3,7 +3,8 @@ FastAPI dependencies for authentication.
 Verifies Supabase JWTs and extracts user information.
 """
 
-from typing import Annotated
+from functools import lru_cache
+from typing import Annotated, Any
 from uuid import UUID
 
 import jwt
@@ -27,7 +28,15 @@ class CurrentUser(BaseModel):
     access_token: str
 
 
-def verify_jwt(token: str) -> dict:
+@lru_cache
+def get_jwk_client() -> jwt.PyJWKClient:
+    """Create and cache JWK client for Supabase asymmetric JWTs."""
+    settings = get_settings()
+    jwks_url = f"{settings.supabase_url.rstrip('/')}/auth/v1/.well-known/jwks.json"
+    return jwt.PyJWKClient(jwks_url)
+
+
+def verify_jwt(token: str) -> dict[str, Any]:
     """
     Verify and decode a Supabase JWT.
 
@@ -43,36 +52,48 @@ def verify_jwt(token: str) -> dict:
     settings = get_settings()
 
     try:
-        # First, decode the header to check the algorithm
         header = jwt.get_unverified_header(token)
-        algorithm = header.get("alg", "HS256")
+        alg = header.get("alg")
 
-        if algorithm == "HS256":
-            # Verify with JWT secret (older Supabase setup)
+        # Legacy/project-secret flow
+        if alg == "HS256":
             payload = jwt.decode(
                 token,
                 settings.supabase_jwt_secret,
                 algorithms=["HS256"],
                 audience="authenticated",
             )
-        elif algorithm in ["ES256", "RS256"]:
-            # For ES256/RS256, Supabase uses asymmetric keys
-            # We verify the signature by fetching the JWKS or skip verification
-            # For now, decode without verification but check claims
+            if not isinstance(payload, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token payload format",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return payload
+
+        # Modern Supabase flow (asymmetric JWTs, e.g. ES256/RS256)
+        if alg in {"ES256", "RS256"}:
+            signing_key = get_jwk_client().get_signing_key_from_jwt(token)
             payload = jwt.decode(
                 token,
-                options={"verify_signature": False},
+                signing_key.key,
+                algorithms=[alg],
                 audience="authenticated",
+                issuer=f"{settings.supabase_url.rstrip('/')}/auth/v1",
             )
-            # Validate essential claims
-            if payload.get("aud") != "authenticated":
-                raise jwt.InvalidTokenError("Invalid audience")
-            if not payload.get("sub"):
-                raise jwt.InvalidTokenError("Missing subject claim")
-        else:
-            raise jwt.InvalidTokenError(f"Unsupported algorithm: {algorithm}")
+            if not isinstance(payload, dict):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid token payload format",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return payload
 
-        return payload
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: unsupported algorithm {alg}",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

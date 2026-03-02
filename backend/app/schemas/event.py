@@ -1,9 +1,19 @@
 """Pydantic schemas for events."""
 
 from datetime import datetime
+from enum import Enum
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+
+class EventProcessingStatus(str, Enum):
+    """Processing status for event background jobs."""
+
+    PENDING = "pending"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
 
 
 class EventBase(BaseModel):
@@ -34,11 +44,13 @@ class EventCreate(EventBase):
 class EventUpdate(BaseModel):
     """Schema for updating an event. All fields optional."""
 
-    name: str | None = Field(None, min_length=1, max_length=255)
+    name: str | None = Field(default=None, min_length=1, max_length=255)
     starts_at: datetime | None = None
     ends_at: datetime | None = None
-    location: str | None = Field(None, max_length=500)
+    location: str | None = Field(default=None, max_length=500)
     is_active: bool | None = None
+    indexing_status: EventProcessingStatus | None = None
+    cleanup_status: EventProcessingStatus | None = None
 
 
 class EventResponse(EventBase):
@@ -49,3 +61,5 @@ class EventResponse(EventBase):
     event_id: UUID
     created_by: UUID
     created_at: datetime
+    indexing_status: EventProcessingStatus
+    cleanup_status: EventProcessingStatus

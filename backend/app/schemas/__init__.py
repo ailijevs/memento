@@ -7,8 +7,15 @@ from .consent import (
 )
 from .event import (
     EventCreate,
+    EventProcessingStatus,
     EventResponse,
     EventUpdate,
+)
+from .linkedin_enrichment import (
+    EducationItem,
+    ExperienceItem,
+    LinkedInEnrichmentRequest,
+    LinkedInEnrichmentResponse,
 )
 from .membership import (
     MembershipCreate,
@@ -16,12 +23,17 @@ from .membership import (
     MembershipRole,
     MembershipUpdate,
 )
+from .onboarding import (
+    LinkedInOnboardingRequest,
+    LinkedInOnboardingResponse,
+)
 from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
     ProfileResponse,
     ProfileUpdate,
 )
+from .profile_completion import ProfileCompletionResponse
 
 __all__ = [
     # Consent
@@ -30,6 +42,7 @@ __all__ = [
     "ConsentUpdate",
     # Event
     "EventCreate",
+    "EventProcessingStatus",
     "EventResponse",
     "EventUpdate",
     # Membership
@@ -37,6 +50,14 @@ __all__ = [
     "MembershipResponse",
     "MembershipRole",
     "MembershipUpdate",
+    # LinkedIn Enrichment
+    "EducationItem",
+    "ExperienceItem",
+    "LinkedInEnrichmentRequest",
+    "LinkedInEnrichmentResponse",
+    "LinkedInOnboardingRequest",
+    "LinkedInOnboardingResponse",
+    "ProfileCompletionResponse",
     # Profile
     "ProfileCreate",
     "ProfileDirectoryEntry",

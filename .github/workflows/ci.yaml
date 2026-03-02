@@ -36,13 +36,13 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run flake8 linter
-        run: flake8 app/ tests/
+        run: flake8 app/ lambdas/ tests/
 
       - name: Run isort import sorting check
-        run: isort --check-only --diff app/ tests/
+        run: isort --check-only --diff app/ lambdas/ tests/
 
       - name: Run black formatter check
-        run: black --check --diff app/ tests/
+        run: black --check --diff app/ lambdas/ tests/
 
   typecheck:
     name: Type Check
@@ -69,7 +69,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run mypy type checking
-        run: mypy --config-file=pyproject.toml app/ tests/
+        run: mypy --config-file=pyproject.toml app/ lambdas/ tests/
 
   test:
     name: Run Tests
