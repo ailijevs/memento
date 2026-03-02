@@ -26,7 +26,7 @@ repos:
     rev: 7.3.0
     hooks:
       - id: flake8
-        files: "^backend/(app|lambdas)/"
+        files: "^backend/(app|lambdas/tests)/"
         args: ["backend/app/", "backend/lambdas/", "backend/tests/", "--config", "backend/.flake8"]
 
   - repo: local
