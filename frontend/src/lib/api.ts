@@ -27,10 +27,13 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(
-        response.status,
-        error.detail || `Request failed: ${response.statusText}`
-      );
+      const detail = error.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
+        : typeof detail === "string"
+        ? detail
+        : `Request failed: ${response.status} ${response.statusText}`;
+      throw new ApiError(response.status, message);
     }
 
     if (response.status === 204) return undefined as T;
@@ -78,10 +81,13 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(
-        response.status,
-        error.detail || `Resume upload failed: ${response.statusText}`
-      );
+      const detail = error.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
+        : typeof detail === "string"
+        ? detail
+        : `Resume upload failed: ${response.status} ${response.statusText}`;
+      throw new ApiError(response.status, message);
     }
 
     return response.json() as Promise<ResumeParseResponse>;
@@ -170,8 +176,7 @@ export interface Education {
 
 export interface ProfileCompletionResponse {
   is_complete: boolean;
-  completion_percentage: number;
-  filled_fields: string[];
+  completion_score: number;
   missing_fields: string[];
 }
 

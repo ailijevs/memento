@@ -6,6 +6,7 @@ import { ChevronLeft, Plus, Loader2 } from "lucide-react";
 import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
+import { getNextRoute } from "@/lib/onboarding";
 
 interface ExperienceEntry {
   company: string;
@@ -45,7 +46,7 @@ export default function ExperiencePage() {
       await api.updateProfile({
         experiences: filled.map((e) => ({ company: e.company.trim() || null, title: e.role.trim() || null })),
       });
-      router.push("/onboarding/education");
+      router.push(getNextRoute("experience"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -174,7 +175,7 @@ export default function ExperiencePage() {
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding/education")}
+          onClick={() => router.push(getNextRoute("experience"))}
           className="mt-4 flex w-full items-center justify-center text-[13px] text-white/30 active:text-white/50"
         >
           Skip for now

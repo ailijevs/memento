@@ -6,6 +6,7 @@ import { ChevronLeft, Loader2 } from "lucide-react";
 import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
+import { getNextRoute } from "@/lib/onboarding";
 
 export default function LocationPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function LocationPage() {
       if (!session) { setError("Session expired. Please sign in again."); return; }
       api.setToken(session.access_token);
       await api.updateProfile({ location: location.trim() });
-      router.push("/onboarding/bio");
+      router.push(getNextRoute("location"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -131,7 +132,7 @@ export default function LocationPage() {
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding/bio")}
+          onClick={() => router.push(getNextRoute("location"))}
           className="mt-4 flex w-full items-center justify-center text-[13px] text-white/30 active:text-white/50"
         >
           Skip for now

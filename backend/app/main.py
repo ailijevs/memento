@@ -59,15 +59,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware - configure for your frontend domain
+    # CORS middleware
+    # allow_origins="*" is safe for dev — auth uses Bearer tokens, not cookies
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",  # Local development
-            "http://localhost:5173",  # Vite default
-            # Add production URLs here
-        ],
-        allow_credentials=True,
+        allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )

@@ -8,6 +8,7 @@ import {
   type ProfileResponse,
   type ProfileCompletionResponse,
 } from "@/lib/api";
+import { saveMissingSteps, getFirstMissingRoute } from "@/lib/onboarding";
 import {
   Loader2,
   CheckCircle2,
@@ -194,7 +195,10 @@ export default function OnboardingPage() {
         profile={profile}
         completion={completion}
         onBack={() => setStep("import")}
-        onContinue={() => router.push("/onboarding/name")}
+        onContinue={() => {
+          saveMissingSteps(completion.missing_fields);
+          router.push(getFirstMissingRoute(completion.missing_fields));
+        }}
       />
     );
   }
@@ -549,9 +553,20 @@ function ProfilePreview({
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/22">
           Step 2 of 8
         </p>
-        <h1 className="text-large-title text-white">Looking good</h1>
-        <p className="text-callout mt-2 text-white/40">
-          This is how you&apos;ll appear to others
+        <h1
+          className="text-white"
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 32,
+            fontWeight: 400,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.1,
+          }}
+        >
+          Looking good
+        </h1>
+        <p className="mt-2 text-[14px] leading-relaxed text-white/38">
+          This is how you&apos;ll appear to others.
         </p>
       </div>
 
@@ -636,7 +651,7 @@ function ProfilePreview({
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-headline text-white/60">Completeness</h3>
             <span className="text-headline memento-gradient-text">
-              {completion.completion_percentage}%
+              {completion.completion_score}%
             </span>
           </div>
 
@@ -644,28 +659,34 @@ function ProfilePreview({
             <div
               className="memento-gradient h-full rounded-full transition-all duration-1000 ease-out"
               style={{
-                width: `${completion.completion_percentage}%`,
-                ...(completion.completion_percentage === 100
+                width: `${completion.completion_score}%`,
+                ...(completion.completion_score === 100
                   ? { background: "linear-gradient(90deg, oklch(0.6 0.18 155), oklch(0.65 0.15 165))" }
                   : {}),
               }}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {completion.filled_fields.map((field) => (
-              <div key={field} className="text-footnote flex items-center gap-2 text-white/40">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400/70" />
-                <span className="capitalize">{field.replace(/_/g, " ")}</span>
+          {(() => {
+            const ALL_FIELDS = ["name", "location", "experiences", "profile_pic", "education", "bio"];
+            const filledFields = ALL_FIELDS.filter((f) => !completion.missing_fields.includes(f));
+            return (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {filledFields.map((field) => (
+                  <div key={field} className="text-footnote flex items-center gap-2 text-white/40">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400/70" />
+                    <span className="capitalize">{field.replace(/_/g, " ")}</span>
+                  </div>
+                ))}
+                {completion.missing_fields.map((field) => (
+                  <div key={field} className="text-footnote flex items-center gap-2 text-white/15">
+                    <Circle className="h-4 w-4 shrink-0" />
+                    <span className="capitalize">{field.replace(/_/g, " ")}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-            {completion.missing_fields.map((field) => (
-              <div key={field} className="text-footnote flex items-center gap-2 text-white/15">
-                <Circle className="h-4 w-4 shrink-0" />
-                <span className="capitalize">{field.replace(/_/g, " ")}</span>
-              </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       </div>
 

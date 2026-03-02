@@ -6,6 +6,7 @@ import { ChevronLeft, Camera, Loader2 } from "lucide-react";
 import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
+import { getNextRoute } from "@/lib/onboarding";
 
 export default function PhotoPage() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function PhotoPage() {
   }
 
   async function handleContinue() {
-    if (!file) { router.push("/onboarding/location"); return; }
+    if (!file) { router.push(getNextRoute("photo")); return; }
     setLoading(true);
     setError(null);
     try {
@@ -43,7 +44,7 @@ export default function PhotoPage() {
 
       api.setToken(session.access_token);
       await api.updateProfile({ photo_path: publicUrl });
-      router.push("/onboarding/location");
+      router.push(getNextRoute("photo"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to upload photo");
     } finally {
@@ -173,7 +174,7 @@ export default function PhotoPage() {
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding/location")}
+          onClick={() => router.push(getNextRoute("photo"))}
           className="mt-4 flex w-full items-center justify-center text-[13px] text-white/30 active:text-white/50"
         >
           Skip for now

@@ -6,6 +6,7 @@ import { ChevronLeft, Loader2 } from "lucide-react";
 import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
+import { getNextRoute } from "@/lib/onboarding";
 
 const MAX_CHARS = 300;
 
@@ -25,7 +26,7 @@ export default function BioPage() {
       if (!session) { setError("Session expired. Please sign in again."); return; }
       api.setToken(session.access_token);
       await api.updateProfile({ bio: bio.trim() });
-      router.push("/onboarding/experience");
+      router.push(getNextRoute("bio"));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save");
     } finally {
@@ -137,7 +138,7 @@ export default function BioPage() {
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding/experience")}
+          onClick={() => router.push(getNextRoute("bio"))}
           className="mt-4 flex w-full items-center justify-center text-[13px] text-white/30 active:text-white/50"
         >
           Skip for now
