@@ -182,10 +182,7 @@ async def upload_resume(
     parser = ResumeParser(openai_api_key=settings.openai_api_key)
 
     try:
-        import io
-
-        file_content = io.BytesIO(contents)
-        resume_data: ResumeData = await parser.parse(file_content, file.filename)
+        resume_data: ResumeData = parser.parse(contents, file.filename)
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
