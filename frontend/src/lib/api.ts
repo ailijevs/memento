@@ -47,6 +47,13 @@ class ApiClient {
     );
   }
 
+  async updateProfile(data: ProfileUpdateRequest) {
+    return this.request<ProfileResponse>("/api/v1/profiles/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",
@@ -55,6 +62,29 @@ class ApiClient {
         body: JSON.stringify({ linkedin_url: linkedinUrl }),
       }
     );
+  }
+
+  async uploadResume(file: File) {
+    if (!this.accessToken) throw new ApiError(401, "Not authenticated");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_URL}/api/v1/profiles/me/resume`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${this.accessToken}` },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      throw new ApiError(
+        response.status,
+        error.detail || `Resume upload failed: ${response.statusText}`
+      );
+    }
+
+    return response.json() as Promise<ResumeParseResponse>;
   }
 }
 
@@ -67,7 +97,41 @@ export class ApiError extends Error {
   }
 }
 
-// Response types matching the backend schemas
+// ─── Request types ────────────────────────────────────────────────────────────
+
+export interface ProfileUpdateRequest {
+  full_name?: string;
+  headline?: string;
+  bio?: string;
+  location?: string;
+  company?: string;
+  major?: string;
+  graduation_year?: number;
+  linkedin_url?: string;
+  photo_path?: string;
+  experiences?: ExperienceInput[];
+  education?: EducationInput[];
+}
+
+export interface ExperienceInput {
+  company?: string | null;
+  title?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  description?: string | null;
+  location?: string | null;
+}
+
+export interface EducationInput {
+  school?: string | null;
+  degree?: string | null;
+  field_of_study?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+// ─── Response types ───────────────────────────────────────────────────────────
+
 export interface ProfileResponse {
   user_id: string;
   full_name: string;
@@ -116,4 +180,10 @@ export interface LinkedInOnboardingResponse {
   enrichment: Record<string, unknown>;
   completion: ProfileCompletionResponse;
   image_saved: boolean;
+}
+
+export interface ResumeParseResponse {
+  message: string;
+  extracted_data: Record<string, unknown>;
+  profile_updated: boolean;
 }

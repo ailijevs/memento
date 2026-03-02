@@ -158,10 +158,6 @@ export default function OnboardingPage() {
   }, []);
 
   async function handleSubmit() {
-    if (isResume) {
-      setError("Resume import coming soon — use LinkedIn for now.");
-      return;
-    }
     setError(null);
     setLoading(true);
     try {
@@ -169,9 +165,21 @@ export default function OnboardingPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Session expired. Please sign in again."); setLoading(false); return; }
       api.setToken(session.access_token);
-      const result = await api.onboardFromLinkedIn(linkedinUrl);
-      setProfile(result.profile);
-      setCompletion(result.completion);
+
+      if (isResume && resumeFile) {
+        await api.uploadResume(resumeFile);
+        const [profileResult, completionResult] = await Promise.all([
+          api.getProfile(),
+          api.getProfileCompletion(),
+        ]);
+        setProfile(profileResult);
+        setCompletion(completionResult);
+      } else {
+        const result = await api.onboardFromLinkedIn(linkedinUrl);
+        setProfile(result.profile);
+        setCompletion(result.completion);
+      }
+
       setStep("preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import profile");
@@ -337,19 +345,6 @@ export default function OnboardingPage() {
                     >
                       {isFilled ? displayVal : opt.label}
                     </span>
-                    {/* "coming soon" badge on resume node */}
-                    {i === 1 && (
-                      <span
-                        style={{
-                          fontSize: 9,
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          color: `rgba(${ocr},${ocg},${ocb},0.45)`,
-                        }}
-                      >
-                        coming soon
-                      </span>
-                    )}
                   </div>
 
                   {isFilled && !isActive && (
@@ -506,7 +501,7 @@ export default function OnboardingPage() {
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin text-white/60" />
           ) : isResume ? (
-            "Coming Soon"
+            "Import Resume"
           ) : (
             "Import Profile"
           )}
