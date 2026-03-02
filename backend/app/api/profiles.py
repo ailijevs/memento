@@ -1,10 +1,12 @@
 """API endpoints for user profiles."""
 
 import asyncio
-from typing import Annotated
+import logging
+from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from pydantic import BaseModel
 
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
@@ -29,7 +31,10 @@ from app.services import (
     ProfileSummaryService,
     calculate_profile_completion,
 )
+from app.services.resume_parser import ResumeData, ResumeParser
 from app.utils.s3_helpers import upload_profile_picture
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -276,6 +281,154 @@ async def get_event_directory(
     Uses the get_event_directory SQL function.
     """
     return await dal.get_event_directory(event_id)
+
+
+# =============================================================================
+# Resume Upload & Parsing
+# =============================================================================
+
+
+class ResumeParseResponse(BaseModel):
+    """Response from resume parsing endpoint."""
+
+    message: str
+    extracted_data: dict
+    profile_updated: bool
+
+
+@router.post("/me/resume", response_model=ResumeParseResponse)
+async def upload_resume(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    file: UploadFile = File(..., description="Resume file (PDF or DOCX)"),
+) -> ResumeParseResponse:
+    """
+    Upload a resume to extract profile information.
+
+    Parses the resume and updates the user's profile with extracted data.
+    Supported formats: PDF, DOCX
+
+    If OpenAI API key is configured, uses AI for smarter extraction.
+    Otherwise, falls back to pattern-based extraction.
+    """
+    # Validate file type
+    if not file.filename:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Filename is required",
+        )
+
+    allowed_extensions = (".pdf", ".docx", ".doc")
+    if not file.filename.lower().endswith(allowed_extensions):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}",
+        )
+
+    # Check file size (max 10MB)
+    contents = await file.read()
+    if len(contents) > 10 * 1024 * 1024:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="File too large. Maximum size is 10MB.",
+        )
+
+    # Reset file position for parsing
+    await file.seek(0)
+
+    # Parse the resume
+    settings = get_settings()
+    parser = ResumeParser(openai_api_key=settings.openai_api_key)
+
+    try:
+        resume_data: ResumeData = parser.parse(contents, file.filename)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except Exception as e:
+        logger.error(f"Resume parsing failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to parse resume. Please try again or use a different format.",
+        )
+
+    # Use admin client to bypass RLS for profile creation/update
+    from app.db.supabase import get_admin_client
+
+    admin_client = get_admin_client()
+
+    # Check if profile exists using admin client
+    existing_response = (
+        admin_client.table("profiles")
+        .select("user_id")
+        .eq("user_id", str(current_user.id))
+        .execute()
+    )
+    existing_profile = existing_response.data and len(existing_response.data) > 0
+
+    profile_updated = False
+    if existing_profile:
+        # Update existing profile (only non-None fields)
+        update_data: dict[str, Any] = {}
+        if resume_data.full_name:
+            update_data["full_name"] = resume_data.full_name
+        if resume_data.headline:
+            update_data["headline"] = resume_data.headline
+        if resume_data.bio:
+            update_data["bio"] = resume_data.bio
+        if resume_data.company:
+            update_data["company"] = resume_data.company
+        if resume_data.major:
+            update_data["major"] = resume_data.major
+        if resume_data.graduation_year:
+            update_data["graduation_year"] = resume_data.graduation_year
+
+        if update_data:
+            admin_client.table("profiles").update(update_data).eq(
+                "user_id", str(current_user.id)
+            ).execute()
+            profile_updated = True
+    else:
+        # Create new profile using admin client
+        profile_data = {
+            "user_id": str(current_user.id),
+            "full_name": resume_data.full_name or "Unknown",
+            "headline": resume_data.headline,
+            "bio": resume_data.bio,
+            "company": resume_data.company,
+            "major": resume_data.major,
+            "graduation_year": resume_data.graduation_year,
+        }
+        # Remove None values
+        profile_data = {k: v for k, v in profile_data.items() if v is not None}
+        admin_client.table("profiles").insert(profile_data).execute()
+        profile_updated = True
+
+    # Build response with extracted data
+    extracted = {
+        "full_name": resume_data.full_name,
+        "headline": resume_data.headline,
+        "bio": resume_data.bio,
+        "company": resume_data.company,
+        "major": resume_data.major,
+        "graduation_year": resume_data.graduation_year,
+        "email": resume_data.email,
+        "phone": resume_data.phone,
+        "skills": resume_data.skills,
+    }
+
+    return ResumeParseResponse(
+        message="Resume parsed successfully",
+        extracted_data={k: v for k, v in extracted.items() if v is not None},
+        profile_updated=profile_updated,
+    )
+
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
 
 
 def _parse_graduation_year(end_date: str | None) -> int | None:
