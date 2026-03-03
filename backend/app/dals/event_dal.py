@@ -158,3 +158,28 @@ class EventDAL(BaseDAL):
         )
 
         return [EventResponse(**event) for event in response.data]
+
+    async def get_events_pending_cleanup(self, window_hours: int = 24) -> list[EventResponse]:
+        """
+        Get events that should have their face collections cleaned up.
+
+        Returns events where:
+        - ends_at <= now - `window_hours`
+        - is_active is true
+        - cleanup_status is pending
+        """
+        if window_hours < 0:
+            raise ValueError("window_hours must be >= 0")
+
+        threshold = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
+        response = (
+            self.client.table(self.TABLE)
+            .select("*")
+            .eq("is_active", True)
+            .lte("ends_at", threshold)
+            .eq("cleanup_status", "pending")
+            .order("ends_at", desc=False)
+            .execute()
+        )
+
+        return [EventResponse(**event) for event in response.data]

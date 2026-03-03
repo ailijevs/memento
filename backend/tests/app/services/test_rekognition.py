@@ -22,8 +22,11 @@ class DummyRekognitionClient:
 
     def __init__(self) -> None:
         self.create_calls: list[dict[str, str]] = []
+        self.delete_calls: list[dict[str, str]] = []
         self.index_calls: list[dict[str, object]] = []
         self.raise_already_exists = False
+        self.raise_not_found_on_delete = False
+        self.raise_delete_error = False
 
     def create_collection(self, CollectionId):  # noqa: N803
         self.create_calls.append({"CollectionId": CollectionId})
@@ -36,6 +39,30 @@ class DummyRekognitionClient:
                     }
                 },
                 "CreateCollection",
+            )
+        return {"StatusCode": 200}
+
+    def delete_collection(self, CollectionId):  # noqa: N803
+        self.delete_calls.append({"CollectionId": CollectionId})
+        if self.raise_not_found_on_delete:
+            raise ClientError(
+                {
+                    "Error": {
+                        "Code": "ResourceNotFoundException",
+                        "Message": "missing",
+                    }
+                },
+                "DeleteCollection",
+            )
+        if self.raise_delete_error:
+            raise ClientError(
+                {
+                    "Error": {
+                        "Code": "AccessDeniedException",
+                        "Message": "denied",
+                    }
+                },
+                "DeleteCollection",
             )
         return {"StatusCode": 200}
 
@@ -66,6 +93,47 @@ def test_ensure_collection_exists_validates_collection_id():
     service = RekognitionService(rekognition_client=DummyRekognitionClient())
     with pytest.raises(ValueError, match="collection_id must not be empty"):
         service.ensure_collection_exists(collection_id="   ")
+
+
+def test_delete_collection_deletes_collection():
+    """delete_collection sends the delete request for a collection ID."""
+    client = DummyRekognitionClient()
+    service = RekognitionService(rekognition_client=client)
+
+    response = service.delete_collection(collection_id="collection-1")
+
+    assert response == {"StatusCode": 200}
+    assert client.delete_calls == [{"CollectionId": "collection-1"}]
+
+
+def test_delete_collection_ignores_missing_collection():
+    """delete_collection is idempotent when the collection does not exist."""
+    client = DummyRekognitionClient()
+    client.raise_not_found_on_delete = True
+    service = RekognitionService(rekognition_client=client)
+
+    response = service.delete_collection(collection_id="collection-1")
+
+    assert response == {"StatusCode": 404}
+    assert client.delete_calls == [{"CollectionId": "collection-1"}]
+
+
+def test_delete_collection_raises_clear_error_for_client_failure():
+    """delete_collection wraps unexpected AWS client errors with context."""
+    client = DummyRekognitionClient()
+    client.raise_delete_error = True
+    service = RekognitionService(rekognition_client=client)
+
+    with pytest.raises(RuntimeError, match="Failed to delete Rekognition collection"):
+        service.delete_collection(collection_id="collection-1")
+
+
+def test_delete_collection_validates_collection_id():
+    """delete_collection validates non-empty collection ID."""
+    service = RekognitionService(rekognition_client=DummyRekognitionClient())
+
+    with pytest.raises(ValueError, match="collection_id must not be empty"):
+        service.delete_collection(collection_id="   ")
 
 
 def test_index_face_from_s3_sends_expected_payload():

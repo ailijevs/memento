@@ -29,6 +29,24 @@ class RekognitionService:
             if error_code != "ResourceAlreadyExistsException":
                 raise
 
+    def delete_collection(self, *, collection_id: str) -> dict[str, Any]:
+        """Delete a Rekognition collection by ID."""
+        cleaned_collection_id = collection_id.strip()
+        if not cleaned_collection_id:
+            raise ValueError("collection_id must not be empty.")
+
+        try:
+            response = self.client.delete_collection(CollectionId=cleaned_collection_id)
+        except ClientError as exc:
+            error_code = exc.response.get("Error", {}).get("Code")
+            if error_code == "ResourceNotFoundException":
+                return {"StatusCode": 404}
+            raise RuntimeError(
+                f"Failed to delete Rekognition collection '{cleaned_collection_id}'."
+            ) from exc
+
+        return cast(dict[str, Any], response)
+
     def index_face_from_s3(
         self,
         *,
