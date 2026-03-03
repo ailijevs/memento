@@ -82,7 +82,6 @@ async def create_my_profile(
     dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
 ) -> ProfileResponse:
     """Create the current user's profile."""
-    # Check if profile already exists
     existing = await dal.get_by_user_id(current_user.id)
     if existing:
         raise HTTPException(
@@ -206,7 +205,8 @@ async def onboard_from_linkedin_url(
         )
         if saved_profile is None:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile update failed."
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Profile update failed.",
             )
     else:
         saved_profile = await dal.create(
@@ -311,7 +311,6 @@ async def upload_resume(
     If OpenAI API key is configured, uses AI for smarter extraction.
     Otherwise, falls back to pattern-based extraction.
     """
-    # Validate file type
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -325,7 +324,6 @@ async def upload_resume(
             detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}",
         )
 
-    # Check file size (max 10MB)
     contents = await file.read()
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(
@@ -333,10 +331,8 @@ async def upload_resume(
             detail="File too large. Maximum size is 10MB.",
         )
 
-    # Reset file position for parsing
     await file.seek(0)
 
-    # Parse the resume
     settings = get_settings()
     parser = ResumeParser(openai_api_key=settings.openai_api_key)
 
@@ -354,69 +350,112 @@ async def upload_resume(
             detail="Failed to parse resume. Please try again or use a different format.",
         )
 
-    # Use admin client to bypass RLS for profile creation/update
+    # Validate extracted data has minimum required content
+    if not resume_data.full_name and not resume_data.raw_text:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not extract any information from the resume. "
+            "Please ensure the file contains readable text.",
+        )
+
     from app.db.supabase import get_admin_client
 
     admin_client = get_admin_client()
 
-    # Check if profile exists using admin client
-    existing_response = (
-        admin_client.table("profiles")
-        .select("user_id")
-        .eq("user_id", str(current_user.id))
-        .execute()
-    )
-    existing_profile = existing_response.data and len(existing_response.data) > 0
+    try:
+        existing_response = (
+            admin_client.table("profiles")
+            .select("user_id")
+            .eq("user_id", str(current_user.id))
+            .execute()
+        )
+        existing_profile = existing_response.data and len(existing_response.data) > 0
+    except Exception as e:
+        logger.error(f"Database query failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error. Please try again.",
+        )
 
     profile_updated = False
     if existing_profile:
-        # Update existing profile (only non-None fields)
         update_data: dict[str, Any] = {}
         if resume_data.full_name:
-            update_data["full_name"] = resume_data.full_name
+            update_data["full_name"] = _truncate_string(resume_data.full_name, 255)
         if resume_data.headline:
-            update_data["headline"] = resume_data.headline
+            update_data["headline"] = _truncate_string(resume_data.headline, 255)
         if resume_data.bio:
-            update_data["bio"] = resume_data.bio
+            update_data["bio"] = _truncate_string(resume_data.bio, 2000)
         if resume_data.company:
-            update_data["company"] = resume_data.company
+            update_data["company"] = _truncate_string(resume_data.company, 255)
         if resume_data.major:
-            update_data["major"] = resume_data.major
+            update_data["major"] = _truncate_string(resume_data.major, 255)
         if resume_data.graduation_year:
             update_data["graduation_year"] = resume_data.graduation_year
+        if resume_data.location:
+            update_data["location"] = _truncate_string(resume_data.location, 255)
+        if resume_data.profile_one_liner:
+            update_data["profile_one_liner"] = _truncate_string(resume_data.profile_one_liner, 500)
+        if resume_data.profile_summary:
+            update_data["profile_summary"] = _truncate_string(resume_data.profile_summary, 5000)
+        if resume_data.experiences:
+            update_data["experiences"] = resume_data.experiences
+        if resume_data.education:
+            update_data["education"] = resume_data.education
 
         if update_data:
-            admin_client.table("profiles").update(update_data).eq(
-                "user_id", str(current_user.id)
-            ).execute()
-            profile_updated = True
+            try:
+                admin_client.table("profiles").update(update_data).eq(
+                    "user_id", str(current_user.id)
+                ).execute()
+                profile_updated = True
+            except Exception as e:
+                logger.error(f"Failed to update profile: {e}")
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Failed to update profile. Please try again.",
+                )
     else:
-        # Create new profile using admin client
-        profile_data = {
+        profile_data: dict[str, Any] = {
             "user_id": str(current_user.id),
-            "full_name": resume_data.full_name or "Unknown",
-            "headline": resume_data.headline,
-            "bio": resume_data.bio,
-            "company": resume_data.company,
-            "major": resume_data.major,
+            "full_name": _truncate_string(resume_data.full_name, 255) or "Unknown",
+            "headline": _truncate_string(resume_data.headline, 255),
+            "bio": _truncate_string(resume_data.bio, 2000),
+            "company": _truncate_string(resume_data.company, 255),
+            "major": _truncate_string(resume_data.major, 255),
             "graduation_year": resume_data.graduation_year,
+            "location": _truncate_string(resume_data.location, 255),
+            "profile_one_liner": _truncate_string(resume_data.profile_one_liner, 500),
+            "profile_summary": _truncate_string(resume_data.profile_summary, 5000),
+            "experiences": resume_data.experiences or [],
+            "education": resume_data.education or [],
         }
-        # Remove None values
         profile_data = {k: v for k, v in profile_data.items() if v is not None}
-        admin_client.table("profiles").insert(profile_data).execute()
-        profile_updated = True
+        try:
+            admin_client.table("profiles").insert(profile_data).execute()
+            profile_updated = True
+        except Exception as e:
+            logger.error(f"Failed to create profile: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to create profile. Please try again.",
+            )
 
-    # Build response with extracted data
-    extracted = {
+    extracted: dict[str, Any] = {
         "full_name": resume_data.full_name,
         "headline": resume_data.headline,
         "bio": resume_data.bio,
         "company": resume_data.company,
         "major": resume_data.major,
         "graduation_year": resume_data.graduation_year,
+        "location": resume_data.location,
         "email": resume_data.email,
         "phone": resume_data.phone,
         "skills": resume_data.skills,
+        "profile_one_liner": resume_data.profile_one_liner,
+        "profile_summary": resume_data.profile_summary,
+        "experiences": resume_data.experiences,
+        "education": resume_data.education,
     }
 
     return ResumeParseResponse(
@@ -429,6 +468,20 @@ async def upload_resume(
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+
+def _truncate_string(value: str | None, max_length: int) -> str | None:
+    """Truncate string to max length, returning None for empty strings."""
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        value = str(value)
+    value = value.strip()
+    if not value:
+        return None
+    if len(value) > max_length:
+        return value[:max_length]
+    return value
 
 
 def _parse_graduation_year(end_date: str | None) -> int | None:
