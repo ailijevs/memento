@@ -1,13 +1,10 @@
 """Tests for the facial recognition feature."""
 
 import base64
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
-from fastapi.testclient import TestClient
-
-from app.main import app
 from app.schemas import (
     BoundingBox,
     FaceMatch,
@@ -15,7 +12,6 @@ from app.schemas import (
 )
 from app.services.rekognition import (
     RekognitionService,
-    RekognitionError,
     FaceNotFoundError,
     decode_base64_image,
 )
