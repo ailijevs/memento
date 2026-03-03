@@ -13,6 +13,7 @@ class ApiClient {
   ): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
       ...(options.headers as Record<string, string>),
     };
 
@@ -75,7 +76,10 @@ class ApiClient {
 
     const response = await fetch(`${API_URL}/api/v1/profiles/me/resume`, {
       method: "POST",
-      headers: { Authorization: `Bearer ${this.accessToken}` },
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "ngrok-skip-browser-warning": "true",
+      },
       body: formData,
     });
 
