@@ -58,6 +58,10 @@ class ApiClient {
     });
   }
 
+  async getProfileById(userId: string) {
+    return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",
