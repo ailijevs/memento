@@ -108,7 +108,7 @@ class ResumeParser:
                         text_parts.append(page_text)
             return "\n".join(text_parts)
         except ImportError:
-            logger.warning("pdfplumber not installed")
+            logger.warning("pdfplumber not installed, returning empty text")
             return ""
         except Exception as e:
             logger.error(f"Error extracting PDF text: {e}")
