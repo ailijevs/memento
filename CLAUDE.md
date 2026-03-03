@@ -344,6 +344,10 @@ It might extract the logged-in user instead of visited profile. The parser uses 
 ### Exa.ai returns no results
 Some LinkedIn profiles are private or not indexed. Try the Playwright scraper as fallback.
 
+## Claude Code (terminal) — Frontend UI rules
+
+When working on the **frontend** (`frontend/`), Claude Code loads project rules from `.claude/rules/`. The file `.claude/rules/frontend-ui.md` is applied automatically for paths under `frontend/**` and contains the Memento design system: Aurora usage, typography, color/opacity, layout, component patterns, and animation. Prefer those rules over ad-hoc styling. Full design doc: `docs/design-system.md`.
+
 ## Useful Links
 
 - [Supabase Dashboard](https://supabase.com/dashboard)

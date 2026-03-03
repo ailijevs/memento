@@ -13,6 +13,7 @@ class ApiClient {
   ): Promise<T> {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true",
       ...(options.headers as Record<string, string>),
     };
 
@@ -27,10 +28,13 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
-      throw new ApiError(
-        response.status,
-        error.detail || `Request failed: ${response.statusText}`
-      );
+      const detail = error.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
+        : typeof detail === "string"
+        ? detail
+        : `Request failed: ${response.status} ${response.statusText}`;
+      throw new ApiError(response.status, message);
     }
 
     if (response.status === 204) return undefined as T;
@@ -47,6 +51,13 @@ class ApiClient {
     );
   }
 
+  async updateProfile(data: ProfileUpdateRequest) {
+    return this.request<ProfileResponse>("/api/v1/profiles/me", {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",
@@ -55,6 +66,35 @@ class ApiClient {
         body: JSON.stringify({ linkedin_url: linkedinUrl }),
       }
     );
+  }
+
+  async uploadResume(file: File) {
+    if (!this.accessToken) throw new ApiError(401, "Not authenticated");
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(`${API_URL}/api/v1/profiles/me/resume`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        "ngrok-skip-browser-warning": "true",
+      },
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      const detail = error.detail;
+      const message = Array.isArray(detail)
+        ? detail.map((e: { msg?: string }) => e.msg ?? JSON.stringify(e)).join("; ")
+        : typeof detail === "string"
+        ? detail
+        : `Resume upload failed: ${response.status} ${response.statusText}`;
+      throw new ApiError(response.status, message);
+    }
+
+    return response.json() as Promise<ResumeParseResponse>;
   }
 }
 
@@ -67,7 +107,41 @@ export class ApiError extends Error {
   }
 }
 
-// Response types matching the backend schemas
+// ─── Request types ────────────────────────────────────────────────────────────
+
+export interface ProfileUpdateRequest {
+  full_name?: string;
+  headline?: string;
+  bio?: string;
+  location?: string;
+  company?: string;
+  major?: string;
+  graduation_year?: number;
+  linkedin_url?: string;
+  photo_path?: string;
+  experiences?: ExperienceInput[];
+  education?: EducationInput[];
+}
+
+export interface ExperienceInput {
+  company?: string | null;
+  title?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  description?: string | null;
+  location?: string | null;
+}
+
+export interface EducationInput {
+  school?: string | null;
+  degree?: string | null;
+  field_of_study?: string | null;
+  start_date?: string | null;
+  end_date?: string | null;
+}
+
+// ─── Response types ───────────────────────────────────────────────────────────
+
 export interface ProfileResponse {
   user_id: string;
   full_name: string;
@@ -106,8 +180,7 @@ export interface Education {
 
 export interface ProfileCompletionResponse {
   is_complete: boolean;
-  completion_percentage: number;
-  filled_fields: string[];
+  completion_score: number;
   missing_fields: string[];
 }
 
@@ -116,4 +189,10 @@ export interface LinkedInOnboardingResponse {
   enrichment: Record<string, unknown>;
   completion: ProfileCompletionResponse;
   image_saved: boolean;
+}
+
+export interface ResumeParseResponse {
+  message: string;
+  extracted_data: Record<string, unknown>;
+  profile_updated: boolean;
 }

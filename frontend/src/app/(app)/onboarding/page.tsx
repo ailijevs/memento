@@ -8,6 +8,7 @@ import {
   type ProfileResponse,
   type ProfileCompletionResponse,
 } from "@/lib/api";
+import { saveMissingSteps, getFirstMissingRoute } from "@/lib/onboarding";
 import {
   Loader2,
   CheckCircle2,
@@ -158,10 +159,6 @@ export default function OnboardingPage() {
   }, []);
 
   async function handleSubmit() {
-    if (isResume) {
-      setError("Resume import coming soon — use LinkedIn for now.");
-      return;
-    }
     setError(null);
     setLoading(true);
     try {
@@ -169,9 +166,22 @@ export default function OnboardingPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Session expired. Please sign in again."); setLoading(false); return; }
       api.setToken(session.access_token);
-      const result = await api.onboardFromLinkedIn(linkedinUrl);
-      setProfile(result.profile);
-      setCompletion(result.completion);
+
+      if (isResume && resumeFile) {
+        await api.uploadResume(resumeFile);
+        const [profileResult, completionResult] = await Promise.all([
+          api.getProfile(),
+          api.getProfileCompletion(),
+        ]);
+        setProfile(profileResult);
+        setCompletion(completionResult);
+      } else {
+        const fullUrl = `https://linkedin.com/in/${linkedinUrl.trim().replace(/^.*linkedin\.com\/in\//i, "")}`;
+        const result = await api.onboardFromLinkedIn(fullUrl);
+        setProfile(result.profile);
+        setCompletion(result.completion);
+      }
+
       setStep("preview");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to import profile");
@@ -186,7 +196,10 @@ export default function OnboardingPage() {
         profile={profile}
         completion={completion}
         onBack={() => setStep("import")}
-        onContinue={() => router.push("/onboarding/name")}
+        onContinue={() => {
+          saveMissingSteps(completion.missing_fields);
+          router.push(getFirstMissingRoute(completion.missing_fields));
+        }}
       />
     );
   }
@@ -272,7 +285,7 @@ export default function OnboardingPage() {
           const isActive = activeIdx === i;
           const isFilled = i === 0 ? linkedinUrl.length > 0 : resumeFile !== null;
           const [ocr, ocg, ocb] = opt.color;
-          const displayVal = i === 0 ? truncate(linkedinUrl) : truncate(resumeFile?.name ?? "");
+          const displayVal = i === 0 ? truncate(linkedinUrl ? `in/${linkedinUrl}` : "") : truncate(resumeFile?.name ?? "");
 
           return (
             <div
@@ -337,19 +350,6 @@ export default function OnboardingPage() {
                     >
                       {isFilled ? displayVal : opt.label}
                     </span>
-                    {/* "coming soon" badge on resume node */}
-                    {i === 1 && (
-                      <span
-                        style={{
-                          fontSize: 9,
-                          letterSpacing: "0.08em",
-                          textTransform: "uppercase",
-                          color: `rgba(${ocr},${ocg},${ocb},0.45)`,
-                        }}
-                      >
-                        coming soon
-                      </span>
-                    )}
                   </div>
 
                   {isFilled && !isActive && (
@@ -428,17 +428,22 @@ export default function OnboardingPage() {
                 </>
               ) : (
                 <>
-                  <input
-                    ref={inputRef}
-                    type="url"
-                    placeholder={activeOption.placeholder}
-                    autoComplete="url"
-                    value={linkedinUrl}
-                    onChange={(e) => setLinkedinUrl(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === "Enter" && hasValue) handleSubmit(); }}
-                    className="flex-1 bg-transparent text-[16px] text-white outline-none placeholder:text-white/15"
-                    style={{ caretColor: `rgba(${cr},${cg},${cb},0.7)` }}
-                  />
+                  <div className="flex flex-1 items-center min-w-0">
+                    <span className="shrink-0 text-[16px] text-white/25">linkedin.com/in/</span>
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      placeholder="yourname"
+                      autoComplete="off"
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      value={linkedinUrl}
+                      onChange={(e) => setLinkedinUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter" && hasValue) handleSubmit(); }}
+                      className="min-w-0 flex-1 bg-transparent text-[16px] text-white outline-none placeholder:text-white/15"
+                      style={{ caretColor: `rgba(${cr},${cg},${cb},0.7)` }}
+                    />
+                  </div>
                   <button
                     type="button"
                     onPointerDown={(e) => { e.preventDefault(); if (hasValue) handleSubmit(); }}
@@ -506,7 +511,7 @@ export default function OnboardingPage() {
           {loading ? (
             <Loader2 className="h-4 w-4 animate-spin text-white/60" />
           ) : isResume ? (
-            "Coming Soon"
+            "Import Resume"
           ) : (
             "Import Profile"
           )}
@@ -535,9 +540,18 @@ function ProfilePreview({
 }) {
   return (
     <div className="relative flex min-h-dvh flex-col px-6 pt-4 pb-8 overflow-hidden">
-      <div className="absolute inset-0">
-        <Aurora className="h-full w-full" mode="focused" />
+      <div className="absolute inset-0" style={{ opacity: 0.28 }}>
+        <Aurora className="h-full w-full" mode="ambient" />
       </div>
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background: [
+            "linear-gradient(to top, oklch(0.04 0.005 270) 15%, transparent 42%)",
+            "linear-gradient(to bottom, oklch(0.04 0.005 270 / 50%) 0%, transparent 22%)",
+          ].join(", "),
+        }}
+      />
 
       {/* Back */}
       <div className="relative z-10">
@@ -554,35 +568,46 @@ function ProfilePreview({
         <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/22">
           Step 2 of 8
         </p>
-        <h1 className="text-large-title text-white">Looking good</h1>
-        <p className="text-callout mt-2 text-white/40">
-          This is how you&apos;ll appear to others
+        <h1
+          className="text-white"
+          style={{
+            fontFamily: "var(--font-serif)",
+            fontSize: 32,
+            fontWeight: 400,
+            letterSpacing: "-0.02em",
+            lineHeight: 1.1,
+          }}
+        >
+          Looking good
+        </h1>
+        <p className="mt-2 text-[14px] leading-relaxed text-white/38">
+          This is how you&apos;ll appear to others.
         </p>
       </div>
 
       {/* Scrollable content */}
       <div className="relative z-10 flex-1 overflow-y-auto">
         {/* Profile Card */}
-        <div className="animate-scale-up delay-200 mb-5 rounded-[20px] bg-white/[0.04] p-6 ring-1 ring-white/[0.06]">
+        <div className="animate-scale-up delay-200 mb-5 rounded-[20px] p-6" style={{ background: "oklch(0.10 0.008 270)", border: "1px solid oklch(0.20 0.01 270)" }}>
           <div className="flex items-start gap-4">
             {profile.photo_path ? (
               <img
                 src={profile.photo_path}
                 alt={profile.full_name}
-                className="h-[72px] w-[72px] shrink-0 rounded-full object-cover ring-2 ring-white/[0.08]"
+                className="h-[72px] w-[72px] shrink-0 rounded-full object-cover ring-2 ring-white/[0.15]"
               />
             ) : (
-              <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-title1 text-white/40">
+              <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-white/[0.10] text-title1 text-white/60">
                 {profile.full_name.charAt(0)}
               </div>
             )}
             <div className="min-w-0 pt-1">
               <h2 className="text-title3 truncate text-white">{profile.full_name}</h2>
               {profile.headline && (
-                <p className="text-subhead mt-0.5 text-white/50 line-clamp-2">{profile.headline}</p>
+                <p className="text-subhead mt-0.5 text-white/65 line-clamp-2">{profile.headline}</p>
               )}
               {profile.location && (
-                <div className="text-caption1 mt-2 flex items-center gap-1.5 text-white/25">
+                <div className="text-caption1 mt-2 flex items-center gap-1.5 text-white/40">
                   <MapPin className="h-3 w-3" />
                   {profile.location}
                 </div>
@@ -592,23 +617,23 @@ function ProfilePreview({
 
           {profile.bio && (
             <>
-              <div className="my-5 h-px bg-white/[0.06]" />
-              <p className="text-subhead leading-[1.6] text-white/40">{profile.bio}</p>
+              <div className="my-5 h-px bg-white/[0.10]" />
+              <p className="text-subhead leading-[1.6] text-white/60">{profile.bio}</p>
             </>
           )}
 
           {profile.experiences && profile.experiences.length > 0 && (
             <>
-              <div className="my-5 h-px bg-white/[0.06]" />
+              <div className="my-5 h-px bg-white/[0.10]" />
               <div className="space-y-3">
-                <h3 className="text-caption1 flex items-center gap-2 font-medium uppercase tracking-[0.1em] text-white/20">
+                <h3 className="text-caption1 flex items-center gap-2 font-medium uppercase tracking-[0.1em] text-white/35">
                   <Briefcase className="h-3 w-3" />
                   Experience
                 </h3>
                 {profile.experiences.slice(0, 3).map((exp, i) => (
                   <div key={i}>
-                    <p className="text-subhead font-medium text-white/70">{exp.title}</p>
-                    <p className="text-footnote text-white/30">{exp.company}</p>
+                    <p className="text-subhead font-medium text-white/80">{exp.title}</p>
+                    <p className="text-footnote text-white/50">{exp.company}</p>
                   </div>
                 ))}
               </div>
@@ -617,16 +642,16 @@ function ProfilePreview({
 
           {profile.education && profile.education.length > 0 && (
             <>
-              <div className="my-5 h-px bg-white/[0.06]" />
+              <div className="my-5 h-px bg-white/[0.10]" />
               <div className="space-y-3">
-                <h3 className="text-caption1 flex items-center gap-2 font-medium uppercase tracking-[0.1em] text-white/20">
+                <h3 className="text-caption1 flex items-center gap-2 font-medium uppercase tracking-[0.1em] text-white/35">
                   <GraduationCap className="h-3 w-3" />
                   Education
                 </h3>
                 {profile.education.slice(0, 2).map((edu, i) => (
                   <div key={i}>
-                    <p className="text-subhead font-medium text-white/70">{edu.school}</p>
-                    <p className="text-footnote text-white/30">
+                    <p className="text-subhead font-medium text-white/80">{edu.school}</p>
+                    <p className="text-footnote text-white/50">
                       {[edu.degree, edu.field_of_study].filter(Boolean).join(", ")}
                     </p>
                   </div>
@@ -637,40 +662,46 @@ function ProfilePreview({
         </div>
 
         {/* Completion */}
-        <div className="animate-fade-up delay-400 rounded-[20px] bg-white/[0.04] p-5 ring-1 ring-white/[0.06]">
+        <div className="animate-fade-up delay-400 rounded-[20px] p-5" style={{ background: "oklch(0.10 0.008 270)", border: "1px solid oklch(0.20 0.01 270)" }}>
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-headline text-white/60">Completeness</h3>
+            <h3 className="text-headline text-white/75">Completeness</h3>
             <span className="text-headline memento-gradient-text">
-              {completion.completion_percentage}%
+              {completion.completion_score}%
             </span>
           </div>
 
-          <div className="mb-5 h-[5px] overflow-hidden rounded-full bg-white/[0.04]">
+          <div className="mb-5 h-[5px] overflow-hidden rounded-full bg-white/[0.10]">
             <div
               className="memento-gradient h-full rounded-full transition-all duration-1000 ease-out"
               style={{
-                width: `${completion.completion_percentage}%`,
-                ...(completion.completion_percentage === 100
+                width: `${completion.completion_score}%`,
+                ...(completion.completion_score === 100
                   ? { background: "linear-gradient(90deg, oklch(0.6 0.18 155), oklch(0.65 0.15 165))" }
                   : {}),
               }}
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-            {completion.filled_fields.map((field) => (
-              <div key={field} className="text-footnote flex items-center gap-2 text-white/40">
-                <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400/70" />
-                <span className="capitalize">{field.replace(/_/g, " ")}</span>
+          {(() => {
+            const ALL_FIELDS = ["name", "location", "experiences", "profile_pic", "education", "bio"];
+            const filledFields = ALL_FIELDS.filter((f) => !completion.missing_fields.includes(f));
+            return (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {filledFields.map((field) => (
+                  <div key={field} className="text-footnote flex items-center gap-2 text-white/60">
+                    <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-400/80" />
+                    <span className="capitalize">{field.replace(/_/g, " ")}</span>
+                  </div>
+                ))}
+                {completion.missing_fields.map((field) => (
+                  <div key={field} className="text-footnote flex items-center gap-2 text-white/25">
+                    <Circle className="h-4 w-4 shrink-0" />
+                    <span className="capitalize">{field.replace(/_/g, " ")}</span>
+                  </div>
+                ))}
               </div>
-            ))}
-            {completion.missing_fields.map((field) => (
-              <div key={field} className="text-footnote flex items-center gap-2 text-white/15">
-                <Circle className="h-4 w-4 shrink-0" />
-                <span className="capitalize">{field.replace(/_/g, " ")}</span>
-              </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       </div>
 

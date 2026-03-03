@@ -2,12 +2,35 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 import { Aurora } from "@/components/aurora";
+import { createClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api";
+import { getNextRoute } from "@/lib/onboarding";
 
 export default function NamePage() {
   const router = useRouter();
   const [name, setName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleContinue() {
+    if (!name.trim()) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError("Session expired. Please sign in again."); return; }
+      api.setToken(session.access_token);
+      await api.updateProfile({ full_name: name.trim() });
+      router.push(getNextRoute("name"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
@@ -81,7 +104,7 @@ export default function NamePage() {
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter" && name.trim()) router.push("/onboarding/photo"); }}
+            onKeyDown={(e) => { if (e.key === "Enter") handleContinue(); }}
             className="w-full bg-transparent px-5 py-5 text-[20px] text-white outline-none placeholder:text-white/15"
             style={{ caretColor: "oklch(0.7 0.18 275)" }}
           />
@@ -95,20 +118,21 @@ export default function NamePage() {
       >
         <button
           type="button"
-          onClick={() => router.push("/onboarding/photo")}
-          disabled={!name.trim()}
-          className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98] disabled:opacity-30"
+          onClick={handleContinue}
+          disabled={!name.trim() || loading}
+          className="flex h-[56px] w-full items-center justify-center gap-2 rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98] disabled:opacity-30"
           style={{
             background: "oklch(1 0 0 / 6%)",
             boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 25%), 0 0 30px oklch(0.4 0.12 275 / 15%)",
           }}
         >
-          Continue
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-white/60" /> : "Continue"}
         </button>
+        {error && <p className="mt-2 text-center text-[13px] text-red-400/80">{error}</p>}
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding/photo")}
+          onClick={() => router.push(getNextRoute("name"))}
           className="mt-4 flex w-full items-center justify-center text-[13px] text-white/30 active:text-white/50"
         >
           Skip for now

@@ -368,43 +368,55 @@ async def upload_resume(
     )
     existing_profile = existing_response.data and len(existing_response.data) > 0
 
-    profile_updated = False
-    if existing_profile:
-        # Update existing profile (only non-None fields)
-        update_data: dict[str, Any] = {}
-        if resume_data.full_name:
-            update_data["full_name"] = resume_data.full_name
-        if resume_data.headline:
-            update_data["headline"] = resume_data.headline
-        if resume_data.bio:
-            update_data["bio"] = resume_data.bio
-        if resume_data.company:
-            update_data["company"] = resume_data.company
-        if resume_data.major:
-            update_data["major"] = resume_data.major
-        if resume_data.graduation_year:
-            update_data["graduation_year"] = resume_data.graduation_year
+    # Safely coerce graduation_year to int (AI parsers sometimes return strings)
+    grad_year: int | None = None
+    if resume_data.graduation_year is not None:
+        try:
+            grad_year = int(resume_data.graduation_year)
+        except (ValueError, TypeError):
+            grad_year = None
 
-        if update_data:
-            admin_client.table("profiles").update(update_data).eq(
-                "user_id", str(current_user.id)
-            ).execute()
+    profile_updated = False
+    try:
+        if existing_profile:
+            # Update existing profile (only non-None fields)
+            update_data: dict[str, Any] = {}
+            if resume_data.full_name:
+                update_data["full_name"] = resume_data.full_name
+            if resume_data.headline:
+                update_data["headline"] = resume_data.headline
+            if resume_data.bio:
+                update_data["bio"] = resume_data.bio
+            if resume_data.company:
+                update_data["company"] = resume_data.company
+            if resume_data.major:
+                update_data["major"] = resume_data.major
+            if grad_year:
+                update_data["graduation_year"] = grad_year
+
+            if update_data:
+                admin_client.table("profiles").update(update_data).eq(
+                    "user_id", str(current_user.id)
+                ).execute()
+                profile_updated = True
+        else:
+            # Create new profile using admin client
+            profile_data = {
+                "user_id": str(current_user.id),
+                "full_name": resume_data.full_name or "Unknown",
+                "headline": resume_data.headline,
+                "bio": resume_data.bio,
+                "company": resume_data.company,
+                "major": resume_data.major,
+                "graduation_year": grad_year,
+            }
+            # Remove None values
+            profile_data = {k: v for k, v in profile_data.items() if v is not None}
+            admin_client.table("profiles").insert(profile_data).execute()
             profile_updated = True
-    else:
-        # Create new profile using admin client
-        profile_data = {
-            "user_id": str(current_user.id),
-            "full_name": resume_data.full_name or "Unknown",
-            "headline": resume_data.headline,
-            "bio": resume_data.bio,
-            "company": resume_data.company,
-            "major": resume_data.major,
-            "graduation_year": resume_data.graduation_year,
-        }
-        # Remove None values
-        profile_data = {k: v for k, v in profile_data.items() if v is not None}
-        admin_client.table("profiles").insert(profile_data).execute()
-        profile_updated = True
+    except Exception as e:
+        logger.error(f"Resume profile save failed: {e}")
+        # Don't fail the whole request — parsed data is still returned
 
     # Build response with extracted data
     extracted = {

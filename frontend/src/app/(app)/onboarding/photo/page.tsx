@@ -2,19 +2,54 @@
 
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Camera } from "lucide-react";
+import { ChevronLeft, Camera, Loader2 } from "lucide-react";
 import { Aurora } from "@/components/aurora";
+import { createClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api";
+import { getNextRoute } from "@/lib/onboarding";
 
 export default function PhotoPage() {
   const router = useRouter();
   const [preview, setPreview] = useState<string | null>(null);
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    setPreview(url);
+    const picked = e.target.files?.[0];
+    if (!picked) return;
+    setFile(picked);
+    setPreview(URL.createObjectURL(picked));
+  }
+
+  async function handleContinue() {
+    if (!file) { router.push(getNextRoute("photo")); return; }
+    setLoading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError("Session expired. Please sign in again."); return; }
+
+      const filePath = `${session.user.id}/avatar.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from("profile-photos")
+        .upload(filePath, file, { upsert: true, contentType: file.type });
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: { publicUrl } } = supabase.storage
+        .from("profile-photos")
+        .getPublicUrl(filePath);
+
+      api.setToken(session.access_token);
+      await api.updateProfile({ photo_path: publicUrl });
+      router.push(getNextRoute("photo"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upload photo");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -125,19 +160,21 @@ export default function PhotoPage() {
       >
         <button
           type="button"
-          onClick={() => router.push("/onboarding/location")}
-          className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98]"
+          onClick={handleContinue}
+          disabled={loading}
+          className="flex h-[56px] w-full items-center justify-center gap-2 rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98] disabled:opacity-60"
           style={{
             background: "oklch(1 0 0 / 6%)",
             boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 25%), 0 0 30px oklch(0.4 0.12 275 / 15%)",
           }}
         >
-          Continue
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-white/60" /> : "Continue"}
         </button>
+        {error && <p className="mt-2 text-center text-[13px] text-red-400/80">{error}</p>}
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding/location")}
+          onClick={() => router.push(getNextRoute("photo"))}
           className="mt-4 flex w-full items-center justify-center text-[13px] text-white/30 active:text-white/50"
         >
           Skip for now

@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, Plus } from "lucide-react";
+import { ChevronLeft, Plus, Loader2 } from "lucide-react";
 import { Aurora } from "@/components/aurora";
+import { createClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api";
+import { getNextRoute } from "@/lib/onboarding";
 
 interface ExperienceEntry {
   company: string;
@@ -27,6 +30,29 @@ export default function ExperiencePage() {
   }
 
   const hasAny = entries.some((e) => e.company.trim() || e.role.trim());
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleContinue() {
+    const filled = entries.filter((e) => e.company.trim() || e.role.trim());
+    if (!filled.length) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { setError("Session expired. Please sign in again."); return; }
+      api.setToken(session.access_token);
+      await api.updateProfile({
+        experiences: filled.map((e) => ({ company: e.company.trim() || null, title: e.role.trim() || null })),
+      });
+      router.push(getNextRoute("experience"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
@@ -135,20 +161,21 @@ export default function ExperiencePage() {
       >
         <button
           type="button"
-          onClick={() => router.push("/onboarding/education")}
-          disabled={!hasAny}
-          className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98] disabled:opacity-30"
+          onClick={handleContinue}
+          disabled={!hasAny || loading}
+          className="flex h-[56px] w-full items-center justify-center gap-2 rounded-[16px] text-[15px] font-semibold tracking-[-0.01em] text-white/90 transition-all active:scale-[0.98] disabled:opacity-30"
           style={{
             background: "oklch(1 0 0 / 6%)",
             boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 25%), 0 0 30px oklch(0.4 0.12 275 / 15%)",
           }}
         >
-          Continue
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-white/60" /> : "Continue"}
         </button>
+        {error && <p className="mt-2 text-center text-[13px] text-red-400/80">{error}</p>}
 
         <button
           type="button"
-          onClick={() => router.push("/onboarding/education")}
+          onClick={() => router.push(getNextRoute("experience"))}
           className="mt-4 flex w-full items-center justify-center text-[13px] text-white/30 active:text-white/50"
         >
           Skip for now
