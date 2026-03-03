@@ -7,23 +7,23 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import CurrentUser, get_current_user
 from app.schemas import (
+    BoundingBox,
     CollectionStatsResponse,
+    DetectedFace,
     DetectFacesRequest,
     DetectFacesResponse,
-    DetectedFace,
     FaceDeleteResponse,
     FaceIndexRequest,
     FaceIndexResponse,
     FaceMatch,
     FrameDetectionRequest,
     FrameDetectionResponse,
-    BoundingBox,
 )
 from app.services.rekognition import (
-    RekognitionService,
-    RekognitionError,
-    FaceNotFoundError,
     CollectionNotFoundError,
+    FaceNotFoundError,
+    RekognitionError,
+    RekognitionService,
     decode_base64_image,
     get_rekognition_service,
 )

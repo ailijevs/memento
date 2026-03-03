@@ -5,17 +5,17 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+
 from app.schemas import (
     BoundingBox,
     FaceMatch,
     FrameDetectionResponse,
 )
 from app.services.rekognition import (
-    RekognitionService,
     FaceNotFoundError,
+    RekognitionService,
     decode_base64_image,
 )
-
 
 SAMPLE_IMAGE_BASE64 = base64.b64encode(b"fake-image-bytes-for-testing" * 100).decode()
 

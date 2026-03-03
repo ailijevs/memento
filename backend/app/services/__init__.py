@@ -11,7 +11,6 @@ from .profile_summary import (
     ProfileSummaryResult,
     ProfileSummaryService,
 )
-
 from .rekognition import RekognitionService, get_rekognition_service
 
 __all__ = [
