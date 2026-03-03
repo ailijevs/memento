@@ -209,13 +209,13 @@ export default function LoginPage() {
       style={{
         transformOrigin: enterOrigin,
         background: [
-          "radial-gradient(ellipse 80% 50% at 50% 20%, oklch(0.12 0.08 275) 0%, transparent 100%)",
-          "radial-gradient(ellipse 50% 35% at 65% 50%, oklch(0.08 0.04 240) 0%, transparent 100%)",
-          "oklch(0.04 0.005 270)",
+          "radial-gradient(ellipse 80% 50% at 50% 20%, oklch(0.22 0.14 275) 0%, transparent 100%)",
+          "radial-gradient(ellipse 50% 35% at 65% 50%, oklch(0.14 0.09 240) 0%, transparent 100%)",
+          "oklch(0.07 0.015 270)",
         ].join(", "),
       }}
     >
-      <div className="absolute inset-0" style={{ opacity: 0.18 }}>
+      <div className="absolute inset-0" style={{ opacity: 0.45 }}>
         <Aurora className="h-full w-full" mode="focused" />
       </div>
 

@@ -145,10 +145,10 @@
   padding-right: env(safe-area-inset-right, 0px);
   overflow: hidden;
   background:
-    radial-gradient(ellipse 90% 50% at 50% 38%, oklch(0.11 0.06 275) 0%, transparent 100%),
-    radial-gradient(ellipse 50% 35% at 68% 52%, oklch(0.08 0.04 240) 0%, transparent 100%),
-    radial-gradient(ellipse 40% 30% at 30% 60%, oklch(0.06 0.03 260) 0%, transparent 100%),
-    oklch(0.04 0.005 270);
+    radial-gradient(ellipse 90% 50% at 50% 38%, oklch(0.22 0.14 275) 0%, transparent 100%),
+    radial-gradient(ellipse 50% 35% at 68% 52%, oklch(0.14 0.09 240) 0%, transparent 100%),
+    radial-gradient(ellipse 40% 30% at 30% 60%, oklch(0.11 0.06 260) 0%, transparent 100%),
+    oklch(0.07 0.015 270);
 }
 
 @media (min-width: 431px) {

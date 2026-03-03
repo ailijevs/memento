@@ -231,7 +231,7 @@ export default function OnboardingPage() {
       {/* Gradient mask — aurora only at top */}
       <div
         className="pointer-events-none absolute inset-0"
-        style={{ background: "linear-gradient(to bottom, transparent 15%, oklch(0.04 0.005 270) 50%)" }}
+        style={{ background: "linear-gradient(to bottom, transparent 15%, oklch(0.07 0.015 270) 50%)" }}
       />
 
       {/* Constellation canvas */}
@@ -557,14 +557,14 @@ function ProfilePreview({
 }) {
   return (
     <div className="relative flex min-h-dvh flex-col px-6 pt-4 pb-8 overflow-hidden">
-      <div className="absolute inset-0" style={{ opacity: 0.28 }}>
+      <div className="absolute inset-0" style={{ opacity: 0.52 }}>
         <Aurora className="h-full w-full" mode="ambient" />
       </div>
       <div
         className="pointer-events-none absolute inset-0"
         style={{
           background: [
-            "linear-gradient(to top, oklch(0.04 0.005 270) 15%, transparent 42%)",
+            "linear-gradient(to top, oklch(0.07 0.015 270) 15%, transparent 42%)",
             "linear-gradient(to bottom, oklch(0.04 0.005 270 / 50%) 0%, transparent 22%)",
           ].join(", "),
         }}

@@ -111,7 +111,7 @@ export default function DashboardPage() {
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Aurora */}
-      <div className="absolute inset-0" style={{ opacity: 0.22 }}>
+      <div className="absolute inset-0" style={{ opacity: 0.45 }}>
         <Aurora className="h-full w-full" mode="focused" />
       </div>
 
@@ -120,7 +120,7 @@ export default function DashboardPage() {
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "linear-gradient(to bottom, transparent 20%, oklch(0.04 0.005 270) 55%)",
+            "linear-gradient(to bottom, transparent 20%, oklch(0.07 0.015 270) 55%)",
         }}
       />
 
@@ -237,8 +237,8 @@ function RecognitionCard({
     <div
       className="rounded-2xl p-4"
       style={{
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.07)",
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.12)",
         animation: `fade-in 0.4s cubic-bezier(0.16,1,0.3,1) ${index * 50}ms both`,
       }}
     >
