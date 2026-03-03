@@ -1,11 +1,15 @@
 """Resume parsing service using OpenAI for intelligent extraction."""
 
+import io
 import json
 import logging
 import re
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
+
+# Minimum characters to consider text extraction successful
+MIN_TEXT_LENGTH = 50
 
 
 @dataclass
@@ -80,10 +84,20 @@ class ResumeParser:
             raise ValueError(f"Unsupported file type: {filename}")
 
     def _extract_from_pdf(self, file_content: bytes) -> str:
-        """Extract text from PDF using pdfplumber."""
-        try:
-            import io
+        """Extract text from PDF using pdfplumber, with OCR fallback for image-based PDFs."""
+        text = self._extract_pdf_text(file_content)
 
+        if len(text.strip()) < MIN_TEXT_LENGTH:
+            logger.info("PDF text extraction returned minimal text, attempting OCR...")
+            ocr_text = self._extract_pdf_with_ocr(file_content)
+            if len(ocr_text.strip()) > len(text.strip()):
+                return ocr_text
+
+        return text
+
+    def _extract_pdf_text(self, file_content: bytes) -> str:
+        """Extract text from PDF using pdfplumber (text-based PDFs)."""
+        try:
             import pdfplumber
 
             text_parts = []
@@ -100,11 +114,34 @@ class ResumeParser:
             logger.error(f"Error extracting PDF text: {e}")
             return ""
 
+    def _extract_pdf_with_ocr(self, pdf_bytes: bytes) -> str:
+        """Extract text from PDF using OCR (for image-based/scanned PDFs)."""
+        try:
+            import pytesseract
+            from pdf2image import convert_from_bytes
+
+            images = convert_from_bytes(pdf_bytes, dpi=300)
+
+            text_parts = []
+            for i, image in enumerate(images):
+                logger.debug(f"Running OCR on page {i + 1}/{len(images)}")
+                page_text = pytesseract.image_to_string(image)
+                if page_text.strip():
+                    text_parts.append(page_text)
+
+            return "\n".join(text_parts)
+
+        except ImportError as e:
+            logger.warning(f"OCR dependencies not installed: {e}")
+            logger.info("Install with: pip install pytesseract pdf2image pillow")
+            return ""
+        except Exception as e:
+            logger.error(f"OCR extraction failed: {e}")
+            return ""
+
     def _extract_from_docx(self, file_content: bytes) -> str:
         """Extract text from DOCX using python-docx."""
         try:
-            import io
-
             from docx import Document
 
             doc = Document(io.BytesIO(file_content))
