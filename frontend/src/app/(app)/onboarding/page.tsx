@@ -77,6 +77,23 @@ export default function OnboardingPage() {
   const [cr, cg, cb] = activeOption.color;
   const hasValue = isResume ? resumeFile !== null : linkedinUrl.length > 0;
 
+  // Redirect to dashboard if user already has a profile
+  useEffect(() => {
+    async function checkExistingProfile() {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      api.setToken(session.access_token);
+      try {
+        await api.getProfile();
+        router.replace("/dashboard");
+      } catch {
+        // No profile — stay on onboarding
+      }
+    }
+    checkExistingProfile();
+  }, [router]);
+
   // Focus text input when on LinkedIn tab
   useEffect(() => {
     if (!isResume) requestAnimationFrame(() => inputRef.current?.focus());

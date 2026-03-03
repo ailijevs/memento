@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { api } from "@/lib/api";
 import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
 
 const FIELDS = [
@@ -158,7 +159,18 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
       password: values[1],
     });
     if (error) { setError(error.message); setLoading(false); return; }
-    router.replace("/onboarding");
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      api.setToken(session.access_token);
+      try {
+        await api.getProfile();
+        router.replace("/dashboard");
+      } catch {
+        router.replace("/onboarding");
+      }
+    } else {
+      router.replace("/onboarding");
+    }
     router.refresh();
   }
 
