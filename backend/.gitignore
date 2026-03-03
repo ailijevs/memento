@@ -223,3 +223,6 @@ data/har_files/
 # Intermediate scraped/parsed data (regeneratable)
 data/parsed_profiles.json
 data/scraped_profiles_exa.json
+
+3 # Supabase
+supabase/.temp/

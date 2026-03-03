@@ -20,6 +20,7 @@ from app.api import (
     profiles_router,
     recognition_router,
 )
+from app.auth import auth_router
 from app.config import get_settings
 
 
@@ -60,20 +61,17 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # CORS middleware - configure for your frontend domain
+    # CORS middleware
+    # allow_origins="*" is safe for dev — auth uses Bearer tokens, not cookies
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "http://localhost:3000",  # Local development
-            "http://localhost:5173",  # Vite default
-            # Add production URLs here
-        ],
-        allow_credentials=True,
+        allow_origins=["*"],
         allow_methods=["*"],
         allow_headers=["*"],
     )
 
     # Register routers
+    app.include_router(auth_router, prefix="/api/v1")
     app.include_router(profiles_router, prefix="/api/v1")
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(memberships_router, prefix="/api/v1")

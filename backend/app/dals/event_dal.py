@@ -1,5 +1,6 @@
 """Data Access Layer for events."""
 
+from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
@@ -129,6 +130,55 @@ class EventDAL(BaseDAL):
             .select("*")
             .eq("is_active", True)
             .order("starts_at", desc=False)
+            .execute()
+        )
+
+        return [EventResponse(**event) for event in response.data]
+
+    async def get_events_pending_indexing(self, window_minutes: int = 20) -> list[EventResponse]:
+        """
+        Get events that should be indexed soon.
+
+        Returns events where:
+        - starts_at <= now + `window_minutes`
+        - indexing_status is pending
+        """
+        if window_minutes < 0:
+            raise ValueError("window_minutes must be >= 0")
+
+        threshold = (datetime.now(timezone.utc) + timedelta(minutes=window_minutes)).isoformat()
+        response = (
+            self.client.table(self.TABLE)
+            .select("*")
+            .eq("is_active", True)
+            .lte("starts_at", threshold)
+            .eq("indexing_status", "pending")
+            .order("starts_at", desc=False)
+            .execute()
+        )
+
+        return [EventResponse(**event) for event in response.data]
+
+    async def get_events_pending_cleanup(self, window_hours: int = 24) -> list[EventResponse]:
+        """
+        Get events that should have their face collections cleaned up.
+
+        Returns events where:
+        - ends_at <= now - `window_hours`
+        - is_active is true
+        - cleanup_status is pending
+        """
+        if window_hours < 0:
+            raise ValueError("window_hours must be >= 0")
+
+        threshold = (datetime.now(timezone.utc) - timedelta(hours=window_hours)).isoformat()
+        response = (
+            self.client.table(self.TABLE)
+            .select("*")
+            .eq("is_active", True)
+            .lte("ends_at", threshold)
+            .eq("cleanup_status", "pending")
+            .order("ends_at", desc=False)
             .execute()
         )
 
