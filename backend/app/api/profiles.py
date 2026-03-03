@@ -82,7 +82,6 @@ async def create_my_profile(
     dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
 ) -> ProfileResponse:
     """Create the current user's profile."""
-    # Check if profile already exists
     existing = await dal.get_by_user_id(current_user.id)
     if existing:
         raise HTTPException(
@@ -206,7 +205,8 @@ async def onboard_from_linkedin_url(
         )
         if saved_profile is None:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Profile update failed."
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Profile update failed.",
             )
     else:
         saved_profile = await dal.create(
@@ -311,7 +311,6 @@ async def upload_resume(
     If OpenAI API key is configured, uses AI for smarter extraction.
     Otherwise, falls back to pattern-based extraction.
     """
-    # Validate file type
     if not file.filename:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -325,7 +324,6 @@ async def upload_resume(
             detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}",
         )
 
-    # Check file size (max 10MB)
     contents = await file.read()
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(
@@ -333,10 +331,8 @@ async def upload_resume(
             detail="File too large. Maximum size is 10MB.",
         )
 
-    # Reset file position for parsing
     await file.seek(0)
 
-    # Parse the resume
     settings = get_settings()
     parser = ResumeParser(openai_api_key=settings.openai_api_key)
 
@@ -362,12 +358,10 @@ async def upload_resume(
             "Please ensure the file contains readable text.",
         )
 
-    # Use admin client to bypass RLS for profile creation/update
     from app.db.supabase import get_admin_client
 
     admin_client = get_admin_client()
 
-    # Check if profile exists using admin client
     try:
         existing_response = (
             admin_client.table("profiles")
@@ -385,7 +379,6 @@ async def upload_resume(
 
     profile_updated = False
     if existing_profile:
-        # Update existing profile (only non-None fields)
         update_data: dict[str, Any] = {}
         if resume_data.full_name:
             update_data["full_name"] = _truncate_string(resume_data.full_name, 255)
@@ -423,7 +416,6 @@ async def upload_resume(
                     detail="Failed to update profile. Please try again.",
                 )
     else:
-        # Create new profile using admin client
         profile_data: dict[str, Any] = {
             "user_id": str(current_user.id),
             "full_name": _truncate_string(resume_data.full_name, 255) or "Unknown",
@@ -438,7 +430,6 @@ async def upload_resume(
             "experiences": resume_data.experiences or [],
             "education": resume_data.education or [],
         }
-        # Remove None values
         profile_data = {k: v for k, v in profile_data.items() if v is not None}
         try:
             admin_client.table("profiles").insert(profile_data).execute()
@@ -450,7 +441,6 @@ async def upload_resume(
                 detail="Failed to create profile. Please try again.",
             )
 
-    # Build response with extracted data
     extracted: dict[str, Any] = {
         "full_name": resume_data.full_name,
         "headline": resume_data.headline,
