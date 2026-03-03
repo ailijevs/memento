@@ -119,9 +119,7 @@ class RekognitionService:
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             if error_code == "InvalidParameterException":
-                raise FaceNotFoundError(
-                    "No face detected or image quality too low"
-                ) from e
+                raise FaceNotFoundError("No face detected or image quality too low") from e
             raise RekognitionError(f"Failed to index face: {e}") from e
 
     async def search_faces_by_image(
@@ -283,9 +281,7 @@ class RekognitionService:
             Dict with face_count, face_model_version, and collection_arn.
         """
         try:
-            response = self._client.describe_collection(
-                CollectionId=self._collection_id
-            )
+            response = self._client.describe_collection(CollectionId=self._collection_id)
             return {
                 "collection_id": self._collection_id,
                 "face_count": response.get("FaceCount", 0),
