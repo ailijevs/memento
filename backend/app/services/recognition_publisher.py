@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import logging
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 logger = logging.getLogger(__name__)
 
 DEDUP_WINDOW_SECONDS = 2.0
+DEFAULT_MAX_AGE_MINUTES = 5
+LAZY_CLEANUP_INTERVAL_SECONDS = 60.0
 
 
 class RecognitionPublisher:
@@ -21,6 +24,7 @@ class RecognitionPublisher:
     def __init__(self, admin_client: Any) -> None:
         self.client = admin_client
         self._recent: dict[tuple[str, str], float] = {}
+        self._last_cleanup: float = 0.0
 
     def publish(
         self,
@@ -34,6 +38,8 @@ class RecognitionPublisher:
 
         Returns True if the row was inserted, False if deduplicated or failed.
         """
+        self._maybe_lazy_cleanup()
+
         if matched_user_id and self._is_duplicate(user_id, matched_user_id):
             logger.debug(
                 "Dedup: skipping %s -> %s (within %.0fs window)",
@@ -89,3 +95,38 @@ class RecognitionPublisher:
         stale_keys = [k for k, t in self._recent.items() if (now - t) >= DEDUP_WINDOW_SECONDS]
         for k in stale_keys:
             del self._recent[k]
+
+    def cleanup_old_results(self, max_age_minutes: int = DEFAULT_MAX_AGE_MINUTES) -> int:
+        """Delete recognition results older than max_age_minutes.
+
+        Returns the number of rows deleted.
+        """
+        cutoff = datetime.now(timezone.utc) - timedelta(minutes=max_age_minutes)
+        cutoff_iso = cutoff.isoformat()
+
+        try:
+            response = (
+                self.client.table("recognition_results")
+                .delete()
+                .lt("created_at", cutoff_iso)
+                .execute()
+            )
+            deleted = len(response.data) if response.data else 0
+            if deleted > 0:
+                logger.info(
+                    "Cleaned up %d recognition results older than %d minutes",
+                    deleted,
+                    max_age_minutes,
+                )
+            return deleted
+
+        except Exception as e:
+            logger.error("Failed to clean up recognition results: %s", e)
+            return 0
+
+    def _maybe_lazy_cleanup(self) -> None:
+        """Run cleanup if enough time has passed since the last one."""
+        now = time.monotonic()
+        if (now - self._last_cleanup) >= LAZY_CLEANUP_INTERVAL_SECONDS:
+            self.cleanup_old_results()
+            self._last_cleanup = now
