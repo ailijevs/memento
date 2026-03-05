@@ -17,6 +17,12 @@ class RekognitionError(Exception):
     pass
 
 
+class FaceNotFoundError(RekognitionError):
+    """Raised when no face is detected in an image."""
+
+    pass
+
+
 class RekognitionService:
     """Service wrapper around a Rekognition client."""
 
@@ -108,7 +114,7 @@ class RekognitionService:
         """
 
         try:
-            response = self._client.search_faces_by_image(
+            response = self.client.search_faces_by_image(
                 CollectionId=collection_id,
                 Image={"Bytes": image_bytes},
             )
@@ -145,7 +151,7 @@ class RekognitionService:
             Number of faces deleted.
         """
         try:
-            response = self._client.list_faces(
+            response = self.client.list_faces(
                 CollectionId=collection_id,
             )
 
@@ -158,7 +164,7 @@ class RekognitionService:
             if not face_ids_to_delete:
                 return 0
 
-            delete_response = self._client.delete_faces(
+            delete_response = self.client.delete_faces(
                 CollectionId=collection_id,
                 FaceIds=face_ids_to_delete,
             )
@@ -176,3 +182,7 @@ class RekognitionService:
                 "Install boto3 or inject an initialized rekognition_client."
             ) from exc
         return boto3.client("rekognition")
+
+
+# Re-export for callers that expect it from the service module
+from app.utils.rekognition_helpers import decode_base64_image  # noqa: E402

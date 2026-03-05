@@ -1,7 +1,6 @@
 """API endpoints for facial recognition using AWS Rekognition."""
 
 import time
-from uuid import UUID
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -39,7 +38,7 @@ async def detect_faces_in_frame(
     event_dal = EventDAL(admin_client)
     # If an event_id is provided, enforce that indexing is completed
     if request.event_id is not None:
-        event = await event_dal.get_by_id(UUID(request.event_id))
+        event = await event_dal.get_by_id(request.event_id)
         if not event:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -74,7 +73,11 @@ async def detect_faces_in_frame(
 
     try:
         rekognition = RekognitionService()
-        collection_id = build_event_collection_id(event.event_id)
+        collection_id = (
+            build_event_collection_id(request.event_id)
+            if request.event_id is not None
+            else "memento_faces"
+        )
 
         matches_raw = rekognition.search_faces_by_image(
             image_bytes=image_bytes,
