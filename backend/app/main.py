@@ -18,6 +18,7 @@ from app.api import (
     events_router,
     memberships_router,
     profiles_router,
+    recognize_router,
 )
 from app.auth import auth_router
 from app.config import get_settings
@@ -74,6 +75,7 @@ def create_app() -> FastAPI:
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(memberships_router, prefix="/api/v1")
     app.include_router(consents_router, prefix="/api/v1")
+    app.include_router(recognize_router, prefix="/api/v1")
 
     @app.get("/")
     async def root():
