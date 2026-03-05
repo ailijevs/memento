@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
-import { LogOut } from "lucide-react";
+import { LogOut, ScanFace, Square } from "lucide-react";
 
 interface RecognitionResult {
   id: string;
@@ -20,6 +20,8 @@ export default function DashboardPage() {
   const router = useRouter();
   const [results, setResults] = useState<RecognitionResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [capturing, setCapturing] = useState(false);
+  const [captureLoading, setCaptureLoading] = useState(false);
   const tokenRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -34,6 +36,12 @@ export default function DashboardPage() {
       const userId = session.user.id;
       tokenRef.current = session.access_token;
       api.setToken(session.access_token);
+
+      // Load initial capture state
+      try {
+        const state = await api.getCaptureState();
+        setCapturing(state.capturing);
+      } catch { /* ignore */ }
 
       // Load recent results
       const { data } = await supabase
@@ -101,6 +109,15 @@ export default function DashboardPage() {
     };
   }, []);
 
+  async function toggleCapture() {
+    setCaptureLoading(true);
+    try {
+      const result = capturing ? await api.stopCapture() : await api.startCapture();
+      setCapturing(result.capturing);
+    } catch { /* ignore */ }
+    setCaptureLoading(false);
+  }
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -125,7 +142,7 @@ export default function DashboardPage() {
       />
 
       {/* Header */}
-      <div className="relative z-10 px-6 pt-14 pb-4">
+      <div className="relative z-10 px-6 pt-14 pb-5">
         <div className="flex items-center justify-between">
           <h1
             className="text-white"
@@ -138,15 +155,39 @@ export default function DashboardPage() {
           >
             Recognition Feed
           </h1>
-          <div className="flex items-center gap-2">
-            <div className="relative flex h-2 w-2">
-              <div className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <div className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-            </div>
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
-              Live
-            </span>
-          </div>
+
+          {/* Scan toggle — replaces the static "Live" indicator */}
+          <button
+            onClick={toggleCapture}
+            disabled={captureLoading}
+            className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-all active:scale-95 disabled:opacity-50"
+            style={{
+              background: capturing ? "oklch(0.22 0.10 25 / 70%)" : "oklch(1 0 0 / 5%)",
+              border: capturing
+                ? "1px solid oklch(0.6 0.2 25 / 35%)"
+                : "1px solid oklch(1 0 0 / 8%)",
+            }}
+          >
+            {capturing ? (
+              <>
+                <div className="relative flex h-2 w-2">
+                  <div className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                  <div className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                </div>
+                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-red-300">
+                  Scanning
+                </span>
+                <Square className="h-3 w-3 text-red-400" />
+              </>
+            ) : (
+              <>
+                <ScanFace className="h-3.5 w-3.5 text-white/40" />
+                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
+                  Scan
+                </span>
+              </>
+            )}
+          </button>
         </div>
       </div>
 
