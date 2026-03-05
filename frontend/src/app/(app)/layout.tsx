@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { BottomTabBar } from "@/components/bottom-tab-bar";
 
 export default async function AppLayout({
   children,
@@ -15,5 +16,10 @@ export default async function AppLayout({
     redirect("/login");
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      <div className="pb-20">{children}</div>
+      <BottomTabBar />
+    </>
+  );
 }
