@@ -29,10 +29,10 @@ from app.services import (
     ProfileImageError,
     ProfileImageService,
     ProfileSummaryService,
+    S3Service,
     calculate_profile_completion,
 )
 from app.services.resume_parser import ResumeData, ResumeParser
-from app.utils.s3_helpers import upload_profile_picture
 
 logger = logging.getLogger(__name__)
 
@@ -173,7 +173,8 @@ async def onboard_from_linkedin_url(
                 raise ProfileImageError(
                     "S3_BUCKET_NAME must be configured to upload profile pictures."
                 )
-            photo_path = upload_profile_picture(
+            s3_service = S3Service()
+            photo_path = s3_service.upload_profile_picture(
                 user_id=current_user.id,
                 image=raw_image_bytes,
                 bucket_name=settings.s3_bucket_name,
