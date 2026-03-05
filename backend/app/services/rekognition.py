@@ -182,7 +182,3 @@ class RekognitionService:
                 "Install boto3 or inject an initialized rekognition_client."
             ) from exc
         return boto3.client("rekognition")
-
-
-# Re-export for callers that expect it from the service module
-from app.utils.rekognition_helpers import decode_base64_image  # noqa: E402
