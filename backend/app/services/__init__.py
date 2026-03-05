@@ -13,6 +13,7 @@ from .profile_summary import (
 )
 from .rekognition import RekognitionService
 from .resume_parser import ResumeData, ResumeParser
+from .s3 import S3Service
 
 __all__ = [
     "LinkedInEnrichmentError",
@@ -26,4 +27,5 @@ __all__ = [
     "RekognitionService",
     "ResumeData",
     "ResumeParser",
+    "S3Service",
 ]
