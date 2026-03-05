@@ -11,6 +11,7 @@ from .profile_summary import (
     ProfileSummaryResult,
     ProfileSummaryService,
 )
+from .recognition_publisher import RecognitionPublisher
 from .rekognition import RekognitionService
 from .resume_parser import ResumeData, ResumeParser
 
@@ -23,6 +24,7 @@ __all__ = [
     "ProfileSummaryError",
     "ProfileSummaryResult",
     "ProfileSummaryService",
+    "RecognitionPublisher",
     "RekognitionService",
     "ResumeData",
     "ResumeParser",
