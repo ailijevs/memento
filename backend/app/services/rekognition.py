@@ -3,11 +3,18 @@
 from __future__ import annotations
 
 from typing import Any, cast
+from uuid import UUID
 
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+class RekognitionError(Exception):
+    """Base exception for Rekognition operations."""
+
+    pass
 
 
 class RekognitionService:
@@ -81,6 +88,84 @@ class RekognitionService:
             DetectionAttributes=[],
         )
         return cast(dict[str, Any], response)
+
+    def search_faces_by_image(
+        self,
+        image_bytes: bytes,
+        collection_id: str,
+    ) -> list[dict[str, Any]]:
+        """
+        Search for matching faces in a frame/image capture.
+
+        This is the primary method for MentraOS frame-based detection.
+
+        Args:
+            image_bytes: The frame image as bytes.
+            collection_id: The ID of the collection to search.
+
+        Returns:
+            List of matched faces with user_id, confidence.
+        """
+
+        try:
+            response = self._client.search_faces_by_image(
+                CollectionId=collection_id,
+                Image={"Bytes": image_bytes},
+            )
+
+            matches: list[dict[str, Any]] = []
+            for match in response.get("FaceMatches", []):
+                face = match["Face"]
+                matches.append(
+                    {
+                        "user_id": face.get("ExternalImageId"),
+                        "face_id": face["FaceId"],
+                        "similarity": match["Similarity"],
+                        "confidence": face["Confidence"],
+                    }
+                )
+
+            return matches
+
+        except ClientError as e:
+            error_code = e.response["Error"]["Code"]
+            if error_code == "InvalidParameterException":
+                return []
+            raise RekognitionError(f"Failed to search faces: {e}") from e
+
+    def delete_faces_by_user(self, *, collection_id: str, user_id: UUID) -> int:
+        """
+        Delete all faces associated with a user.
+
+        Args:
+            user_id: The user's UUID.
+            collection_id: The ID of the collection to delete the faces from.
+
+        Returns:
+            Number of faces deleted.
+        """
+        try:
+            response = self._client.list_faces(
+                CollectionId=collection_id,
+            )
+
+            face_ids_to_delete = [
+                face["FaceId"]
+                for face in response.get("Faces", [])
+                if face.get("ExternalImageId") == str(user_id)
+            ]
+
+            if not face_ids_to_delete:
+                return 0
+
+            delete_response = self._client.delete_faces(
+                CollectionId=collection_id,
+                FaceIds=face_ids_to_delete,
+            )
+            return len(delete_response.get("DeletedFaces", []))
+
+        except ClientError as e:
+            raise RekognitionError(f"Failed to delete user faces: {e}") from e
 
     def _create_client(self) -> Any:
         try:

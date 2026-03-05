@@ -35,14 +35,6 @@ from .profile import (
 )
 from .profile_completion import ProfileCompletionResponse
 from .recognition import (
-    BoundingBox,
-    CollectionStatsResponse,
-    DetectedFace,
-    DetectFacesRequest,
-    DetectFacesResponse,
-    FaceDeleteResponse,
-    FaceIndexRequest,
-    FaceIndexResponse,
     FaceMatch,
     FrameDetectionRequest,
     FrameDetectionResponse,
@@ -77,14 +69,6 @@ __all__ = [
     "ProfileResponse",
     "ProfileUpdate",
     # Recognition
-    "BoundingBox",
-    "CollectionStatsResponse",
-    "DetectedFace",
-    "DetectFacesRequest",
-    "DetectFacesResponse",
-    "FaceDeleteResponse",
-    "FaceIndexRequest",
-    "FaceIndexResponse",
     "FaceMatch",
     "FrameDetectionRequest",
     "FrameDetectionResponse",
