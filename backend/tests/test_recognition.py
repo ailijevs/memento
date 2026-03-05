@@ -1,132 +1,136 @@
 """Tests for the facial recognition feature."""
 
 import base64
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 
+from app.main import app
 from app.schemas import (
     BoundingBox,
+    EventProcessingStatus,
     FaceMatch,
+    FrameDetectionRequest,
     FrameDetectionResponse,
 )
 from app.services.rekognition import (
     FaceNotFoundError,
+    RekognitionError,
     RekognitionService,
+)
+from app.utils.rekognition_helpers import (
+    build_event_collection_id,
     decode_base64_image,
 )
 
+# Minimum length for FrameDetectionRequest.image_base64
 SAMPLE_IMAGE_BASE64 = base64.b64encode(b"fake-image-bytes-for-testing" * 100).decode()
 
 
+# --- rekognition_helpers -----------------------------------------------------
+
+
 class TestDecodeBase64Image:
-    """Tests for base64 image decoding utility."""
+    """Tests for decode_base64_image."""
 
     def test_decode_raw_base64(self):
-        """Test decoding raw base64 string."""
+        """Decode raw base64 string to bytes."""
         original = b"test image data"
         encoded = base64.b64encode(original).decode()
-        result = decode_base64_image(encoded)
-        assert result == original
+        assert decode_base64_image(encoded) == original
 
     def test_decode_data_url_format(self):
-        """Test decoding data URL format (with prefix)."""
+        """Decode data URL format (data:image/jpeg;base64,...)."""
         original = b"test image data"
         encoded = base64.b64encode(original).decode()
         data_url = f"data:image/jpeg;base64,{encoded}"
-        result = decode_base64_image(data_url)
-        assert result == original
+        assert decode_base64_image(data_url) == original
 
     def test_decode_png_data_url(self):
-        """Test decoding PNG data URL format."""
+        """Decode PNG data URL format."""
         original = b"png image data"
         encoded = base64.b64encode(original).decode()
         data_url = f"data:image/png;base64,{encoded}"
-        result = decode_base64_image(data_url)
-        assert result == original
+        assert decode_base64_image(data_url) == original
+
+
+class TestBuildEventCollectionId:
+    """Tests for build_event_collection_id."""
+
+    def test_with_uuid(self):
+        """Build collection ID from UUID."""
+        event_id = uuid4()
+        got = build_event_collection_id(event_id)
+        assert got == f"memento_event_{event_id}"
+
+    def test_with_string(self):
+        """Build collection ID from string."""
+        got = build_event_collection_id("abc-123")
+        assert got == "memento_event_abc-123"
+
+    def test_empty_string_raises(self):
+        """Empty event_id raises ValueError."""
+        with pytest.raises(ValueError, match="must not be empty"):
+            build_event_collection_id("")
+
+
+# --- RekognitionService ------------------------------------------------------
 
 
 class TestRekognitionService:
-    """Tests for RekognitionService class."""
+    """Tests for RekognitionService (sync API)."""
 
     @pytest.fixture
     def mock_client(self):
-        """Create a mock boto3 Rekognition client."""
         return MagicMock()
 
     @pytest.fixture
-    def mock_settings(self):
-        """Create mock settings."""
-        settings = MagicMock()
-        settings.rekognition_collection_id = "test-collection"
-        settings.rekognition_face_match_threshold = 80.0
-        settings.rekognition_max_faces = 10
-        return settings
+    def service(self, mock_client):
+        return RekognitionService(rekognition_client=mock_client)
 
-    @pytest.fixture
-    def service(self, mock_client, mock_settings):
-        """Create a RekognitionService instance with mocks."""
-        return RekognitionService(client=mock_client, settings=mock_settings)
+    def test_ensure_collection_exists_creates(self, service, mock_client):
+        """Creates collection when it does not exist."""
+        service.ensure_collection_exists(collection_id="test-collection")
+        mock_client.create_collection.assert_called_once_with(CollectionId="test-collection")
 
-    @pytest.mark.asyncio
-    async def test_ensure_collection_exists_when_exists(self, service, mock_client):
-        """Test ensuring collection exists when it already does."""
-        mock_client.describe_collection.return_value = {"FaceCount": 10}
-        result = await service.ensure_collection_exists()
-        assert result is True
-        mock_client.describe_collection.assert_called_once()
-
-    @pytest.mark.asyncio
-    async def test_ensure_collection_creates_when_missing(self, service, mock_client):
-        """Test collection is created when it doesn't exist."""
+    def test_ensure_collection_exists_ignores_already_exists(self, service, mock_client):
+        """Does not raise when collection already exists."""
         from botocore.exceptions import ClientError
 
-        mock_client.describe_collection.side_effect = ClientError(
-            {"Error": {"Code": "ResourceNotFoundException"}},
-            "DescribeCollection",
+        mock_client.create_collection.side_effect = ClientError(
+            {"Error": {"Code": "ResourceAlreadyExistsException"}},
+            "CreateCollection",
         )
-        mock_client.create_collection.return_value = {}
-
-        result = await service.ensure_collection_exists()
-
-        assert result is True
+        service.ensure_collection_exists(collection_id="existing")
         mock_client.create_collection.assert_called_once()
 
-    @pytest.mark.asyncio
-    async def test_index_face_success(self, service, mock_client):
-        """Test successfully indexing a face."""
-        user_id = uuid4()
-        mock_client.index_faces.return_value = {
-            "FaceRecords": [
-                {
-                    "Face": {
-                        "FaceId": "face-123",
-                        "BoundingBox": {"Width": 0.5, "Height": 0.5, "Left": 0.25, "Top": 0.25},
-                        "Confidence": 99.5,
-                        "ImageId": "img-123",
-                    }
-                }
-            ]
-        }
+    def test_ensure_collection_exists_empty_id_raises(self, service):
+        """Empty collection_id raises ValueError."""
+        with pytest.raises(ValueError, match="must not be empty"):
+            service.ensure_collection_exists(collection_id="   ")
 
-        result = await service.index_face(user_id, b"image-bytes")
+    def test_delete_collection_success(self, service, mock_client):
+        """delete_collection returns response."""
+        mock_client.delete_collection.return_value = {"StatusCode": 200}
+        got = service.delete_collection(collection_id="coll-1")
+        assert got["StatusCode"] == 200
+        mock_client.delete_collection.assert_called_once_with(CollectionId="coll-1")
 
-        assert result["face_id"] == "face-123"
-        assert result["user_id"] == str(user_id)
-        assert result["confidence"] == 99.5
+    def test_delete_collection_not_found_returns_404(self, service, mock_client):
+        """ResourceNotFoundException returns dict with StatusCode 404."""
+        from botocore.exceptions import ClientError
 
-    @pytest.mark.asyncio
-    async def test_index_face_no_face_detected(self, service, mock_client):
-        """Test indexing fails when no face is detected."""
-        mock_client.index_faces.return_value = {"FaceRecords": []}
+        mock_client.delete_collection.side_effect = ClientError(
+            {"Error": {"Code": "ResourceNotFoundException"}},
+            "DeleteCollection",
+        )
+        got = service.delete_collection(collection_id="missing")
+        assert got["StatusCode"] == 404
 
-        with pytest.raises(FaceNotFoundError):
-            await service.index_face(uuid4(), b"image-bytes")
-
-    @pytest.mark.asyncio
-    async def test_search_faces_by_image_success(self, service, mock_client):
-        """Test searching for faces returns matches."""
+    def test_search_faces_by_image_returns_matches(self, service, mock_client):
+        """search_faces_by_image returns normalized list of matches."""
         mock_client.search_faces_by_image.return_value = {
             "FaceMatches": [
                 {
@@ -135,50 +139,88 @@ class TestRekognitionService:
                         "FaceId": "face-123",
                         "ExternalImageId": "user-uuid-123",
                         "Confidence": 99.0,
-                        "BoundingBox": {"Width": 0.5, "Height": 0.5, "Left": 0.25, "Top": 0.25},
                     },
                 }
             ]
         }
-
-        result = await service.search_faces_by_image(b"image-bytes")
-
+        result = service.search_faces_by_image(
+            image_bytes=b"image-bytes",
+            collection_id="memento_event_xyz",
+        )
         assert len(result) == 1
         assert result[0]["user_id"] == "user-uuid-123"
+        assert result[0]["face_id"] == "face-123"
         assert result[0]["similarity"] == 95.5
+        assert result[0]["confidence"] == 99.0
+        mock_client.search_faces_by_image.assert_called_once_with(
+            CollectionId="memento_event_xyz",
+            Image={"Bytes": b"image-bytes"},
+        )
 
-    @pytest.mark.asyncio
-    async def test_search_faces_no_matches(self, service, mock_client):
-        """Test search returns empty list when no matches."""
+    def test_search_faces_by_image_no_matches(self, service, mock_client):
+        """Empty FaceMatches returns empty list."""
         mock_client.search_faces_by_image.return_value = {"FaceMatches": []}
-
-        result = await service.search_faces_by_image(b"image-bytes")
-
+        result = service.search_faces_by_image(
+            image_bytes=b"bytes",
+            collection_id="coll",
+        )
         assert result == []
 
-    @pytest.mark.asyncio
-    async def test_detect_faces_success(self, service, mock_client):
-        """Test detecting faces in an image."""
-        mock_client.detect_faces.return_value = {
-            "FaceDetails": [
+    def test_search_faces_by_image_invalid_parameter_returns_empty(self, service, mock_client):
+        """InvalidParameterException (e.g. no face) returns empty list."""
+        from botocore.exceptions import ClientError
+
+        mock_client.search_faces_by_image.side_effect = ClientError(
+            {"Error": {"Code": "InvalidParameterException"}},
+            "SearchFacesByImage",
+        )
+        result = service.search_faces_by_image(
+            image_bytes=b"bytes",
+            collection_id="coll",
+        )
+        assert result == []
+
+    def test_search_faces_by_image_other_client_error_raises(self, service, mock_client):
+        """Other ClientError is wrapped in RekognitionError."""
+        from botocore.exceptions import ClientError
+
+        mock_client.search_faces_by_image.side_effect = ClientError(
+            {"Error": {"Code": "ThrottlingException"}},
+            "SearchFacesByImage",
+        )
+        with pytest.raises(RekognitionError):
+            service.search_faces_by_image(
+                image_bytes=b"bytes",
+                collection_id="coll",
+            )
+
+    def test_index_face_from_s3_calls_client(self, service, mock_client):
+        """index_face_from_s3 calls index_faces with S3 object."""
+        mock_client.index_faces.return_value = {
+            "FaceRecords": [
                 {
-                    "BoundingBox": {"Width": 0.3, "Height": 0.4, "Left": 0.1, "Top": 0.2},
-                    "Confidence": 99.9,
-                    "Landmarks": [],
-                    "Pose": {},
-                    "Quality": {},
+                    "Face": {
+                        "FaceId": "f1",
+                        "Confidence": 99.0,
+                    }
                 }
             ]
         }
+        service.index_face_from_s3(
+            collection_id="coll",
+            bucket_name="bucket",
+            object_key="key.jpg",
+            image_id="user-uuid",
+        )
+        mock_client.index_faces.assert_called_once()
+        call_kw = mock_client.index_faces.call_args[1]
+        assert call_kw["CollectionId"] == "coll"
+        assert call_kw["Image"]["S3Object"]["Bucket"] == "bucket"
+        assert call_kw["Image"]["S3Object"]["Name"] == "key.jpg"
+        assert call_kw["ExternalImageId"] == "user-uuid"
 
-        result = await service.detect_faces(b"image-bytes")
-
-        assert len(result) == 1
-        assert result[0]["confidence"] == 99.9
-
-    @pytest.mark.asyncio
-    async def test_delete_faces_by_user(self, service, mock_client):
-        """Test deleting all faces for a user."""
+    def test_delete_faces_by_user(self, service, mock_client):
+        """delete_faces_by_user deletes only faces for that user."""
         user_id = uuid4()
         mock_client.list_faces.return_value = {
             "Faces": [
@@ -188,41 +230,54 @@ class TestRekognitionService:
             ]
         }
         mock_client.delete_faces.return_value = {"DeletedFaces": ["face-1", "face-2"]}
-
-        result = await service.delete_faces_by_user(user_id)
-
-        assert result == 2
+        count = service.delete_faces_by_user(
+            collection_id="coll",
+            user_id=user_id,
+        )
+        assert count == 2
         mock_client.delete_faces.assert_called_once_with(
-            CollectionId="test-collection",
+            CollectionId="coll",
             FaceIds=["face-1", "face-2"],
         )
 
-    @pytest.mark.asyncio
-    async def test_get_collection_stats(self, service, mock_client):
-        """Test getting collection statistics."""
-        mock_client.describe_collection.return_value = {
-            "FaceCount": 100,
-            "FaceModelVersion": "6.0",
-            "CollectionARN": "arn:aws:rekognition:...",
-        }
+    def test_delete_faces_by_user_none_to_delete(self, service, mock_client):
+        """Returns 0 when no faces for user."""
+        user_id = uuid4()
+        mock_client.list_faces.return_value = {"Faces": []}
+        count = service.delete_faces_by_user(
+            collection_id="coll",
+            user_id=user_id,
+        )
+        assert count == 0
+        mock_client.delete_faces.assert_not_called()
 
-        result = await service.get_collection_stats()
 
-        assert result["face_count"] == 100
-        assert result["collection_id"] == "test-collection"
+class TestRekognitionExceptions:
+    """Rekognition exception hierarchy."""
+
+    def test_face_not_found_is_rekognition_error(self):
+        """FaceNotFoundError is a RekognitionError."""
+        assert issubclass(FaceNotFoundError, RekognitionError)
+
+    def test_can_raise_face_not_found(self):
+        """FaceNotFoundError can be raised and caught."""
+        with pytest.raises(FaceNotFoundError):
+            raise FaceNotFoundError("no face")
+
+
+# --- Schemas ------------------------------------------------------------------
 
 
 class TestBoundingBoxSchema:
     """Tests for BoundingBox schema."""
 
     def test_valid_bounding_box(self):
-        """Test creating a valid bounding box."""
         box = BoundingBox(width=0.5, height=0.5, left=0.25, top=0.25)
         assert box.width == 0.5
         assert box.height == 0.5
 
-    def test_bounding_box_validation(self):
-        """Test bounding box validates range 0-1."""
+    def test_bounding_box_validation_0_to_1(self):
+        """Values must be in [0, 1]."""
         with pytest.raises(ValueError):
             BoundingBox(width=1.5, height=0.5, left=0.25, top=0.25)
 
@@ -231,7 +286,6 @@ class TestFaceMatchSchema:
     """Tests for FaceMatch schema."""
 
     def test_face_match_with_user(self):
-        """Test creating face match with user ID."""
         match = FaceMatch(
             user_id="user-123",
             face_id="face-456",
@@ -241,8 +295,7 @@ class TestFaceMatchSchema:
         assert match.user_id == "user-123"
         assert match.similarity == 95.5
 
-    def test_face_match_without_user(self):
-        """Test face match can have null user ID."""
+    def test_face_match_user_id_optional(self):
         match = FaceMatch(
             user_id=None,
             face_id="face-456",
@@ -252,11 +305,34 @@ class TestFaceMatchSchema:
         assert match.user_id is None
 
 
-class TestFrameDetectionResponse:
+class TestFrameDetectionRequestSchema:
+    """Tests for FrameDetectionRequest schema."""
+
+    def test_min_length_image_base64(self):
+        """image_base64 has min_length=100."""
+        with pytest.raises(ValueError):
+            FrameDetectionRequest(image_base64="short")
+
+    def test_event_id_optional(self):
+        req = FrameDetectionRequest(
+            image_base64=SAMPLE_IMAGE_BASE64,
+            event_id=None,
+        )
+        assert req.event_id is None
+
+    def test_event_id_provided(self):
+        eid = uuid4()
+        req = FrameDetectionRequest(
+            image_base64=SAMPLE_IMAGE_BASE64,
+            event_id=eid,
+        )
+        assert req.event_id == eid
+
+
+class TestFrameDetectionResponseSchema:
     """Tests for FrameDetectionResponse schema."""
 
     def test_response_with_matches(self):
-        """Test response with face matches."""
         response = FrameDetectionResponse(
             matches=[
                 FaceMatch(
@@ -266,18 +342,172 @@ class TestFrameDetectionResponse:
                     confidence=99.0,
                 )
             ],
-            faces_detected=2,
             processing_time_ms=150.5,
+            event_id=None,
         )
         assert len(response.matches) == 1
-        assert response.faces_detected == 2
+        assert response.processing_time_ms == 150.5
+        assert response.event_id is None
 
     def test_response_no_matches(self):
-        """Test response with no matches."""
         response = FrameDetectionResponse(
             matches=[],
-            faces_detected=1,
             processing_time_ms=100.0,
         )
         assert len(response.matches) == 0
-        assert response.faces_detected == 1
+        assert response.processing_time_ms == 100.0
+
+
+# --- API /recognition/detect --------------------------------------------------
+
+
+class TestDetectEndpoint:
+    """Tests for POST /api/v1/recognition/detect."""
+
+    @pytest.fixture
+    def client(self):
+        return TestClient(app)
+
+    @patch("app.api.recognition.decode_base64_image")
+    @patch("app.api.recognition.build_event_collection_id")
+    @patch("app.api.recognition.RekognitionService")
+    @patch("app.api.recognition.get_admin_client")
+    def test_detect_returns_200_with_matches(
+        self,
+        mock_get_admin,
+        mock_service_cls,
+        mock_build_collection,
+        mock_decode,
+        client,
+    ):
+        """Detect returns 200 and FrameDetectionResponse with matches."""
+        mock_get_admin.return_value = MagicMock()
+        mock_decode.return_value = b"decoded-image-bytes"
+        mock_build_collection.return_value = "memento_faces"
+        svc = MagicMock()
+        svc.search_faces_by_image.return_value = [
+            {
+                "user_id": "user-1",
+                "face_id": "f1",
+                "similarity": 90.0,
+                "confidence": 98.0,
+            }
+        ]
+        mock_service_cls.return_value = svc
+
+        response = client.post(
+            "/api/v1/recognition/detect",
+            json={
+                "image_base64": SAMPLE_IMAGE_BASE64,
+                "event_id": None,
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "matches" in data
+        assert len(data["matches"]) == 1
+        assert data["matches"][0]["user_id"] == "user-1"
+        assert "processing_time_ms" in data
+        mock_decode.assert_called_once()
+        svc.search_faces_by_image.assert_called_once_with(
+            image_bytes=b"decoded-image-bytes",
+            collection_id="memento_faces",
+        )
+
+    @patch("app.api.recognition.decode_base64_image")
+    @patch("app.api.recognition.RekognitionService")
+    @patch("app.api.recognition.get_admin_client")
+    def test_detect_invalid_base64_returns_400(
+        self,
+        mock_get_admin,
+        mock_service_cls,
+        mock_decode,
+        client,
+    ):
+        """Invalid base64 image returns 400."""
+        mock_get_admin.return_value = MagicMock()
+        mock_decode.side_effect = ValueError("bad base64")
+
+        response = client.post(
+            "/api/v1/recognition/detect",
+            json={
+                "image_base64": SAMPLE_IMAGE_BASE64,
+                "event_id": None,
+            },
+        )
+
+        assert response.status_code == 400
+        assert "Invalid base64" in response.json()["detail"]
+
+    @patch("app.api.recognition.decode_base64_image")
+    @patch("app.api.recognition.RekognitionService")
+    @patch("app.api.recognition.get_admin_client")
+    def test_detect_rekognition_error_returns_502(
+        self,
+        mock_get_admin,
+        mock_service_cls,
+        mock_decode,
+        client,
+    ):
+        """RekognitionError from service returns 502."""
+        mock_get_admin.return_value = MagicMock()
+        mock_decode.return_value = b"bytes"
+        svc = MagicMock()
+        svc.search_faces_by_image.side_effect = RekognitionError("service down")
+        mock_service_cls.return_value = svc
+
+        response = client.post(
+            "/api/v1/recognition/detect",
+            json={
+                "image_base64": SAMPLE_IMAGE_BASE64,
+                "event_id": None,
+            },
+        )
+
+        assert response.status_code == 502
+        assert "Recognition service error" in response.json()["detail"]
+
+    @patch("app.api.recognition.EventDAL")
+    @patch("app.api.recognition.decode_base64_image")
+    @patch("app.api.recognition.build_event_collection_id")
+    @patch("app.api.recognition.RekognitionService")
+    @patch("app.api.recognition.get_admin_client")
+    def test_detect_with_event_id_uses_event_collection(
+        self,
+        mock_get_admin,
+        mock_service_cls,
+        mock_build_collection,
+        mock_decode,
+        mock_dal_cls,
+        client,
+    ):
+        """When event_id is provided, collection_id is built from event."""
+        mock_get_admin.return_value = MagicMock()
+        mock_decode.return_value = b"bytes"
+        mock_build_collection.return_value = "memento_event_abc"
+        dal = AsyncMock()
+        dal.get_by_id.return_value = MagicMock(
+            event_id=uuid4(),
+            indexing_status=EventProcessingStatus.COMPLETED,
+        )
+        mock_dal_cls.return_value = dal
+        svc = MagicMock()
+        svc.search_faces_by_image.return_value = []
+        mock_service_cls.return_value = svc
+
+        event_id = uuid4()
+        response = client.post(
+            "/api/v1/recognition/detect",
+            json={
+                "image_base64": SAMPLE_IMAGE_BASE64,
+                "event_id": str(event_id),
+            },
+        )
+
+        assert response.status_code == 200
+        mock_build_collection.assert_called_once_with(event_id)
+        svc.search_faces_by_image.assert_called_once_with(
+            image_bytes=b"bytes",
+            collection_id="memento_event_abc",
+        )
