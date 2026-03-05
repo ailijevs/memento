@@ -13,6 +13,7 @@ from app.dals.profile_dal import ProfileDAL
 from app.db.supabase import get_admin_client
 from app.schemas.event import EventProcessingStatus, EventUpdate
 from app.services.rekognition import RekognitionService
+from app.utils.rekognition_helpers import build_event_collection_id
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -52,7 +53,7 @@ async def _run(*, window_minutes: int = 20) -> dict[str, Any]:
             )
             logger.info("Set indexing_status=in_progress event_id=%s", event_id)
 
-            collection_id = f"memento_event_{event_id}"
+            collection_id = build_event_collection_id(event_id)
             rekognition_service.ensure_collection_exists(collection_id=collection_id)
             logger.info("Collection ready collection_id=%s", collection_id)
 
