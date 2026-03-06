@@ -2,15 +2,19 @@
   "name": "memento-glasses-app",
   "version": "1.0.0",
   "description": "MentraOS smart glasses app for Memento face recognition",
-  "main": "src/index.js",
+  "main": "dist/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
-    "@mentra/sdk": "latest",
-    "dotenv": "^16.0.0"
+    "@mentra/sdk": "^2.1.29",
+    "dotenv": "^16.0.0",
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.21.0"
   },
   "engines": {
     "node": ">=18.0.0"
