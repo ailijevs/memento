@@ -2,11 +2,9 @@ import { createServer, IncomingMessage, Server as HttpServer } from 'http';
 import { randomUUID } from 'crypto';
 import { WebSocketServer, WebSocket } from 'ws';
 
-type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
-
 export type IncomingSocketMessage = {
   type: string;
-  payload?: JsonValue;
+  payload?: unknown;
 };
 
 type ClientSession = {
@@ -14,12 +12,15 @@ type ClientSession = {
   socket: WebSocket;
 };
 
+type MessageHandler = (clientId: string, message: IncomingSocketMessage) => void | Promise<void>;
+
 /** WebSocket server wrapper with basic connection/session management. */
 export class SocketServer {
   private readonly port: number;
   private readonly httpServer: HttpServer;
   private readonly wsServer: WebSocketServer;
   private readonly clients = new Map<string, ClientSession>();
+  private readonly messageHandlers = new Set<MessageHandler>();
 
   constructor(port = 8080) {
     this.port = port;
@@ -71,15 +72,12 @@ export class SocketServer {
     return true;
   }
 
-  /** Send a JSON message to every currently connected client. */
-  broadcast(message: IncomingSocketMessage): void {
-    const serialized = JSON.stringify(message);
-    // Pre-serialize once to avoid repeated JSON work in the loop.
-    for (const session of this.clients.values()) {
-      if (session.socket.readyState === WebSocket.OPEN) {
-        session.socket.send(serialized);
-      }
-    }
+  /** Register a callback for inbound client messages. */
+  onMessage(handler: MessageHandler): () => void {
+    this.messageHandlers.add(handler);
+    return () => {
+      this.messageHandlers.delete(handler);
+    };
   }
 
   /** Register event handlers for a newly connected websocket client. */
@@ -114,6 +112,12 @@ export class SocketServer {
           payload: { receivedType: message.type },
         } satisfies IncomingSocketMessage),
       );
+
+      for (const handler of this.messageHandlers) {
+        Promise.resolve(handler(clientId, message)).catch((error) => {
+          console.error(`Message handler error for ${clientId}:`, error);
+        });
+      }
     });
 
     socket.on('close', () => {
