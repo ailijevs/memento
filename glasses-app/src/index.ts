@@ -1,5 +1,8 @@
-import { AppServer } from '@mentra/sdk';
+import Mentra from '@mentra/sdk';
+import type { AppSession } from '@mentra/sdk';
 import 'dotenv/config';
+
+const { AppServer } = Mentra;
 
 import { SocketServer } from './webSocketServer.ts';
 
@@ -15,11 +18,8 @@ class MementoApp extends AppServer {
     this.socketServer = new SocketServer(Number.isNaN(wsPort) ? 8080 : wsPort);
   }
 
-  async onSession(session: any, sessionId: string, userId: string): Promise<void> {
+  async onSession(session: AppSession, sessionId: string, userId: string): Promise<void> {
     console.log(`Session initialized: ${sessionId} for user: ${userId}`);
-
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    session.layouts.showWebView(frontendUrl);
 
     await this.startWebSocketConnection();
   }
