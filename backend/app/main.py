@@ -18,6 +18,7 @@ from app.api import (
     events_router,
     memberships_router,
     profiles_router,
+    recognition_router,
 )
 from app.auth import auth_router
 from app.config import get_settings
@@ -46,7 +47,8 @@ def create_app() -> FastAPI:
             "- **Profiles**: Manage user profiles with customizable visibility\n"
             "- **Events**: Create and manage networking events\n"
             "- **Memberships**: Join/leave events with role management\n"
-            "- **Consents**: Fine-grained privacy controls per event\n\n"
+            "- **Consents**: Fine-grained privacy controls per event\n"
+            "- **Recognition**: Face detection and identification via MentraOS glasses\n\n"
             "## Authentication\n"
             "All endpoints require a valid Supabase JWT in the Authorization header. "
             "Use `Bearer <token>` format.\n\n"
@@ -74,6 +76,7 @@ def create_app() -> FastAPI:
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(memberships_router, prefix="/api/v1")
     app.include_router(consents_router, prefix="/api/v1")
+    app.include_router(recognition_router, prefix="/api/v1")
 
     @app.get("/")
     async def root():
