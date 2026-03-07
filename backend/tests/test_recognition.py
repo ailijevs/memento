@@ -13,6 +13,7 @@ from app.schemas import (
     FaceMatch,
     FrameDetectionRequest,
     FrameDetectionResponse,
+    ProfileCard,
 )
 from app.services.rekognition import (
     RekognitionError,
@@ -306,11 +307,11 @@ class TestFrameDetectionResponseSchema:
     def test_response_with_matches(self):
         response = FrameDetectionResponse(
             matches=[
-                FaceMatch(
+                ProfileCard(
                     user_id="user-1",
-                    face_id="face-1",
+                    full_name="Test User",
+                    headline="Engineer",
                     similarity=95.0,
-                    confidence=99.0,
                 )
             ],
             processing_time_ms=150.5,
@@ -339,6 +340,7 @@ class TestDetectEndpoint:
     def client(self):
         return TestClient(app)
 
+    @patch("app.api.recognition.ProfileCardBuilder")
     @patch("app.api.recognition.decode_base64_image")
     @patch("app.api.recognition.build_event_collection_id")
     @patch("app.api.recognition.RekognitionService")
@@ -349,9 +351,10 @@ class TestDetectEndpoint:
         mock_service_cls,
         mock_build_collection,
         mock_decode,
+        mock_card_builder_cls,
         client,
     ):
-        """Detect returns 200 and FrameDetectionResponse with matches."""
+        """Detect returns 200 and FrameDetectionResponse with profile cards."""
         mock_get_admin.return_value = MagicMock()
         mock_decode.return_value = b"decoded-image-bytes"
         mock_build_collection.return_value = "memento_faces"
@@ -366,6 +369,17 @@ class TestDetectEndpoint:
         ]
         mock_service_cls.return_value = svc
 
+        card_builder = MagicMock()
+        card_builder.build_cards.return_value = [
+            ProfileCard(
+                user_id="user-1",
+                full_name="Test User",
+                headline="Engineer",
+                similarity=90.0,
+            )
+        ]
+        mock_card_builder_cls.return_value = card_builder
+
         response = client.post(
             "/api/v1/recognition/detect",
             json={
@@ -379,6 +393,7 @@ class TestDetectEndpoint:
         assert "matches" in data
         assert len(data["matches"]) == 1
         assert data["matches"][0]["user_id"] == "user-1"
+        assert data["matches"][0]["full_name"] == "Test User"
         assert "processing_time_ms" in data
         mock_decode.assert_called_once()
         svc.search_faces_by_image.assert_called_once_with(
