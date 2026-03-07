@@ -17,12 +17,6 @@ class RekognitionError(Exception):
     pass
 
 
-class FaceNotFoundError(RekognitionError):
-    """Raised when no face is detected in an image."""
-
-    pass
-
-
 class RekognitionService:
     """Service wrapper around a Rekognition client."""
 

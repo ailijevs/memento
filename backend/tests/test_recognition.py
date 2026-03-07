@@ -9,14 +9,12 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.schemas import (
-    BoundingBox,
     EventProcessingStatus,
     FaceMatch,
     FrameDetectionRequest,
     FrameDetectionResponse,
 )
 from app.services.rekognition import (
-    FaceNotFoundError,
     RekognitionError,
     RekognitionService,
 )
@@ -252,34 +250,7 @@ class TestRekognitionService:
         mock_client.delete_faces.assert_not_called()
 
 
-class TestRekognitionExceptions:
-    """Rekognition exception hierarchy."""
-
-    def test_face_not_found_is_rekognition_error(self):
-        """FaceNotFoundError is a RekognitionError."""
-        assert issubclass(FaceNotFoundError, RekognitionError)
-
-    def test_can_raise_face_not_found(self):
-        """FaceNotFoundError can be raised and caught."""
-        with pytest.raises(FaceNotFoundError):
-            raise FaceNotFoundError("no face")
-
-
 # --- Schemas ------------------------------------------------------------------
-
-
-class TestBoundingBoxSchema:
-    """Tests for BoundingBox schema."""
-
-    def test_valid_bounding_box(self):
-        box = BoundingBox(width=0.5, height=0.5, left=0.25, top=0.25)
-        assert box.width == 0.5
-        assert box.height == 0.5
-
-    def test_bounding_box_validation_0_to_1(self):
-        """Values must be in [0, 1]."""
-        with pytest.raises(ValueError):
-            BoundingBox(width=1.5, height=0.5, left=0.25, top=0.25)
 
 
 class TestFaceMatchSchema:

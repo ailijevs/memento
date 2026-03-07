@@ -5,15 +5,6 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
-class BoundingBox(BaseModel):
-    """Bounding box coordinates for a detected face."""
-
-    width: float = Field(..., ge=0, le=1, description="Width as fraction of image")
-    height: float = Field(..., ge=0, le=1, description="Height as fraction of image")
-    left: float = Field(..., ge=0, le=1, description="Left position as fraction")
-    top: float = Field(..., ge=0, le=1, description="Top position as fraction of image")
-
-
 class FaceMatch(BaseModel):
     """A matched face from the recognition collection."""
 
