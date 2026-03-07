@@ -20,7 +20,7 @@ class MementoApp extends AppServer {
     super(config);
     const wsPort = Number.parseInt(process.env.WS_PORT ?? '8080', 10);
     this.socketServer = new SocketServer(Number.isNaN(wsPort) ? 8080 : wsPort);
-    const backendClient = new BackendClient(process.env.RECOGNITION_URL);
+    const backendClient = new BackendClient();
     this.recognitionController = new RecognitionController({
       socketServer: this.socketServer,
       backendClient,
@@ -49,13 +49,12 @@ class MementoApp extends AppServer {
 }
 
 const app = new MementoApp({
-  packageName: 'memento.app',
+  packageName: 'memento-app',
   apiKey: process.env.MENTRA_API_KEY || '',
   port: Number.parseInt(process.env.PORT || '3001', 10),
 });
 
 console.log('Starting Memento app...');
-console.log(`Frontend: ${process.env.FRONTEND_URL}`);
 
 app.start();
 console.log(`Memento app running on port ${process.env.PORT || 3001}`);
