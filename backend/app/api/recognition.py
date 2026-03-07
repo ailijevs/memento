@@ -8,10 +8,10 @@ from app.dals.event_dal import EventDAL
 from app.db.supabase import get_admin_client
 from app.schemas import (
     EventProcessingStatus,
-    FaceMatch,
     FrameDetectionRequest,
     FrameDetectionResponse,
 )
+from app.services.profile_card_builder import ProfileCardBuilder
 from app.services.rekognition import (
     RekognitionError,
     RekognitionService,
@@ -29,14 +29,13 @@ async def detect_faces_in_frame(
     Detect and identify faces in a frame from MentraOS smart glasses.
 
     This endpoint processes a frame capture from the glasses camera,
-    detects all faces, and matches them against registered users in
-    the Rekognition collection.
-
-    Returns identified users with confidence scores.
+    detects all faces, matches them against registered users via
+    Rekognition, and returns profile cards with the matched users'
+    name, headline, company, photo, and LinkedIn info.
     """
     admin_client = get_admin_client()
     event_dal = EventDAL(admin_client)
-    # If an event_id is provided, enforce that indexing is completed
+
     if request.event_id is not None:
         event = await event_dal.get_by_id(request.event_id)
         if not event:
@@ -84,20 +83,17 @@ async def detect_faces_in_frame(
             collection_id=collection_id,
         )
 
-        matches = [
-            FaceMatch(
-                user_id=m.get("user_id"),
-                face_id=m["face_id"],
-                similarity=m["similarity"],
-                confidence=m["confidence"],
-            )
-            for m in matches_raw
-        ]
+        card_builder = ProfileCardBuilder(admin_client)
+        event_id_str = str(request.event_id) if request.event_id else None
+        profile_cards = card_builder.build_cards(
+            matches=matches_raw,
+            event_id=event_id_str,
+        )
 
         processing_time = (time.perf_counter() - start_time) * 1000
 
         return FrameDetectionResponse(
-            matches=matches,
+            matches=profile_cards,
             processing_time_ms=round(processing_time, 2),
             event_id=request.event_id,
         )

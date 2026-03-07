@@ -38,6 +38,7 @@ from .recognition import (
     FaceMatch,
     FrameDetectionRequest,
     FrameDetectionResponse,
+    ProfileCard,
 )
 
 __all__ = [
@@ -72,4 +73,5 @@ __all__ = [
     "FaceMatch",
     "FrameDetectionRequest",
     "FrameDetectionResponse",
+    "ProfileCard",
 ]

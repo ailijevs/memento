@@ -6,12 +6,26 @@ from pydantic import BaseModel, Field
 
 
 class FaceMatch(BaseModel):
-    """A matched face from the recognition collection."""
+    """A matched face from the recognition collection (internal use)."""
 
     user_id: str | None = Field(None, description="User UUID if face is registered")
     face_id: str = Field(..., description="Rekognition face ID")
     similarity: float = Field(..., ge=0, le=100, description="Match confidence %")
     confidence: float = Field(..., ge=0, le=100, description="Detection confidence %")
+
+
+class ProfileCard(BaseModel):
+    """Frontend-friendly profile card for a recognized person."""
+
+    user_id: str = Field(..., description="Matched user UUID")
+    full_name: str = Field(..., description="Person's full name")
+    headline: str | None = Field(None, description="Professional headline")
+    bio: str | None = Field(None, description="Short bio")
+    company: str | None = Field(None, description="Current company")
+    photo_path: str | None = Field(None, description="Profile photo storage key")
+    linkedin_url: str | None = Field(None, description="LinkedIn profile URL")
+    profile_one_liner: str | None = Field(None, description="One-line summary")
+    similarity: float = Field(..., ge=0, le=100, description="Match confidence %")
 
 
 class FrameDetectionRequest(BaseModel):
@@ -29,11 +43,11 @@ class FrameDetectionRequest(BaseModel):
 
 
 class FrameDetectionResponse(BaseModel):
-    """Response containing identified faces from a frame."""
+    """Response containing profile cards for identified faces."""
 
-    matches: list[FaceMatch] = Field(
+    matches: list[ProfileCard] = Field(
         default_factory=list,
-        description="List of identified faces",
+        description="Profile cards for identified people",
     )
     processing_time_ms: float = Field(..., description="Processing time in milliseconds")
     event_id: UUID | None = None
