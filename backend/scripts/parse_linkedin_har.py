@@ -5,10 +5,10 @@ Parse LinkedIn HAR file(s) to extract and download profile pictures.
 Usage:
     # Single HAR file:
     python parse_linkedin_har.py path/to/file.har
-    
+
     # Directory of HAR files:
     python parse_linkedin_har.py path/to/har_directory/
-    
+
     # Default (processes backend/data/har_files/):
     python parse_linkedin_har.py
 
@@ -26,11 +26,9 @@ The script will:
 """
 
 import json
-import hashlib
 import re
 import sys
 from pathlib import Path
-from urllib.parse import urlparse, unquote
 
 import requests
 
@@ -44,20 +42,20 @@ DEFAULT_HAR_DIR = DATA_DIR / "har_files"
 def extract_profile_pics_from_har(har_path: str) -> list[dict]:
     """
     Extract LinkedIn profile picture URLs from a HAR file.
-    
+
     Returns list of dicts with 'url' and optional 'profile_hint' keys.
     """
     with open(har_path, "r", encoding="utf-8") as f:
         har_data = json.load(f)
-    
+
     entries = har_data.get("log", {}).get("entries", [])
     profile_pics = []
     seen_urls = set()
-    
+
     for entry in entries:
         request = entry.get("request", {})
         url = request.get("url", "")
-        
+
         # LinkedIn profile pictures are served from media.licdn.com
         if "media.licdn.com" in url or "media-exp1.licdn.com" in url:
             # Skip company logos and background images
@@ -65,42 +63,41 @@ def extract_profile_pics_from_har(har_path: str) -> list[dict]:
                 continue
             if "background" in url:
                 continue
-            
+
             # Only keep actual profile photos
-            if any(pattern in url for pattern in [
-                "profile-displayphoto",
-                "profile-framedphoto",
-            ]):
+            if any(
+                pattern in url
+                for pattern in [
+                    "profile-displayphoto",
+                    "profile-framedphoto",
+                ]
+            ):
                 # Skip duplicates and tiny thumbnails
                 if url in seen_urls:
                     continue
-                    
+
                 # Skip very small images (usually thumbnails)
                 if "shrink_100_100" in url or "shrink_50_50" in url:
                     continue
-                
+
                 seen_urls.add(url)
-                
+
                 # Try to extract profile info from referer
                 referer = ""
                 for header in request.get("headers", []):
                     if header.get("name", "").lower() == "referer":
                         referer = header.get("value", "")
                         break
-                
+
                 profile_hint = None
                 if "/in/" in referer:
                     # Extract LinkedIn username from referer
                     match = re.search(r"/in/([^/?]+)", referer)
                     if match:
                         profile_hint = match.group(1)
-                
-                profile_pics.append({
-                    "url": url,
-                    "profile_hint": profile_hint,
-                    "referer": referer
-                })
-    
+
+                profile_pics.append({"url": url, "profile_hint": profile_hint, "referer": referer})
+
     return profile_pics
 
 
@@ -112,11 +109,11 @@ def download_image(url: str, output_path: Path, referer: str = None) -> bool:
     }
     if referer:
         headers["Referer"] = referer
-    
+
     try:
         response = requests.get(url, headers=headers, timeout=30)
         response.raise_for_status()
-        
+
         output_path.write_bytes(response.content)
         return True
     except Exception as e:
@@ -140,7 +137,7 @@ def get_best_profile_pic(pics: list[dict]) -> dict | None:
     """
     if not pics:
         return None
-    
+
     # Score by size preference (larger = better)
     def score(pic):
         url = pic["url"]
@@ -151,7 +148,7 @@ def get_best_profile_pic(pics: list[dict]) -> dict | None:
         elif "100_100" in url:
             return 1
         return 2  # Default for unknown sizes
-    
+
     return max(pics, key=score)
 
 
@@ -174,7 +171,7 @@ def save_classlist(classlist: list[dict]):
 def find_person_in_classlist(classlist: list[dict], name_hint: str) -> dict | None:
     """Try to find a person in the classlist by name."""
     name_hint_lower = name_hint.lower().replace("-", " ").replace("_", " ")
-    
+
     for person in classlist:
         full_name_lower = person.get("full_name", "").lower()
         # Check if the hint matches the full name
@@ -194,7 +191,7 @@ def main():
         input_path = Path(sys.argv[1])
     else:
         input_path = DEFAULT_HAR_DIR
-    
+
     # Check if path exists
     if not input_path.exists():
         if input_path == DEFAULT_HAR_DIR:
@@ -206,79 +203,83 @@ def main():
             print("  3. Log into LinkedIn")
             print("  4. Visit a profile you want to capture")
             print("  5. Right-click in Network tab -> 'Save all as HAR with content'")
-            print(f"  6. Save as the person's name: firstname-lastname.har")
+            print("  6. Save as the person's name: firstname-lastname.har")
             print(f"  7. Save to: {DEFAULT_HAR_DIR}")
             print("  8. Run this script again: python parse_linkedin_har.py")
             sys.exit(0)
         else:
             print(f"Error: Path not found: {input_path}")
             sys.exit(1)
-    
+
     # Get HAR files
     har_files = get_har_files(input_path)
-    
+
     if not har_files:
         print(f"No .har files found in: {input_path}")
         print("\nSave your HAR file(s) there and run again.")
         sys.exit(1)
-    
+
     print(f"Found {len(har_files)} HAR file(s) to process")
-    
+
     # Create output directory
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    
+
     # Load classlist for auto-matching
     classlist = load_classlist()
     classlist_updated = False
-    
+
     results = []
-    
+
     # Process each HAR file individually
     for har_file in har_files:
         har_name = har_file.stem  # filename without extension
         print(f"\n{'='*50}")
         print(f"Processing: {har_file.name}")
-        
+
         pics = extract_profile_pics_from_har(str(har_file))
         print(f"  Found {len(pics)} profile picture(s)")
-        
+
         if not pics:
             print(f"  No profile pictures found in {har_file.name}")
             continue
-        
+
         # Get the best quality image
         best_pic = get_best_profile_pic(pics)
         if not best_pic:
             continue
-        
+
         url = best_pic["url"]
         referer = best_pic.get("referer", "")
-        
+
         # Use HAR filename as the image name
         filename = f"{har_name}.jpg"
         output_path = OUTPUT_DIR / filename
-        
+
         # Skip if already exists
         if output_path.exists():
             print(f"  Skipping (already exists): {filename}")
-            results.append({
-                "name": har_name,
-                "local_path": f"data/profile_images/{filename}",
-                "original_url": url
-            })
-        else:
-            print(f"  Downloading best quality image...")
-            if download_image(url, output_path, referer):
-                print(f"  Saved: {filename}")
-                results.append({
+            results.append(
+                {
                     "name": har_name,
                     "local_path": f"data/profile_images/{filename}",
-                    "original_url": url
-                })
+                    "original_url": url,
+                }
+            )
+        else:
+            print("  Downloading best quality image...")
+            if download_image(url, output_path, referer):
+                print(f"  Saved: {filename}")
+                results.append(
+                    {
+                        "name": har_name,
+                        "local_path": f"data/profile_images/{filename}",
+                        "original_url": url,
+                    }
+                )
             else:
-                print(f"  Failed to download")
+                print("  Failed to download")
                 continue
-        
+
         # Try to auto-update classlist
         if classlist:
             person = find_person_in_classlist(classlist, har_name)
@@ -291,21 +292,21 @@ def main():
                     print(f"  Already has photo: {person.get('full_name')}")
             else:
                 print(f"  Could not auto-match '{har_name}' to classlist")
-    
+
     # Save updated classlist
     if classlist_updated:
         save_classlist(classlist)
-        print(f"\nUpdated classlist.json with new photo paths")
-    
+        print("\nUpdated classlist.json with new photo paths")
+
     # Save mapping file
     mapping_path = OUTPUT_DIR / "_image_mapping.json"
     with open(mapping_path, "w") as f:
         json.dump(results, f, indent=2)
-    
+
     print(f"\n{'='*50}")
     print(f"Processed {len(results)} profile(s)")
     print(f"Images saved to: {OUTPUT_DIR}")
-    
+
     if classlist:
         # Show progress
         with_photos = sum(1 for p in classlist if p.get("photo_path"))

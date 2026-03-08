@@ -34,6 +34,11 @@ from .profile import (
     ProfileUpdate,
 )
 from .profile_completion import ProfileCompletionResponse
+from .recognition import (
+    FaceMatch,
+    FrameDetectionRequest,
+    FrameDetectionResponse,
+)
 
 __all__ = [
     # Consent
@@ -63,4 +68,8 @@ __all__ = [
     "ProfileDirectoryEntry",
     "ProfileResponse",
     "ProfileUpdate",
+    # Recognition
+    "FaceMatch",
+    "FrameDetectionRequest",
+    "FrameDetectionResponse",
 ]

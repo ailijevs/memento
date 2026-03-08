@@ -1,4 +1,4 @@
-"""Service layer modules."""
+"""Service modules for external integrations."""
 
 from .linkedin_enrichment import (
     LinkedInEnrichmentError,
