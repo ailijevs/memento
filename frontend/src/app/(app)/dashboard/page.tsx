@@ -24,11 +24,14 @@ export default function DashboardPage() {
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
   const socketRef = useRef<SocketClient | null>(null);
+  const mountIdRef = useRef(`dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
   useEffect(() => {
     const supabase = createClient();
     const socket = new SocketClient();
     socketRef.current = socket;
+    const mountId = mountIdRef.current;
+    console.log("[DashboardSocket] effect mount", { mountId });
 
     const unsubscribe = socket.onMessage((message) => {
       if (message.type === "recognition_status") {
@@ -66,6 +69,11 @@ export default function DashboardPage() {
 
     void init();
     return () => {
+      console.log("[DashboardSocket] effect cleanup", {
+        mountId,
+        hadSocket: Boolean(socketRef.current),
+        wasConnected: socket.isConnected(),
+      });
       unsubscribe();
       socket.disconnect();
       socketRef.current = null;
