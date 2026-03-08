@@ -4,6 +4,7 @@ import { BackendClient } from './backendClient.ts';
 import { IncomingSocketMessage, SocketServer } from './webSocketServer.ts';
 
 type RecognitionCommand = 'start_recognition' | 'stop_recognition';
+import 'dotenv/config';
 
 type StartRecognitionPayload = {
   event_id?: string;
