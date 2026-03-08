@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { api, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { LogOut, ScanFace, Square } from "lucide-react";
+import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 interface RecognitionResult {
   id: string;
@@ -22,98 +23,84 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
-  const tokenRef = useRef<string | null>(null);
+  const socketRef = useRef<SocketClient | null>(null);
+  const mountIdRef = useRef(`dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
   useEffect(() => {
     const supabase = createClient();
+    const socket = new SocketClient();
+    socketRef.current = socket;
+    const mountId = mountIdRef.current;
+    console.log("[DashboardSocket] effect mount", { mountId });
+
+    const unsubscribe = socket.onMessage((message) => {
+      if (message.type === "recognition_status") {
+        const status = message.payload.status;
+        if (status === "started") setCapturing(true);
+        if (status === "stopping" || status === "stopped") setCapturing(false);
+        return;
+      }
+
+      if (message.type === "recognition_result") {
+        const parsed = parseRecognitionResult(message);
+        if (!parsed) return;
+        setResults((prev) => upsertRecognitionResult(prev, parsed));
+        return;
+      }
+
+      if (message.type === "recognition_error") {
+        console.error("Recognition error:", message.payload);
+      }
+    });
 
     async function init() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session) return;
-
-      const userId = session.user.id;
-      tokenRef.current = session.access_token;
-      api.setToken(session.access_token);
-
-      // Load initial capture state
-      try {
-        const state = await api.getCaptureState();
-        setCapturing(state.capturing);
-      } catch { /* ignore */ }
-
-      // Load recent results
-      const { data } = await supabase
-        .from("recognition_results")
-        .select("*")
-        .eq("user_id", userId)
-        .order("created_at", { ascending: false })
-        .limit(20);
-
-      if (data && data.length > 0) {
-        const enriched = await Promise.all(
-          data.map(async (r: RecognitionResult) => {
-            if (r.matched_user_id) {
-              try {
-                const profile = await api.getProfileById(r.matched_user_id);
-                return { ...r, profile };
-              } catch {
-                return r;
-              }
-            }
-            return r;
-          })
-        );
-        setResults(enriched);
+      if (!session) {
+        setLoading(false);
+        return;
       }
+
+      api.setToken(session.access_token);
+      socket.connect();
       setLoading(false);
-
-      // Subscribe to real-time inserts
-      const channel = supabase
-        .channel("recognition-feed")
-        .on(
-          "postgres_changes",
-          {
-            event: "INSERT",
-            schema: "public",
-            table: "recognition_results",
-            filter: `user_id=eq.${userId}`,
-          },
-          async (payload) => {
-            const newResult = payload.new as RecognitionResult;
-            let enriched: RecognitionResult = newResult;
-            if (newResult.matched_user_id) {
-              try {
-                const profile = await api.getProfileById(
-                  newResult.matched_user_id
-                );
-                enriched = { ...newResult, profile };
-              } catch {
-                // show card without profile data
-              }
-            }
-            setResults((prev) => [enriched, ...prev.slice(0, 19)]);
-          }
-        )
-        .subscribe();
-
-      return () => {
-        channel.unsubscribe();
-      };
     }
 
-    const cleanup = init();
+    void init();
     return () => {
-      cleanup.then((fn) => fn?.());
+      console.log("[DashboardSocket] effect cleanup", {
+        mountId,
+        hadSocket: Boolean(socketRef.current),
+        wasConnected: socket.isConnected(),
+      });
+      unsubscribe();
+      socket.disconnect();
+      socketRef.current = null;
     };
   }, []);
 
   async function toggleCapture() {
+    const socket = socketRef.current;
+    if (!socket) {
+      return;
+    }
+
     setCaptureLoading(true);
     try {
-      const result = capturing ? await api.stopCapture() : await api.startCapture();
-      setCapturing(result.capturing);
+      if (!socket.isConnected()) {
+        socket.connect();
+      }
+      const connected = await waitForSocketConnection(socket);
+      if (!connected) return;
+
+      const sent = socket.send({
+        type: capturing ? "stop_recognition" : "start_recognition",
+      });
+      if (!sent) return;
+      if (capturing) {
+        setCapturing(false);
+      }
     } catch { /* ignore */ }
     setCaptureLoading(false);
   }
@@ -337,4 +324,98 @@ function RecognitionCard({
       </div>
     </div>
   );
+}
+
+function parseRecognitionResult(
+  message: Extract<SocketMessage, { type: "recognition_result" }>,
+): RecognitionResult | null {
+  const match = message.payload.result.matches[0];
+  if (!match) return null;
+
+  const normalizedProfile = toProfileResponse(match);
+
+  return {
+    id: match.user_id,
+    user_id: match.user_id,
+    matched_user_id: match.user_id,
+    confidence: match.face_similarity,
+    created_at: message.payload.timestamp || new Date().toISOString(),
+    profile: normalizedProfile,
+  };
+}
+
+function waitForSocketConnection(socket: SocketClient): Promise<boolean> {
+  if (socket.isConnected()) {
+    return Promise.resolve(true);
+  }
+
+  return new Promise((resolve) => {
+    let attempts = 0;
+    const maxAttempts = 20;
+    const interval = window.setInterval(() => {
+      attempts += 1;
+      if (socket.isConnected()) {
+        window.clearInterval(interval);
+        resolve(true);
+        return;
+      }
+      if (attempts >= maxAttempts) {
+        window.clearInterval(interval);
+        resolve(false);
+      }
+    }, 100);
+  });
+}
+
+function upsertRecognitionResult(
+  previous: RecognitionResult[],
+  incoming: RecognitionResult,
+): RecognitionResult[] {
+  const incomingProfileKey = getRecognitionProfileKey(incoming);
+  const existingIndex = previous.findIndex((item) => {
+    const itemProfileKey = getRecognitionProfileKey(item);
+    if (incomingProfileKey && itemProfileKey) {
+      return itemProfileKey === incomingProfileKey;
+    }
+    return item.id === incoming.id;
+  });
+
+  if (existingIndex === -1) {
+    return [incoming, ...previous].slice(0, 20);
+  }
+
+  if (existingIndex === 0) {
+    return [incoming, ...previous.slice(1)];
+  }
+
+  return [
+    incoming,
+    ...previous.slice(0, existingIndex),
+    ...previous.slice(existingIndex + 1),
+  ].slice(0, 20);
+}
+
+function getRecognitionProfileKey(result: RecognitionResult): string | null {
+  return result.profile?.user_id || result.matched_user_id;
+}
+
+function toProfileResponse(match: ProfileCard): ProfileResponse {
+  return {
+    user_id: match.user_id,
+    full_name: match.full_name,
+    headline: match.headline,
+    bio: match.bio,
+    location: match.location,
+    company: match.company,
+    major: match.major,
+    graduation_year: match.graduation_year,
+    linkedin_url: match.linkedin_url,
+    photo_path: match.photo_path,
+    experiences: match.experiences as ProfileResponse["experiences"],
+    education: match.education as ProfileResponse["education"],
+    profile_one_liner: match.profile_one_liner,
+    profile_summary: match.profile_summary,
+    // created_at: timestamp || new Date().toISOString(),
+    // updated_at: timestamp || new Date().toISOString(),
+  };
 }

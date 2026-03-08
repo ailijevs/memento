@@ -1,6 +1,5 @@
 """API routers for the Memento application."""
 
-from .capture import router as capture_router
 from .consents import router as consents_router
 from .events import router as events_router
 from .memberships import router as memberships_router
