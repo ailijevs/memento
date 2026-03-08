@@ -311,7 +311,7 @@ class TestFrameDetectionResponseSchema:
                     user_id="user-1",
                     full_name="Test User",
                     headline="Engineer",
-                    similarity=95.0,
+                    face_similarity=95.0,
                 )
             ],
             processing_time_ms=150.5,
@@ -370,14 +370,16 @@ class TestDetectEndpoint:
         mock_service_cls.return_value = svc
 
         card_builder = MagicMock()
-        card_builder.build_cards.return_value = [
-            ProfileCard(
-                user_id="user-1",
-                full_name="Test User",
-                headline="Engineer",
-                similarity=90.0,
-            )
-        ]
+        card_builder.build_cards = AsyncMock(
+            return_value=[
+                ProfileCard(
+                    user_id="user-1",
+                    full_name="Test User",
+                    headline="Engineer",
+                    face_similarity=90.0,
+                )
+            ]
+        )
         mock_card_builder_cls.return_value = card_builder
 
         response = client.post(

@@ -85,7 +85,7 @@ async def detect_faces_in_frame(
 
         card_builder = ProfileCardBuilder(admin_client)
         event_id_str = str(request.event_id) if request.event_id else None
-        profile_cards = card_builder.build_cards(
+        profile_cards = await card_builder.build_cards(
             matches=matches_raw,
             event_id=event_id_str,
         )
