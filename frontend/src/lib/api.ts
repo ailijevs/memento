@@ -58,6 +58,22 @@ class ApiClient {
     });
   }
 
+  async getProfileById(userId: string) {
+    return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
+  }
+
+  async startCapture() {
+    return this.request<{ capturing: boolean }>("/api/v1/capture/start", { method: "POST" });
+  }
+
+  async stopCapture() {
+    return this.request<{ capturing: boolean }>("/api/v1/capture/stop", { method: "POST" });
+  }
+
+  async getCaptureState() {
+    return this.request<{ capturing: boolean }>("/api/v1/capture/state");
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",

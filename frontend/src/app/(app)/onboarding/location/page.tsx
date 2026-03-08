@@ -35,7 +35,7 @@ export default function LocationPage() {
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Aurora — full mode dimmed, matches welcome page glow */}
-      <div className="absolute inset-0" style={{ opacity: 0.28 }}>
+      <div className="absolute inset-0" style={{ opacity: 0.52 }}>
         <Aurora className="h-full w-full" mode="ambient" />
       </div>
 
@@ -44,7 +44,7 @@ export default function LocationPage() {
         className="pointer-events-none absolute inset-0"
         style={{
           background: [
-            "linear-gradient(to top, oklch(0.04 0.005 270) 15%, transparent 42%)",
+            "linear-gradient(to top, oklch(0.07 0.015 270) 15%, transparent 42%)",
             "linear-gradient(to bottom, oklch(0.04 0.005 270 / 50%) 0%, transparent 22%)",
           ].join(", "),
         }}

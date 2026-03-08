@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
+    capture_router,
     consents_router,
     events_router,
     memberships_router,
@@ -76,6 +77,7 @@ def create_app() -> FastAPI:
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(memberships_router, prefix="/api/v1")
     app.include_router(consents_router, prefix="/api/v1")
+    app.include_router(capture_router, prefix="/api/v1")
     app.include_router(recognition_router, prefix="/api/v1")
 
     @app.get("/")
