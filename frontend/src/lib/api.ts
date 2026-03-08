@@ -173,8 +173,8 @@ export interface ProfileResponse {
   education: Education[] | null;
   profile_one_liner: string | null;
   profile_summary: string | null;
-  created_at: string;
-  updated_at: string;
+  // created_at: string;
+  // updated_at: string;
 }
 
 export interface Experience {

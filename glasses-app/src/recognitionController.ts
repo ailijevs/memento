@@ -1,6 +1,6 @@
 import type { AppSession } from '@mentra/sdk';
 
-import { BackendClient } from './backendClient.ts';
+import { BackendClient, type FrameDetectionResponse } from './backendClient.ts';
 import { IncomingSocketMessage, SocketServer } from './webSocketServer.ts';
 
 type RecognitionCommand = 'start_recognition' | 'stop_recognition';
@@ -102,7 +102,7 @@ export class RecognitionController {
         // TODO(demo): remove env fallback and pass event_id explicitly from client commands.
         const eventId = payload.event_id ?? process.env.RECOGNITION_EVENT_ID;
 
-        const response = await this.backendClient.recognizeFrame({
+        const response: FrameDetectionResponse = await this.backendClient.recognizeFrame({
           image_base64: imageBase64,
           event_id: eventId,
         });
@@ -111,7 +111,7 @@ export class RecognitionController {
           type: 'recognition_result',
           payload: {
             timestamp: new Date().toISOString(),
-            result: response as Record<string, unknown>,
+            result: response,
           },
         });
       } catch (error) {

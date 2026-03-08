@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { api, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { LogOut, ScanFace, Square } from "lucide-react";
-import { SocketClient, type SocketMessage } from "@/lib/socket";
+import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 interface RecognitionResult {
   id: string;
@@ -32,7 +32,7 @@ export default function DashboardPage() {
 
     const unsubscribe = socket.onMessage((message) => {
       if (message.type === "recognition_status") {
-        const status = getStringField(message.payload, "status");
+        const status = message.payload.status;
         if (status === "started") setCapturing(true);
         if (status === "stopping" || status === "stopped") setCapturing(false);
         return;
@@ -318,70 +318,22 @@ function RecognitionCard({
   );
 }
 
-function parseRecognitionResult(message: SocketMessage): RecognitionResult | null {
-  const payload = getObject(message.payload);
-  const result = getObject(payload?.result);
-  if (!result) return null;
+function parseRecognitionResult(
+  message: Extract<SocketMessage, { type: "recognition_result" }>,
+): RecognitionResult | null {
+  const match = message.payload.result.matches[0];
+  if (!match) return null;
 
-  const profile = getObject(result.profile);
-  const normalizedProfile: ProfileResponse | undefined = profile
-    ? {
-        user_id: getStringField(profile, "user_id"),
-        full_name: getStringField(profile, "full_name"),
-        headline: getNullableStringField(profile, "headline"),
-        bio: getNullableStringField(profile, "bio"),
-        location: getNullableStringField(profile, "location"),
-        company: getNullableStringField(profile, "company"),
-        major: getNullableStringField(profile, "major"),
-        graduation_year: getNullableNumberField(profile, "graduation_year"),
-        linkedin_url: getNullableStringField(profile, "linkedin_url"),
-        photo_path: getNullableStringField(profile, "photo_path"),
-        experiences: Array.isArray(profile["experiences"])
-          ? (profile["experiences"] as ProfileResponse["experiences"])
-          : null,
-        education: Array.isArray(profile["education"])
-          ? (profile["education"] as ProfileResponse["education"])
-          : null,
-        profile_one_liner: getNullableStringField(profile, "profile_one_liner"),
-        profile_summary: getNullableStringField(profile, "profile_summary"),
-        created_at: getStringField(profile, "created_at"),
-        updated_at: getStringField(profile, "updated_at"),
-      }
-    : undefined;
+  const normalizedProfile = toProfileResponse(match);
 
   return {
-    id: getStringField(result, "id"),
-    user_id: getStringField(result, "user_id"),
-    matched_user_id: getNullableStringField(result, "matched_user_id"),
-    confidence: getNullableNumberField(result, "confidence"),
-    created_at:
-      getStringField(result, "created_at") ||
-      (payload ? getStringField(payload, "timestamp") : "") ||
-      new Date().toISOString(),
+    id: match.user_id,
+    user_id: match.user_id,
+    matched_user_id: match.user_id,
+    confidence: match.face_similarity,
+    created_at: message.payload.timestamp || new Date().toISOString(),
     profile: normalizedProfile,
   };
-}
-
-function getObject(value: unknown): Record<string, unknown> | null {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return null;
-  }
-  return value as Record<string, unknown>;
-}
-
-function getStringField(obj: Record<string, unknown>, field: string): string {
-  const value = obj[field];
-  return typeof value === "string" ? value : "";
-}
-
-function getNullableStringField(obj: Record<string, unknown>, field: string): string | null {
-  const value = obj[field];
-  return typeof value === "string" ? value : null;
-}
-
-function getNullableNumberField(obj: Record<string, unknown>, field: string): number | null {
-  const value = obj[field];
-  return typeof value === "number" ? value : null;
 }
 
 function waitForSocketConnection(socket: SocketClient): Promise<boolean> {
@@ -437,4 +389,25 @@ function upsertRecognitionResult(
 
 function getRecognitionProfileKey(result: RecognitionResult): string | null {
   return result.profile?.user_id || result.matched_user_id;
+}
+
+function toProfileResponse(match: ProfileCard): ProfileResponse {
+  return {
+    user_id: match.user_id,
+    full_name: match.full_name,
+    headline: match.headline,
+    bio: match.bio,
+    location: match.location,
+    company: match.company,
+    major: match.major,
+    graduation_year: match.graduation_year,
+    linkedin_url: match.linkedin_url,
+    photo_path: match.photo_path,
+    experiences: match.experiences as ProfileResponse["experiences"],
+    education: match.education as ProfileResponse["education"],
+    profile_one_liner: match.profile_one_liner,
+    profile_summary: match.profile_summary,
+    // created_at: timestamp || new Date().toISOString(),
+    // updated_at: timestamp || new Date().toISOString(),
+  };
 }

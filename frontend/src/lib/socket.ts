@@ -1,7 +1,40 @@
-export type SocketMessage = {
-  type: string;
-  payload?: unknown;
+export type ProfileCard = {
+  user_id: string;
+  full_name: string;
+  headline: string | null;
+  company: string | null;
+  photo_path: string | null;
+  profile_one_liner: string | null;
+  face_similarity: number;
+  experience_similarity: number | null;
+  bio: string | null;
+  location: string | null;
+  major: string | null;
+  graduation_year: number | null;
+  linkedin_url: string | null;
+  profile_summary: string | null;
+  experiences: Record<string, unknown>[] | null;
+  education: Record<string, unknown>[] | null;
 };
+
+export type FrameDetectionResponse = {
+  matches: ProfileCard[];
+  processing_time_ms: number;
+  event_id: string | null;
+};
+
+export type SocketMessage =
+  | { type: "start_recognition"; payload?: { event_id?: string } }
+  | { type: "stop_recognition"; payload?: undefined }
+  | { type: "connected"; payload: { clientId: string } }
+  | { type: "ack"; payload: { receivedType: string } }
+  | { type: "error"; payload: { reason: string } }
+  | { type: "recognition_status"; payload: { status: string } }
+  | { type: "recognition_error"; payload: { message: string } }
+  | {
+      type: "recognition_result";
+      payload: { timestamp: string; result: FrameDetectionResponse };
+    };
 
 type MessageHandler = (message: SocketMessage) => void | Promise<void>;
 
