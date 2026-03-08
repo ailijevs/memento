@@ -13,6 +13,16 @@ app.use(
   })
 );
 
+// WebSocket server
+app.use(
+  "/ws",
+  createProxyMiddleware({
+    target: "ws://localhost:8080",
+    changeOrigin: true,
+    ws: true,
+  })
+);
+
 // Backend API
 app.use(
   "/api",
