@@ -98,10 +98,12 @@ export class RecognitionController {
       try {
         const photo = await session.camera.requestPhoto();
         const imageBase64 = photo.buffer.toString('base64');
+        // TODO(demo): remove env fallback and pass event_id explicitly from client commands.
+        const eventId = payload.event_id ?? process.env.RECOGNITION_EVENT_ID;
 
         const response = await this.backendClient.recognizeFrame({
           image_base64: imageBase64,
-          event_id: payload.event_id,
+          event_id: eventId,
         });
 
         this.emitToActiveClient({
