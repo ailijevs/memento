@@ -32,7 +32,7 @@ export default function PhotoPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Session expired. Please sign in again."); return; }
 
-      const filePath = `${session.user.id}/avatar.jpg`;
+      const filePath = `${session.user.id}.jpg`;
       const { error: uploadError } = await supabase.storage
         .from("profile-photos")
         .upload(filePath, file, { upsert: true, contentType: file.type });
