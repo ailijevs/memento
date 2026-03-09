@@ -25,55 +25,15 @@ interface RecognitionResult {
   profile?: ProfileResponse;
 }
 
-// Bump this version string whenever mock data changes to bust sessionStorage cache
-const MOCK_VERSION = "v4";
-const MOCK_RESULTS: RecognitionResult[] = [
-  {
-    id: "mock-will-ott",
-    user_id: "29bb4bd6-2206-4c75-a299-3ee6bcf72735",
-    matched_user_id: "29bb4bd6-2206-4c75-a299-3ee6bcf72735",
-    confidence: 94.7,
-    created_at: new Date().toISOString(),
-    profile: {
-      user_id: "29bb4bd6-2206-4c75-a299-3ee6bcf72735",
-      full_name: "Will Ott",
-      headline: "ECE Student at Purdue · Whirlpool Alum",
-      bio: "ECE senior bridging hardware and software. Interned at Whirlpool on consumer appliance electronics. Into embedded systems and signal processing.",
-      location: "West Lafayette, IN",
-      company: "Whirlpool Corporation",
-      major: "Electrical and Computer Engineering",
-      graduation_year: 2026,
-      linkedin_url: "https://linkedin.com/in/william-ott-438026245",
-      photo_path: "https://vvodafvmwkvbuurdpcyj.supabase.co/storage/v1/object/public/profile-photos/29bb4bd6-2206-4c75-a299-3ee6bcf72735.jpg",
-      experiences: [
-        { title: "Senior Specialist — Electrical Engineering", company: "Whirlpool Corporation", start_date: "May 2024", end_date: "Aug 2024", description: null, location: "Benton Harbor, MI" },
-        { title: "ECE 495 Capstone Researcher", company: "Purdue University", start_date: "Jan 2025", end_date: null, description: null, location: "West Lafayette, IN" },
-      ],
-      education: [{ school: "Purdue University", degree: "B.S.", field_of_study: "Electrical and Computer Engineering", start_date: "2022", end_date: "2026" }],
-      profile_one_liner: "Ask me about my work at Whirlpool or embedded systems at Purdue.",
-      profile_summary: null,
-    },
-  },
-];
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [results, setResults] = useState<RecognitionResult[]>(MOCK_RESULTS);
+  const [results, setResults] = useState<RecognitionResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
   const socketRef = useRef<SocketClient | null>(null);
   const mountIdRef = useRef(`dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
-
-  // Always seed mock profiles into sessionStorage — force overwrite any stale API-fetched cache
-  useEffect(() => {
-    for (const r of MOCK_RESULTS) {
-      if (r.profile && r.matched_user_id) {
-        sessionStorage.setItem(`profile_cache_${r.matched_user_id}_mock`, MOCK_VERSION);
-        sessionStorage.setItem(`profile_cache_${r.matched_user_id}`, JSON.stringify(r.profile));
-      }
-    }
-  }, []);
 
   useEffect(() => {
     const supabase = createClient();
