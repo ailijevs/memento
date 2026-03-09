@@ -80,12 +80,18 @@ export class SocketClient {
       }
     };
 
-    this.socket.onerror = (event) => {
-      console.error("[SocketClient] WebSocket error:", event);
+    this.socket.onerror = () => {
+      // Browser WebSocket error events intentionally contain no detail.
+      // The most common cause is the glasses-app server not running at this.url.
+      console.warn(`[SocketClient] Could not connect to ${this.url} — is the glasses-app running?`);
     };
 
-    this.socket.onclose = () => {
-      console.log("[SocketClient] Disconnected");
+    this.socket.onclose = (event) => {
+      if (event.wasClean) {
+        console.log(`[SocketClient] Disconnected cleanly (code ${event.code})`);
+      } else {
+        console.warn(`[SocketClient] Connection lost (code ${event.code})`);
+      }
       this.socket = null;
     };
   }

@@ -8,6 +8,14 @@ import { Aurora } from "@/components/aurora";
 import { LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
+function resolvePhotoUrl(photoPath: string | null): string | null {
+  if (!photoPath) return null;
+  if (photoPath.startsWith("http")) return photoPath;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  if (!supabaseUrl) return null;
+  return `${supabaseUrl}/storage/v1/object/public/${photoPath}`;
+}
+
 interface RecognitionResult {
   id: string;
   user_id: string;
@@ -16,6 +24,7 @@ interface RecognitionResult {
   created_at: string;
   profile?: ProfileResponse;
 }
+
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -82,15 +91,11 @@ export default function DashboardPage() {
 
   async function toggleCapture() {
     const socket = socketRef.current;
-    if (!socket) {
-      return;
-    }
+    if (!socket) return;
 
     setCaptureLoading(true);
     try {
-      if (!socket.isConnected()) {
-        socket.connect();
-      }
+      if (!socket.isConnected()) socket.connect();
       const connected = await waitForSocketConnection(socket);
       if (!connected) return;
 
@@ -98,9 +103,7 @@ export default function DashboardPage() {
         type: capturing ? "stop_recognition" : "start_recognition",
       });
       if (!sent) return;
-      if (capturing) {
-        setCapturing(false);
-      }
+      if (capturing) setCapturing(false);
     } catch { /* ignore */ }
     setCaptureLoading(false);
   }
@@ -123,8 +126,7 @@ export default function DashboardPage() {
       <div
         className="pointer-events-none absolute inset-0"
         style={{
-          background:
-            "linear-gradient(to bottom, transparent 20%, oklch(0.07 0.015 270) 55%)",
+          background: "linear-gradient(to bottom, transparent 20%, oklch(0.07 0.015 270) 55%)",
         }}
       />
 
@@ -143,7 +145,6 @@ export default function DashboardPage() {
             Recognition Feed
           </h1>
 
-          {/* Scan toggle — replaces the static "Live" indicator */}
           <button
             onClick={toggleCapture}
             disabled={captureLoading}
@@ -189,7 +190,19 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {results.map((result, i) => (
-              <RecognitionCard key={result.id} result={result} index={i} />
+              <RecognitionCard
+                key={result.id}
+                result={result}
+                index={i}
+                onSelect={(r) => {
+                  const userId = r.matched_user_id;
+                  if (!userId) return;
+                  if (r.profile) {
+                    sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(r.profile));
+                  }
+                  router.push(`/profile/${userId}`);
+                }}
+              />
             ))}
           </div>
         )}
@@ -205,9 +218,12 @@ export default function DashboardPage() {
           Sign Out
         </button>
       </div>
+
     </div>
   );
 }
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
 function EmptyState() {
   return (
@@ -224,36 +240,32 @@ function EmptyState() {
         <div className="h-3 w-3 rounded-full bg-white/20" />
       </div>
       <p className="text-[15px] text-white/30">Waiting for recognitions...</p>
-      <p className="mt-2 text-[13px] text-white/15">
-        Results appear here in real-time
-      </p>
+      <p className="mt-2 text-[13px] text-white/15">Results appear here in real-time</p>
     </div>
   );
 }
 
+// ─── Recognition card ─────────────────────────────────────────────────────────
+
 function RecognitionCard({
   result,
   index,
+  onSelect,
 }: {
   result: RecognitionResult;
   index: number;
+  onSelect: (result: RecognitionResult) => void;
 }) {
+  const [imgFailed, setImgFailed] = useState(false);
   const profile = result.profile;
   const name = profile?.full_name ?? "Unknown person";
-  const initials = name
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-  const confidencePct =
-    result.confidence != null ? Math.round(result.confidence * 100) : null;
+  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const confidencePct = result.confidence != null ? Math.round(result.confidence) : null;
+  const photoUrl = resolvePhotoUrl(profile?.photo_path ?? null);
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
+    const diffMins = Math.floor((Date.now() - date.getTime()) / 60000);
     if (diffMins < 1) return "just now";
     if (diffMins < 60) return `${diffMins}m ago`;
     const diffHours = Math.floor(diffMins / 60);
@@ -263,25 +275,27 @@ function RecognitionCard({
 
   return (
     <div
-      className="rounded-2xl p-4"
+      className="rounded-2xl p-4 cursor-pointer active:scale-[0.98] transition-transform"
       style={{
         background: "rgba(255,255,255,0.07)",
         border: "1px solid rgba(255,255,255,0.12)",
         animation: `fade-in 0.4s cubic-bezier(0.16,1,0.3,1) ${index * 50}ms both`,
       }}
+      onClick={() => onSelect(result)}
     >
-      <div className="flex items-center gap-3">
+      <div className="flex items-start gap-3">
         {/* Avatar */}
-        {profile?.photo_path ? (
+        {photoUrl && !imgFailed ? (
           <img
-            src={profile.photo_path}
+            src={photoUrl}
             alt={name}
-            className="h-12 w-12 shrink-0 rounded-full object-cover"
+            className="h-12 w-12 shrink-0 rounded-full object-cover mt-0.5"
             style={{ border: "1px solid rgba(255,255,255,0.10)" }}
+            onError={() => setImgFailed(true)}
           />
         ) : (
           <div
-            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[15px] font-medium text-white/60"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[15px] font-medium text-white/60 mt-0.5"
             style={{
               background: "rgba(255,255,255,0.06)",
               border: "1px solid rgba(255,255,255,0.10)",
@@ -293,38 +307,41 @@ function RecognitionCard({
 
         {/* Info */}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <p className="truncate text-[15px] font-semibold text-white">
-              {name}
-            </p>
-            {confidencePct != null && (
-              <span
-                className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                style={{
-                  background: "oklch(0.35 0.12 275 / 40%)",
-                  border: "1px solid oklch(0.5 0.15 275 / 25%)",
-                  color: "oklch(0.8 0.1 275)",
-                }}
-              >
-                {confidencePct}%
-              </span>
-            )}
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <p className="truncate text-[15px] font-semibold text-white">{name}</p>
+                {confidencePct != null && (
+                  <span
+                    className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
+                    style={{
+                      background: "oklch(0.35 0.12 275 / 40%)",
+                      border: "1px solid oklch(0.5 0.15 275 / 25%)",
+                      color: "oklch(0.8 0.1 275)",
+                    }}
+                  >
+                    {confidencePct}%
+                  </span>
+                )}
+              </div>
+              {profile?.headline && (
+                <p className="truncate text-[13px] text-white/50 mt-0.5">{profile.headline}</p>
+              )}
+              {profile?.profile_one_liner && (
+                <p className="text-[12px] text-white/35 mt-1.5 leading-snug line-clamp-2">
+                  {profile.profile_one_liner}
+                </p>
+              )}
+            </div>
+            <p className="shrink-0 text-[11px] text-white/22 pt-0.5">{formatTime(result.created_at)}</p>
           </div>
-          {profile?.headline && (
-            <p className="truncate text-[13px] text-white/50">
-              {profile.headline}
-            </p>
-          )}
         </div>
-
-        {/* Timestamp */}
-        <p className="shrink-0 text-[11px] text-white/22">
-          {formatTime(result.created_at)}
-        </p>
       </div>
     </div>
   );
 }
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseRecognitionResult(
   message: Extract<SocketMessage, { type: "recognition_result" }>,
@@ -332,37 +349,25 @@ function parseRecognitionResult(
   const match = message.payload.result.matches[0];
   if (!match) return null;
 
-  const normalizedProfile = toProfileResponse(match);
-
   return {
     id: match.user_id,
     user_id: match.user_id,
     matched_user_id: match.user_id,
     confidence: match.face_similarity,
     created_at: message.payload.timestamp || new Date().toISOString(),
-    profile: normalizedProfile,
+    profile: toProfileResponse(match),
   };
 }
 
 function waitForSocketConnection(socket: SocketClient): Promise<boolean> {
-  if (socket.isConnected()) {
-    return Promise.resolve(true);
-  }
+  if (socket.isConnected()) return Promise.resolve(true);
 
   return new Promise((resolve) => {
     let attempts = 0;
-    const maxAttempts = 20;
     const interval = window.setInterval(() => {
       attempts += 1;
-      if (socket.isConnected()) {
-        window.clearInterval(interval);
-        resolve(true);
-        return;
-      }
-      if (attempts >= maxAttempts) {
-        window.clearInterval(interval);
-        resolve(false);
-      }
+      if (socket.isConnected()) { window.clearInterval(interval); resolve(true); return; }
+      if (attempts >= 20) { window.clearInterval(interval); resolve(false); }
     }, 100);
   });
 }
@@ -371,28 +376,16 @@ function upsertRecognitionResult(
   previous: RecognitionResult[],
   incoming: RecognitionResult,
 ): RecognitionResult[] {
-  const incomingProfileKey = getRecognitionProfileKey(incoming);
+  const incomingKey = getRecognitionProfileKey(incoming);
   const existingIndex = previous.findIndex((item) => {
-    const itemProfileKey = getRecognitionProfileKey(item);
-    if (incomingProfileKey && itemProfileKey) {
-      return itemProfileKey === incomingProfileKey;
-    }
+    const itemKey = getRecognitionProfileKey(item);
+    if (incomingKey && itemKey) return itemKey === incomingKey;
     return item.id === incoming.id;
   });
 
-  if (existingIndex === -1) {
-    return [incoming, ...previous].slice(0, 20);
-  }
-
-  if (existingIndex === 0) {
-    return [incoming, ...previous.slice(1)];
-  }
-
-  return [
-    incoming,
-    ...previous.slice(0, existingIndex),
-    ...previous.slice(existingIndex + 1),
-  ].slice(0, 20);
+  if (existingIndex === -1) return [incoming, ...previous].slice(0, 20);
+  if (existingIndex === 0) return [incoming, ...previous.slice(1)];
+  return [incoming, ...previous.slice(0, existingIndex), ...previous.slice(existingIndex + 1)].slice(0, 20);
 }
 
 function getRecognitionProfileKey(result: RecognitionResult): string | null {
@@ -415,7 +408,5 @@ function toProfileResponse(match: ProfileCard): ProfileResponse {
     education: match.education as ProfileResponse["education"],
     profile_one_liner: match.profile_one_liner,
     profile_summary: match.profile_summary,
-    // created_at: timestamp || new Date().toISOString(),
-    // updated_at: timestamp || new Date().toISOString(),
   };
 }
