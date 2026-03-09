@@ -25,6 +25,8 @@ class DummyS3Client:
     def __init__(self) -> None:
         self.calls: list[dict] = []
         self.delete_calls: list[dict] = []
+        self.presign_calls: list[dict] = []
+        self.presign_url = "https://example.com/presigned"
 
     def upload_fileobj(self, fileobj, bucket, key, ExtraArgs):  # noqa: N803
         """Record upload details from boto3-compatible upload call."""
@@ -40,6 +42,13 @@ class DummyS3Client:
     def delete_object(self, Bucket, Key):  # noqa: N803
         """Record delete details from boto3-compatible delete call."""
         self.delete_calls.append({"bucket": Bucket, "key": Key})
+
+    def generate_presigned_url(self, ClientMethod, Params, ExpiresIn):  # noqa: N803
+        """Record presign details from boto3-compatible presign call."""
+        self.presign_calls.append(
+            {"client_method": ClientMethod, "params": Params, "expires_in": ExpiresIn}
+        )
+        return self.presign_url
 
 
 def _png_bytes(mode: str = "RGB") -> bytes:
@@ -276,3 +285,61 @@ def test_delete_profile_picture_uses_default_client(monkeypatch):
     )
 
     assert client.delete_calls == [{"bucket": "bucket", "key": "profiles/u123-onboarding.jpg"}]
+
+
+def test_get_profile_picture_presigned_url_validates_inputs():
+    """get_profile_picture_presigned_url validates required inputs."""
+    service = S3Service(s3_client=DummyS3Client())
+
+    with pytest.raises(ValueError, match="bucket_name must not be empty"):
+        service.get_profile_picture_presigned_url(
+            s3_key="profiles/u1-linkedin.jpg",
+            bucket_name="   ",
+        )
+
+    with pytest.raises(ValueError, match="s3_key must not be empty"):
+        service.get_profile_picture_presigned_url(s3_key="  ", bucket_name="bucket")
+
+    with pytest.raises(ValueError, match="expires_in_seconds must be greater than 0"):
+        service.get_profile_picture_presigned_url(
+            s3_key="profiles/u1-linkedin.jpg",
+            bucket_name="bucket",
+            expires_in_seconds=0,
+        )
+
+
+def test_get_profile_picture_presigned_url_returns_presigned_url():
+    """get_profile_picture_presigned_url returns a URL for the provided key."""
+    client = DummyS3Client()
+    service = S3Service(s3_client=client)
+
+    result = service.get_profile_picture_presigned_url(
+        s3_key=" profiles/u123-onboarding.jpg ",
+        bucket_name=" my-bucket ",
+        expires_in_seconds=600,
+    )
+
+    assert result == "https://example.com/presigned"
+    assert client.presign_calls == [
+        {
+            "client_method": "get_object",
+            "params": {"Bucket": "my-bucket", "Key": "profiles/u123-onboarding.jpg"},
+            "expires_in": 600,
+        }
+    ]
+
+
+def test_get_profile_picture_presigned_url_raises_on_presign_error():
+    """get_profile_picture_presigned_url wraps presign failures with RuntimeError."""
+
+    class FailingPresignClient(DummyS3Client):
+        def generate_presigned_url(self, ClientMethod, Params, ExpiresIn):  # noqa: N803
+            raise Exception("boom")
+
+    service = S3Service(s3_client=FailingPresignClient())
+
+    with pytest.raises(RuntimeError, match="Failed to generate pre-signed URL"):
+        service.get_profile_picture_presigned_url(
+            s3_key="profiles/u1-linkedin.jpg",
+            bucket_name="bucket",
+        )
