@@ -1,24 +1,29 @@
 """API endpoints for facial recognition using AWS Rekognition."""
 
+import logging
 import time
 
 from fastapi import APIRouter, HTTPException, status
 
+from app.config import get_settings
 from app.dals.event_dal import EventDAL
 from app.db.supabase import get_admin_client
 from app.schemas import (
     EventProcessingStatus,
     FrameDetectionRequest,
     FrameDetectionResponse,
+    ProfileCard,
 )
 from app.services.profile_card_builder import ProfileCardBuilder
 from app.services.rekognition import (
     RekognitionError,
     RekognitionService,
 )
+from app.services.s3 import S3Service
 from app.utils.rekognition_helpers import build_event_collection_id, decode_base64_image
 
 router = APIRouter(prefix="/recognition", tags=["recognition"])
+logger = logging.getLogger(__name__)
 
 
 @router.post("/detect", response_model=FrameDetectionResponse)
@@ -89,6 +94,7 @@ async def detect_faces_in_frame(
             matches=matches_raw,
             event_id=event_id_str,
         )
+        profile_cards = _attach_presigned_profile_photo_urls(profile_cards)
 
         processing_time = (time.perf_counter() - start_time) * 1000
 
@@ -103,3 +109,35 @@ async def detect_faces_in_frame(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Recognition service error: {str(e)}",
         )
+
+
+def _attach_presigned_profile_photo_urls(profile_cards: list[ProfileCard]) -> list[ProfileCard]:
+    """Replace profile card photo_path S3 keys with pre-signed URLs when possible."""
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        return profile_cards
+
+    s3_service = S3Service()
+    cards_with_urls: list[ProfileCard] = []
+
+    for card in profile_cards:
+        if not card.photo_path:
+            cards_with_urls.append(card)
+            continue
+
+        try:
+            presigned_url = s3_service.get_profile_picture_presigned_url(
+                s3_key=card.photo_path,
+                bucket_name=settings.s3_bucket_name,
+            )
+            cards_with_urls.append(card.model_copy(update={"photo_path": presigned_url}))
+        except Exception as exc:
+            logger.warning(
+                "Failed to pre-sign profile photo for user_id=%s and key=%s: %s",
+                card.user_id,
+                card.photo_path,
+                exc,
+            )
+            cards_with_urls.append(card)
+
+    return cards_with_urls
