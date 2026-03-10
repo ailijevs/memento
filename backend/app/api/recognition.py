@@ -1,7 +1,9 @@
 """API endpoints for facial recognition using AWS Rekognition."""
 
 import logging
+import math
 import time
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -41,6 +43,7 @@ async def detect_faces_in_frame(
     admin_client = get_admin_client()
     event_dal = EventDAL(admin_client)
 
+    event = None
     if request.event_id is not None:
         event = await event_dal.get_by_id(request.event_id)
         if not event:
@@ -94,7 +97,10 @@ async def detect_faces_in_frame(
             matches=matches_raw,
             event_id=event_id_str,
         )
-        profile_cards = _attach_presigned_profile_photo_urls(profile_cards)
+        profile_cards = _attach_presigned_profile_photo_urls(
+            profile_cards=profile_cards,
+            event_end_time=event.ends_at if event else None,
+        )
 
         processing_time = (time.perf_counter() - start_time) * 1000
 
@@ -111,12 +117,17 @@ async def detect_faces_in_frame(
         )
 
 
-def _attach_presigned_profile_photo_urls(profile_cards: list[ProfileCard]) -> list[ProfileCard]:
+def _attach_presigned_profile_photo_urls(
+    profile_cards: list[ProfileCard],
+    *,
+    event_end_time: datetime | None = None,
+) -> list[ProfileCard]:
     """Replace profile card photo_path S3 keys with pre-signed URLs when possible."""
     settings = get_settings()
     if not settings.s3_bucket_name:
         return profile_cards
 
+    expires_in_seconds = _resolve_presigned_url_ttl_seconds(event_end_time)
     s3_service = S3Service()
     cards_with_urls: list[ProfileCard] = []
 
@@ -129,6 +140,7 @@ def _attach_presigned_profile_photo_urls(profile_cards: list[ProfileCard]) -> li
             presigned_url = s3_service.get_profile_picture_presigned_url(
                 s3_key=card.photo_path,
                 bucket_name=settings.s3_bucket_name,
+                expires_in_seconds=expires_in_seconds,
             )
             cards_with_urls.append(card.model_copy(update={"photo_path": presigned_url}))
         except Exception as exc:
@@ -141,3 +153,21 @@ def _attach_presigned_profile_photo_urls(profile_cards: list[ProfileCard]) -> li
             cards_with_urls.append(card)
 
     return cards_with_urls
+
+
+def _resolve_presigned_url_ttl_seconds(event_end_time: datetime | None) -> int:
+    """Return URL TTL in seconds based on event time, defaulting to 10 minutes."""
+    fallback_seconds = 600
+    if event_end_time is None:
+        return fallback_seconds
+
+    if event_end_time.tzinfo is None:
+        end_time_utc = event_end_time.replace(tzinfo=timezone.utc)
+    else:
+        end_time_utc = event_end_time.astimezone(timezone.utc)
+
+    remaining_seconds = math.ceil((end_time_utc - datetime.now(timezone.utc)).total_seconds())
+    if remaining_seconds <= 0:
+        return fallback_seconds
+
+    return remaining_seconds
