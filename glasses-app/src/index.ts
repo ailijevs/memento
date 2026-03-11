@@ -1,6 +1,6 @@
 import Mentra from '@mentra/sdk';
 import type { AppSession } from '@mentra/sdk';
-import { createServer } from 'http';
+import { createServer, type Server as HttpServer } from 'http';
 import 'dotenv/config';
 
 const { AppServer } = Mentra;
@@ -17,7 +17,7 @@ const port = Number.parseInt(process.env.PORT ?? '3001', 10);
 const useSharedPort = !!process.env.PORT;
 
 class MementoApp extends AppServer {
-  private readonly socketServer: SocketServer;
+  private socketServer: SocketServer;
   private readonly recognitionController: RecognitionController;
   private websocketStarted = false;
   private activeSession: AppSession | null = null;
@@ -25,19 +25,13 @@ class MementoApp extends AppServer {
   constructor(config: AppServerConfig) {
     super(config);
 
-    if (useSharedPort) {
-      // Attach WebSocket to the same HTTP server as Express (single Railway port)
-      const httpServer = createServer(this.getExpressApp());
-      this.socketServer = new SocketServer(httpServer);
-    } else {
-      // Local dev: separate WebSocket port
-      const wsPort = Number.parseInt(process.env.WS_PORT ?? '8080', 10);
-      this.socketServer = new SocketServer(Number.isNaN(wsPort) ? 8080 : wsPort);
-    }
+    // Local dev: start with a standalone WebSocket port
+    const wsPort = Number.parseInt(process.env.WS_PORT ?? '8080', 10);
+    this.socketServer = new SocketServer(Number.isNaN(wsPort) ? 8080 : wsPort);
 
     const backendClient = new BackendClient();
     this.recognitionController = new RecognitionController({
-      socketServer: this.socketServer,
+      getSocketServer: () => this.socketServer,
       backendClient,
       getSession: () => this.activeSession,
     });
@@ -48,15 +42,29 @@ class MementoApp extends AppServer {
 
   override async start(): Promise<void> {
     if (useSharedPort) {
-      // Start the shared HTTP server (serves both Express routes and WebSocket)
-      const httpServer = (this.socketServer as unknown as { httpServer: ReturnType<typeof createServer> }).httpServer;
-      await new Promise<void>((resolve) => {
-        httpServer.listen(port, () => {
-          console.log(`Memento app running on port ${port} (HTTP + WebSocket)`);
-          resolve();
-        });
-      });
-      await this.startWebSocketConnection();
+      // Intercept Express's listen call to capture the HTTP server,
+      // then attach our WebSocket to it — so both share a single Railway port.
+      // super.start() runs in full (MentraOS SDK init included).
+      const expressApp = this.getExpressApp();
+      let capturedServer: HttpServer | undefined;
+
+      const origListen = expressApp.listen.bind(expressApp);
+      (expressApp as unknown as { listen: (...a: unknown[]) => HttpServer }).listen = (...args: unknown[]) => {
+        capturedServer = createServer(expressApp);
+        (capturedServer as unknown as { listen: (...a: unknown[]) => void }).listen(...args);
+        return capturedServer;
+      };
+
+      await super.start();
+
+      if (capturedServer) {
+        // Replace the standalone WS server with one attached to the shared HTTP server
+        this.socketServer = new SocketServer(capturedServer);
+        this.socketServer.onMessage((clientId, message) =>
+          this.recognitionController.handleSocketCommand(clientId, message),
+        );
+        await this.startWebSocketConnection();
+      }
     } else {
       await super.start();
     }
