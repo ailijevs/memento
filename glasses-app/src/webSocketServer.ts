@@ -18,13 +18,21 @@ type MessageHandler = (clientId: string, message: IncomingSocketMessage) => void
 export class SocketServer {
   private readonly port: number;
   private readonly httpServer: HttpServer;
+  private readonly ownHttpServer: boolean;
   private readonly wsServer: WebSocketServer;
   private readonly clients = new Map<string, ClientSession>();
   private readonly messageHandlers = new Set<MessageHandler>();
 
-  constructor(port = 8080) {
-    this.port = port;
-    this.httpServer = createServer();
+  constructor(portOrServer: number | HttpServer = 8080) {
+    if (typeof portOrServer === 'number') {
+      this.port = portOrServer;
+      this.httpServer = createServer();
+      this.ownHttpServer = true;
+    } else {
+      this.port = 0;
+      this.httpServer = portOrServer;
+      this.ownHttpServer = false;
+    }
     this.wsServer = new WebSocketServer({ server: this.httpServer });
 
     this.wsServer.on('connection', (socket, request) => {
@@ -32,8 +40,12 @@ export class SocketServer {
     });
   }
 
-  /** Start listening for websocket connections on the configured port. */
+  /** Start listening for websocket connections. If using a shared HTTP server, it is already listening. */
   start(): Promise<void> {
+    if (!this.ownHttpServer) {
+      console.log(`WebSocket server attached to shared HTTP server`);
+      return Promise.resolve();
+    }
     return new Promise((resolve) => {
       this.httpServer.listen(this.port, () => {
         console.log(`WebSocket server listening on ws://localhost:${this.port}`);
