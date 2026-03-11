@@ -5,8 +5,16 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
-import { LogOut, ScanFace, Square } from "lucide-react";
+import { Camera, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+type FrameDetectionResponse = {
+  matches: ProfileCard[];
+  processing_time_ms: number;
+  event_id: string | null;
+};
 
 function resolvePhotoUrl(photoPath: string | null): string | null {
   if (!photoPath) return null;
@@ -32,8 +40,13 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
+  const [cameraMode, setCameraMode] = useState(false);
   const socketRef = useRef<SocketClient | null>(null);
   const mountIdRef = useRef(`dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const cameraActiveRef = useRef(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -89,7 +102,101 @@ export default function DashboardPage() {
     };
   }, []);
 
+  // Stop camera stream and capture loop
+  function stopCameraStream() {
+    cameraActiveRef.current = false;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }
+
+  // Camera capture loop — runs while cameraActiveRef is true
+  async function runCameraCapture() {
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+
+    while (cameraActiveRef.current) {
+      if (video.readyState >= 2 && video.videoWidth > 0) {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+          const imageBase64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+          if (imageBase64) {
+            try {
+              const res = await fetch(`${API_URL}/api/v1/recognition/detect`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ image_base64: imageBase64 }),
+              });
+              if (res.ok) {
+                const data = (await res.json()) as FrameDetectionResponse;
+                for (const match of data.matches) {
+                  const result: RecognitionResult = {
+                    id: match.user_id,
+                    user_id: match.user_id,
+                    matched_user_id: match.user_id,
+                    confidence: match.face_similarity,
+                    created_at: new Date().toISOString(),
+                    profile: toProfileResponse(match),
+                  };
+                  setResults((prev) => upsertRecognitionResult(prev, result));
+                }
+              }
+            } catch (err) {
+              console.error("[Camera] Recognition error:", err);
+            }
+          }
+        }
+      }
+      await new Promise<void>((resolve) => setTimeout(resolve, 1500));
+    }
+
+    setCapturing(false);
+  }
+
+  // Cleanup camera on unmount
+  useEffect(() => {
+    return () => { stopCameraStream(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function toggleCapture() {
+    if (cameraMode) {
+      if (capturing) {
+        stopCameraStream();
+        setCapturing(false);
+      } else {
+        setCaptureLoading(true);
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: "environment" },
+          });
+          streamRef.current = stream;
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream;
+            await videoRef.current.play();
+          }
+          cameraActiveRef.current = true;
+          setCapturing(true);
+          runCameraCapture().catch((err) => {
+            console.error("[Camera] Loop error:", err);
+            stopCameraStream();
+            setCapturing(false);
+          });
+        } catch (err) {
+          console.error("[Camera] getUserMedia failed:", err);
+        }
+        setCaptureLoading(false);
+      }
+      return;
+    }
+
+    // Glasses mode
     const socket = socketRef.current;
     if (!socket) return;
 
@@ -108,6 +215,19 @@ export default function DashboardPage() {
     setCaptureLoading(false);
   }
 
+  function handleModeToggle() {
+    if (capturing) {
+      if (cameraMode) {
+        stopCameraStream();
+      } else {
+        const socket = socketRef.current;
+        if (socket?.isConnected()) socket.send({ type: "stop_recognition" });
+      }
+      setCapturing(false);
+    }
+    setCameraMode((m) => !m);
+  }
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -117,6 +237,11 @@ export default function DashboardPage() {
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
+      {/* Hidden camera elements for phone camera mode */}
+      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+      <video ref={videoRef} className="hidden" playsInline muted />
+      <canvas ref={canvasRef} className="hidden" />
+
       {/* Aurora */}
       <div className="absolute inset-0" style={{ opacity: 0.45 }}>
         <Aurora className="h-full w-full" mode="focused" />
@@ -145,37 +270,68 @@ export default function DashboardPage() {
             Recognition Feed
           </h1>
 
-          <button
-            onClick={toggleCapture}
-            disabled={captureLoading}
-            className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-all active:scale-95 disabled:opacity-50"
-            style={{
-              background: capturing ? "oklch(0.22 0.10 25 / 70%)" : "oklch(1 0 0 / 5%)",
-              border: capturing
-                ? "1px solid oklch(0.6 0.2 25 / 35%)"
-                : "1px solid oklch(1 0 0 / 8%)",
-            }}
-          >
-            {capturing ? (
-              <>
-                <div className="relative flex h-2 w-2">
-                  <div className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
-                  <div className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
-                </div>
-                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-red-300">
-                  Scanning
-                </span>
-                <Square className="h-3 w-3 text-red-400" />
-              </>
-            ) : (
-              <>
-                <ScanFace className="h-3.5 w-3.5 text-white/40" />
-                <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
-                  Scan
-                </span>
-              </>
-            )}
-          </button>
+          <div className="flex items-center gap-2">
+            {/* Mode toggle */}
+            <button
+              onClick={handleModeToggle}
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-all active:scale-95"
+              style={{
+                background: cameraMode ? "oklch(0.22 0.12 230 / 60%)" : "oklch(1 0 0 / 5%)",
+                border: cameraMode
+                  ? "1px solid oklch(0.55 0.18 230 / 35%)"
+                  : "1px solid oklch(1 0 0 / 8%)",
+              }}
+              title={cameraMode ? "Switch to glasses mode" : "Switch to phone camera mode"}
+            >
+              <Camera
+                className="h-3.5 w-3.5"
+                style={{ color: cameraMode ? "oklch(0.75 0.15 230)" : "oklch(1 0 0 / 30%)" }}
+              />
+              <span
+                className="text-[10px] font-medium uppercase tracking-[0.1em]"
+                style={{ color: cameraMode ? "oklch(0.75 0.15 230)" : "oklch(1 0 0 / 25%)" }}
+              >
+                {cameraMode ? "Phone" : "Glasses"}
+              </span>
+            </button>
+
+            {/* Scan / Stop button */}
+            <button
+              onClick={toggleCapture}
+              disabled={captureLoading}
+              className="flex items-center gap-2 rounded-full px-3 py-1.5 transition-all active:scale-95 disabled:opacity-50"
+              style={{
+                background: capturing ? "oklch(0.22 0.10 25 / 70%)" : "oklch(1 0 0 / 5%)",
+                border: capturing
+                  ? "1px solid oklch(0.6 0.2 25 / 35%)"
+                  : "1px solid oklch(1 0 0 / 8%)",
+              }}
+            >
+              {capturing ? (
+                <>
+                  <div className="relative flex h-2 w-2">
+                    <div className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                    <div className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                  </div>
+                  <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-red-300">
+                    Scanning
+                  </span>
+                  <Square className="h-3 w-3 text-red-400" />
+                </>
+              ) : (
+                <>
+                  {cameraMode ? (
+                    <Camera className="h-3.5 w-3.5 text-white/40" />
+                  ) : (
+                    <ScanFace className="h-3.5 w-3.5 text-white/40" />
+                  )}
+                  <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
+                    Scan
+                  </span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
 
