@@ -359,7 +359,7 @@ class TestDetectEndpoint:
         mock_decode.return_value = b"decoded-image-bytes"
         mock_build_collection.return_value = "memento_faces"
         svc = MagicMock()
-        svc.search_faces_by_image.return_value = [
+        svc.search_all_faces_in_frame.return_value = [
             {
                 "user_id": "user-1",
                 "face_id": "f1",
@@ -398,7 +398,7 @@ class TestDetectEndpoint:
         assert data["matches"][0]["full_name"] == "Test User"
         assert "processing_time_ms" in data
         mock_decode.assert_called_once()
-        svc.search_faces_by_image.assert_called_once_with(
+        svc.search_all_faces_in_frame.assert_called_once_with(
             image_bytes=b"decoded-image-bytes",
             collection_id="memento_faces",
         )
@@ -442,7 +442,7 @@ class TestDetectEndpoint:
         mock_get_admin.return_value = MagicMock()
         mock_decode.return_value = b"bytes"
         svc = MagicMock()
-        svc.search_faces_by_image.side_effect = RekognitionError("service down")
+        svc.search_all_faces_in_frame.side_effect = RekognitionError("service down")
         mock_service_cls.return_value = svc
 
         response = client.post(
@@ -481,7 +481,7 @@ class TestDetectEndpoint:
         )
         mock_dal_cls.return_value = dal
         svc = MagicMock()
-        svc.search_faces_by_image.return_value = []
+        svc.search_all_faces_in_frame.return_value = []
         mock_service_cls.return_value = svc
 
         event_id = uuid4()
@@ -495,7 +495,7 @@ class TestDetectEndpoint:
 
         assert response.status_code == 200
         mock_build_collection.assert_called_once_with(event_id)
-        svc.search_faces_by_image.assert_called_once_with(
+        svc.search_all_faces_in_frame.assert_called_once_with(
             image_bytes=b"bytes",
             collection_id="memento_event_abc",
         )

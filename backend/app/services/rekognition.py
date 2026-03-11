@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import io
 from typing import Any, cast
 from uuid import UUID
 
 from botocore.exceptions import ClientError
 from dotenv import load_dotenv
+from PIL import Image
 
 load_dotenv()
 
@@ -130,8 +132,88 @@ class RekognitionService:
         except ClientError as e:
             error_code = e.response["Error"]["Code"]
             if error_code == "InvalidParameterException":
+                # This typically indicates that no face was found in the image.
                 return []
             raise RekognitionError(f"Failed to search faces: {e}") from e
+
+    def detect_faces(self, *, image_bytes: bytes) -> list[dict[str, Any]]:
+        """
+        Detect all faces in an image.
+
+        This wraps Rekognition DetectFaces and returns the raw face details,
+        including bounding boxes needed for per-face recognition.
+        """
+        try:
+            response = self.client.detect_faces(
+                Image={"Bytes": image_bytes},
+                Attributes=[],
+            )
+        except ClientError as e:
+            raise RekognitionError(f"Failed to detect faces: {e}") from e
+
+        return cast(list[dict[str, Any]], response.get("FaceDetails", []))
+
+    def search_all_faces_in_frame(
+        self,
+        *,
+        image_bytes: bytes,
+        collection_id: str,
+    ) -> list[dict[str, Any]]:
+        """
+        Detect all faces in a frame and search each one against the collection.
+
+        Rekognition's SearchFacesByImage only searches for the largest face in
+        an image. To support multi-face frames from the glasses, we:
+
+        1. Call DetectFaces to get bounding boxes for all faces.
+        2. Crop each bounding box out of the original frame.
+        3. Call SearchFacesByImage on each cropped face image.
+        """
+        face_details = self.detect_faces(image_bytes=image_bytes)
+        if not face_details:
+            return []
+
+        try:
+            image = Image.open(io.BytesIO(image_bytes))
+        except Exception as e:  # pragma: no cover - defensive
+            raise RekognitionError(f"Failed to open image for cropping: {e}") from e
+
+        width, height = image.size
+        all_matches: list[dict[str, Any]] = []
+
+        for face in face_details:
+            box = face.get("BoundingBox") or {}
+            try:
+                left = max(0.0, float(box.get("Left", 0.0)))
+                top = max(0.0, float(box.get("Top", 0.0)))
+                box_width = float(box.get("Width", 0.0))
+                box_height = float(box.get("Height", 0.0))
+            except (TypeError, ValueError):
+                continue
+
+            if box_width <= 0 or box_height <= 0:
+                continue
+
+            x1 = int(left * width)
+            y1 = int(top * height)
+            x2 = int(min(1.0, left + box_width) * width)
+            y2 = int(min(1.0, top + box_height) * height)
+
+            if x2 <= x1 or y2 <= y1:
+                continue
+
+            cropped = image.crop((x1, y1, x2, y2))
+            buffer = io.BytesIO()
+            cropped.save(buffer, format="JPEG")
+            cropped_bytes = buffer.getvalue()
+
+            matches = self.search_faces_by_image(
+                image_bytes=cropped_bytes,
+                collection_id=collection_id,
+            )
+            all_matches.extend(matches)
+
+        return all_matches
 
     def delete_faces_by_user(self, *, collection_id: str, user_id: UUID) -> int:
         """
