@@ -132,7 +132,10 @@ export default function DashboardPage() {
               const res = await fetch(`${API_URL}/api/v1/recognition/detect`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ image_base64: imageBase64 }),
+                body: JSON.stringify({
+                  image_base64: imageBase64,
+                  event_id: process.env.NEXT_PUBLIC_RECOGNITION_EVENT_ID ?? null,
+                }),
               });
               if (res.ok) {
                 const data = (await res.json()) as FrameDetectionResponse;
