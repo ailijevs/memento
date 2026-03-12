@@ -86,7 +86,10 @@ async def detect_faces_in_frame(
             else "memento_faces"
         )
 
-        matches_raw = rekognition.search_faces_by_image(
+        # Detect all faces in the frame and search each one against the
+        # appropriate Rekognition collection so we can return multiple
+        # matches when several people are in view.
+        matches_raw = rekognition.search_all_faces_in_frame(
             image_bytes=image_bytes,
             collection_id=collection_id,
         )
