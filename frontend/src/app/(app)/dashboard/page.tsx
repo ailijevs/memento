@@ -120,12 +120,14 @@ export default function DashboardPage() {
 
     while (cameraActiveRef.current) {
       if (video.readyState >= 2 && video.videoWidth > 0) {
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        const maxDim = 640;
+        const scale = Math.min(1, maxDim / Math.max(video.videoWidth, video.videoHeight));
+        canvas.width = Math.round(video.videoWidth * scale);
+        canvas.height = Math.round(video.videoHeight * scale);
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          ctx.drawImage(video, 0, 0);
-          const imageBase64 = canvas.toDataURL("image/jpeg", 0.8).split(",")[1];
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          const imageBase64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
           if (imageBase64) {
             try {
               const res = await fetch(`${API_URL}/api/v1/recognition/detect`, {
