@@ -208,13 +208,12 @@ export default function DashboardPage() {
     try {
       if (!socket.isConnected()) socket.connect();
       const connected = await waitForSocketConnection(socket);
-      if (!connected) return;
-
-      const sent = socket.send({
-        type: capturing ? "stop_recognition" : "start_recognition",
-      });
-      if (!sent) return;
-      if (capturing) setCapturing(false);
+      if (connected) {
+        const sent = socket.send({
+          type: capturing ? "stop_recognition" : "start_recognition",
+        });
+        if (sent && capturing) setCapturing(false);
+      }
     } catch { /* ignore */ }
     setCaptureLoading(false);
   }
