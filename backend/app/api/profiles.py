@@ -182,7 +182,7 @@ async def onboard_from_linkedin_url(
             )
             image_saved = True
         except (ProfileImageError, RuntimeError, ValueError):
-            photo_path = None
+            photo_path = enrichment.profile_image_url
             image_saved = False
 
     existing = await dal.get_by_user_id(current_user.id)
