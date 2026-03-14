@@ -67,9 +67,7 @@ class TestCompaniesFromProfile:
         assert "acme corp" in _companies_from_profile(profile)
 
     def test_experience_companies_included(self):
-        profile = _make_profile(
-            experiences=[{"company": "Beta Inc", "title": "Engineer"}]
-        )
+        profile = _make_profile(experiences=[{"company": "Beta Inc", "title": "Engineer"}])
         assert "beta inc" in _companies_from_profile(profile)
 
     def test_company_normalized_to_lowercase(self):
@@ -155,12 +153,8 @@ class TestCompatibilityServiceScore:
         assert "Acme" in result.shared_companies
 
     def test_shared_school_adds_twenty_five_points(self):
-        viewer = _make_profile(
-            full_name="Alice", education=[{"school": "MIT"}]
-        )
-        target = _make_profile(
-            full_name="Bob", education=[{"school": "MIT"}]
-        )
+        viewer = _make_profile(full_name="Alice", education=[{"school": "MIT"}])
+        target = _make_profile(full_name="Bob", education=[{"school": "MIT"}])
         result = self._service().compute(viewer, target)
         assert result.score == 25.0
 
@@ -259,7 +253,5 @@ class TestTemplateStarters:
 
     def test_at_most_three_starters_returned(self):
         target = _make_profile(full_name="Bob")
-        starters = _template_starters(
-            target, ["Acme"], ["Mit"], ["Computer Science"]
-        )
+        starters = _template_starters(target, ["Acme"], ["Mit"], ["Computer Science"])
         assert len(starters) <= 3
