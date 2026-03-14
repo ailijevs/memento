@@ -30,7 +30,9 @@ class CompatibilityService:
         shared_schools = _shared_schools(viewer, target)
         shared_fields = _shared_fields(viewer, target)
         same_location = bool(
-            viewer.location and target.location and viewer.location.strip().lower() == target.location.strip().lower()
+            viewer.location
+            and target.location
+            and viewer.location.strip().lower() == target.location.strip().lower()
         )
 
         score = min(
@@ -41,7 +43,9 @@ class CompatibilityService:
             + (10.0 if same_location else 0.0),
         )
 
-        starters = self._generate_starters(viewer, target, shared_companies, shared_schools, shared_fields)
+        starters = self._generate_starters(
+            viewer, target, shared_companies, shared_schools, shared_fields
+        )
 
         return CompatibilityResult(
             score=round(score, 1),
@@ -187,10 +191,18 @@ def _get_dspy_predictor(model: str, api_key: str):  # pragma: no cover - runtime
     class ConversationStarterSignature(dspy.Signature):
         """Generate natural ice-breaker conversation starters for a networking event."""
 
-        context = dspy.InputField(desc="Profile context: who you are, who you met, and any shared background.")
-        starter_1 = dspy.OutputField(desc="First conversation starter, one sentence, first-person, natural.")
-        starter_2 = dspy.OutputField(desc="Second conversation starter, one sentence, first-person, natural.")
-        starter_3 = dspy.OutputField(desc="Third conversation starter, one sentence, first-person, natural.")
+        context = dspy.InputField(
+            desc="Profile context: who you are, who you met, and any shared background."
+        )
+        starter_1 = dspy.OutputField(
+            desc="First conversation starter, one sentence, first-person, natural."
+        )
+        starter_2 = dspy.OutputField(
+            desc="Second conversation starter, one sentence, first-person, natural."
+        )
+        starter_3 = dspy.OutputField(
+            desc="Third conversation starter, one sentence, first-person, natural."
+        )
 
     lm = dspy.LM(model=model, api_key=api_key)
     dspy.configure(lm=lm)
@@ -206,15 +218,22 @@ def _template_starters(
     starters: list[str] = []
 
     if shared_companies:
-        starters.append(f"I see we've both worked at {shared_companies[0]} — what was your experience like there?")
+        starters.append(
+            f"I see we've both worked at {shared_companies[0]}"
+            " — what was your experience like there?"
+        )
     if shared_schools:
         starters.append(f"Did you enjoy your time at {shared_schools[0]}?")
     if shared_fields:
         starters.append(f"I studied {shared_fields[0]} too — how are you applying it in your work?")
 
     if not starters and target.headline:
-        starters.append(f"I noticed you work in {target.headline} — what does a typical day look like for you?")
+        starters.append(
+            f"I noticed you work in {target.headline} — what does a typical day look like for you?"
+        )
     if not starters:
-        starters.append(f"Hi {target.full_name}, great to meet you — what brings you to this event?")
+        starters.append(
+            f"Hi {target.full_name}, great to meet you — what brings you to this event?"
+        )
 
     return starters[:3]
