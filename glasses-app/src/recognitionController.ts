@@ -16,9 +16,10 @@ export class RecognitionController {
   private readonly getSession: () => AppSession | null;
   private isRunning = false;
   private activeClientId: string | null = null;
-  /** User IDs announced via TTS in the current recognition session */
-  private announcedUserIds = new Set<string>();
+  /** Timestamp of last announcement per user_id (ms). Cleared on session stop. */
+  private lastAnnouncedAt = new Map<string, number>();
   private readonly soundEnabled: boolean;
+  private readonly announceCooldownMs: number;
 
   constructor(params: {
     getSocketServer: () => SocketServer;
@@ -29,6 +30,7 @@ export class RecognitionController {
     this.backendClient = params.backendClient;
     this.getSession = params.getSession;
     this.soundEnabled = process.env.RECOGNITION_SOUND_ENABLED !== 'false';
+    this.announceCooldownMs = Number.parseInt(process.env.RECOGNITION_SOUND_COOLDOWN_MS ?? '5000', 10);
   }
 
   private get socketServer(): SocketServer {
@@ -68,7 +70,7 @@ export class RecognitionController {
 
     this.isRunning = true;
     this.activeClientId = clientId;
-    this.announcedUserIds.clear();
+    this.lastAnnouncedAt.clear();
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'started' },
@@ -94,7 +96,7 @@ export class RecognitionController {
     }
 
     this.isRunning = false;
-    this.announcedUserIds.clear();
+    this.lastAnnouncedAt.clear();
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'stopping' },
@@ -149,9 +151,12 @@ export class RecognitionController {
     session: AppSession,
     matches: FrameDetectionResponse['matches'],
   ): Promise<void> {
+    const now = Date.now();
     for (const match of matches) {
-      if (!match.user_id || this.announcedUserIds.has(match.user_id)) continue;
-      this.announcedUserIds.add(match.user_id);
+      if (!match.user_id) continue;
+      const last = this.lastAnnouncedAt.get(match.user_id) ?? 0;
+      if (now - last < this.announceCooldownMs) continue;
+      this.lastAnnouncedAt.set(match.user_id, now);
       const firstName = match.full_name?.split(' ')[0] ?? 'someone';
       try {
         await session.audio.speak(`${firstName} recognized`, { stopOtherAudio: false });
