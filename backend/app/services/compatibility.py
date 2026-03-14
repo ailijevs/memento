@@ -168,10 +168,7 @@ def _generate_with_dspy(
     predictor = _get_dspy_predictor(model, api_key)
     context = _build_context(viewer, target, shared_companies, shared_schools, shared_fields)
     prediction = predictor(context=context)
-    starters = [
-        str(getattr(prediction, f"starter_{i}", "")).strip()
-        for i in range(1, 4)
-    ]
+    starters = [str(getattr(prediction, f"starter_{i}", "")).strip() for i in range(1, 4)]
     starters = [s for s in starters if s]
     if not starters:
         raise ValueError("DSPy returned empty starter fields.")
