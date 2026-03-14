@@ -139,6 +139,11 @@ def _attach_presigned_profile_photo_urls(
             cards_with_urls.append(card)
             continue
 
+        # If already a full URL (e.g. Supabase Storage), use it directly
+        if card.photo_path.startswith("http://") or card.photo_path.startswith("https://"):
+            cards_with_urls.append(card)
+            continue
+
         try:
             presigned_url = s3_service.get_profile_picture_presigned_url(
                 s3_key=card.photo_path,
