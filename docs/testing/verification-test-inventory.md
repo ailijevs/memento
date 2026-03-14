@@ -22,6 +22,8 @@
 | UT-06 | FR-4.1 | ProfileCardBuilder constructs cards from recognition matches | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestProfileCardBuilder](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
 | UT-07 | FR-4.1 | Recognition schemas validate FaceMatch and ProfileCard | pytest | Marty | Yes | Yes | [`backend/tests/test_recognition.py` — TestFaceMatchSchema, TestFrameDetectionResponseSchema](https://github.com/ailijevs/memento/blob/main/backend/tests/test_recognition.py) |
 | UT-08 | FR-4.2 | RekognitionService creates/deletes collections, searches faces | pytest | Team | Yes | Yes | [`backend/tests/test_recognition.py` — TestRekognitionService](https://github.com/ailijevs/memento/blob/main/backend/tests/test_recognition.py) |
+| UT-09 | FR-4.3 | CompatibilityService: shared field extraction, score calculation, conversation starters | pytest | Sasha | Yes | Yes | [`backend/tests/test_compatibility.py`](https://github.com/ailijevs/memento/blob/main/backend/tests/test_compatibility.py) |
+| UT-10 | FR-4.4 | SSRF URL validation blocks private IPs, loopback, non-HTTPS before image fetch | pytest | Sasha | Yes | Yes | [`backend/tests/test_profiles_ssrf.py`](https://github.com/ailijevs/memento/blob/main/backend/tests/test_profiles_ssrf.py) |
 | IT-01 | FR-4.1 | /recognition/detect endpoint returns ProfileCards end-to-end | pytest | Marty | Yes | Yes | [`backend/tests/test_recognition.py` — TestDetectEndpoint](https://github.com/ailijevs/memento/blob/main/backend/tests/test_recognition.py) |
 | IT-02 | FR-2.1 | Resume file type validation rejects unsupported formats | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeParserFileType](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
 | IT-03 | FR-2.1 | Resume upload endpoint returns all fields (TestClient integration) | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeUploadEndpoint](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
@@ -44,4 +46,5 @@
 ### Owner Key
 
 - **Marty** – Tests authored or significantly modified by Marty
+- **Sasha** – Tests authored or significantly modified by Sasha
 - **Team** – Shared ownership across team members
