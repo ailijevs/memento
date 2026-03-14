@@ -49,7 +49,7 @@ def _make_profile(**kwargs) -> ProfileResponse:
         "updated_at": _NOW,
     }
     defaults.update(kwargs)
-    return ProfileResponse(**defaults)
+    return ProfileResponse(**defaults)  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
