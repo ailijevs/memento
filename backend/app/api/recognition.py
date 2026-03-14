@@ -177,6 +177,12 @@ async def enroll_face(
 
     try:
         rekognition.ensure_collection_exists(collection_id=collection_id)
+        # Remove any previous face records for this user before re-indexing
+        # to avoid accumulating duplicates across multiple enroll calls.
+        rekognition.delete_faces_by_user(
+            collection_id=collection_id,
+            user_id=current_user.id,
+        )
         result = rekognition.index_face_from_bytes(
             collection_id=collection_id,
             image_bytes=image_bytes,
