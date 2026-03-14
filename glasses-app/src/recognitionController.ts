@@ -128,7 +128,8 @@ export class RecognitionController {
         });
 
         if (this.soundEnabled) {
-          await this.announceNewMatches(session, response.matches);
+          // Fire-and-forget — don't let TTS latency block the capture loop
+          void this.announceNewMatches(session, response.matches);
         }
       } catch (error) {
         this.emitToActiveClient({
