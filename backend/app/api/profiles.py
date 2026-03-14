@@ -1,8 +1,10 @@
 """API endpoints for user profiles."""
 
 import asyncio
+import ipaddress
 import logging
 from typing import Annotated, Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -24,6 +26,8 @@ from app.schemas import (
     ProfileUpdate,
 )
 from app.services import (
+    CompatibilityResult,
+    CompatibilityService,
     LinkedInEnrichmentError,
     LinkedInEnrichmentService,
     ProfileImageError,
@@ -166,7 +170,7 @@ async def onboard_from_linkedin_url(
 
     photo_path: str | None = None
     image_saved = False
-    if enrichment.profile_image_url:
+    if enrichment.profile_image_url and _is_safe_image_url(enrichment.profile_image_url):
         try:
             raw_image_bytes = await image_service.fetch_image_bytes(enrichment.profile_image_url)
             if not settings.s3_bucket_name:
@@ -182,7 +186,7 @@ async def onboard_from_linkedin_url(
             )
             image_saved = True
         except (ProfileImageError, RuntimeError, ValueError):
-            photo_path = None
+            photo_path = enrichment.profile_image_url
             image_saved = False
 
     existing = await dal.get_by_user_id(current_user.id)
@@ -190,7 +194,7 @@ async def onboard_from_linkedin_url(
         saved_profile = await dal.update(
             current_user.id,
             ProfileUpdate(
-                full_name=enrichment.full_name,
+                full_name=existing.full_name or _title_case_name(enrichment.full_name),
                 headline=enrichment.headline,
                 bio=enrichment.bio,
                 location=enrichment.location,
@@ -213,7 +217,7 @@ async def onboard_from_linkedin_url(
         saved_profile = await dal.create(
             current_user.id,
             ProfileCreate(
-                full_name=enrichment.full_name,
+                full_name=_title_case_name(enrichment.full_name),
                 headline=enrichment.headline,
                 bio=enrichment.bio,
                 location=enrichment.location,
@@ -269,6 +273,59 @@ async def get_profile(
             detail="Profile not found or not visible.",
         )
     return profile
+
+
+class CompatibilityResponse(BaseModel):
+    """Compatibility score and conversation starters between two users."""
+
+    score: float
+    shared_companies: list[str]
+    shared_schools: list[str]
+    shared_fields: list[str]
+    conversation_starters: list[str]
+
+
+@router.get("/{user_id}/compatibility", response_model=CompatibilityResponse)
+async def get_compatibility(
+    user_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> CompatibilityResponse:
+    """
+    Compute a compatibility score between the current user and another user,
+    and generate conversation starters based on shared background.
+    """
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot compute compatibility with yourself.",
+        )
+
+    viewer_profile = await dal.get_by_user_id(current_user.id)
+    if not viewer_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Your profile was not found. Please create one first.",
+        )
+
+    target_profile = await dal.get_by_user_id(user_id)
+    if not target_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target profile not found or not visible.",
+        )
+
+    result: CompatibilityResult = await asyncio.to_thread(
+        CompatibilityService().compute, viewer_profile, target_profile
+    )
+
+    return CompatibilityResponse(
+        score=result.score,
+        shared_companies=result.shared_companies,
+        shared_schools=result.shared_schools,
+        shared_fields=result.shared_fields,
+        conversation_starters=result.conversation_starters,
+    )
 
 
 @router.get("/directory/{event_id}", response_model=list[ProfileDirectoryEntry])
@@ -442,6 +499,38 @@ async def upload_resume(
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+
+def _title_case_name(name: str) -> str:
+    """Title-case a name string, e.g. 'aleksandar ilijevski' → 'Aleksandar Ilijevski'."""
+    return name.strip().title()
+
+
+def _is_safe_image_url(url: str) -> bool:
+    """Return True only for https URLs pointing to a public, non-private host."""
+    try:
+        parsed = urlparse(url.strip())
+    except Exception:
+        return False
+
+    if parsed.scheme != "https":
+        return False
+
+    host = parsed.hostname or ""
+    if not host:
+        return False
+
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return False
+
+    try:
+        addr = ipaddress.ip_address(host)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return False
+    except ValueError:
+        pass  # domain name, not an IP — fine
+
+    return True
 
 
 def _parse_graduation_year(end_date: str | None) -> int | None:
