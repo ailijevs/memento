@@ -16,8 +16,8 @@ export class RecognitionController {
   private readonly getSession: () => AppSession | null;
   private isRunning = false;
   private activeClientId: string | null = null;
-  /** Timestamp of last announcement per user_id (ms). Cleared on session stop. */
-  private lastAnnouncedAt = new Map<string, number>();
+  /** Timestamp of last sound played (ms). */
+  private lastSoundAt = 0;
   private readonly soundEnabled: boolean;
   private readonly announceCooldownMs: number;
 
@@ -70,7 +70,7 @@ export class RecognitionController {
 
     this.isRunning = true;
     this.activeClientId = clientId;
-    this.lastAnnouncedAt.clear();
+    this.lastSoundAt = 0;
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'started' },
@@ -96,7 +96,7 @@ export class RecognitionController {
     }
 
     this.isRunning = false;
-    this.lastAnnouncedAt.clear();
+    this.lastSoundAt = 0;
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'stopping' },
@@ -151,18 +151,15 @@ export class RecognitionController {
     session: AppSession,
     matches: FrameDetectionResponse['matches'],
   ): Promise<void> {
+    if (matches.length === 0) return;
     const now = Date.now();
-    for (const match of matches) {
-      if (!match.user_id) continue;
-      const last = this.lastAnnouncedAt.get(match.user_id) ?? 0;
-      if (now - last < this.announceCooldownMs) continue;
-      this.lastAnnouncedAt.set(match.user_id, now);
-      const firstName = match.full_name?.split(' ')[0] ?? 'someone';
-      try {
-        await session.audio.speak(`${firstName} recognized`, { stopOtherAudio: false });
-      } catch {
-        // Audio failure is non-fatal
-      }
+    if (now - this.lastSoundAt < this.announceCooldownMs) return;
+    this.lastSoundAt = now;
+    const firstName = matches[0].full_name?.split(' ')[0] ?? 'someone';
+    try {
+      await session.audio.speak(`${firstName} recognized`, { stopOtherAudio: false });
+    } catch {
+      // Audio failure is non-fatal
     }
   }
 
