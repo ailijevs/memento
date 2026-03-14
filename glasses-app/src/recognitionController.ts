@@ -16,6 +16,9 @@ export class RecognitionController {
   private readonly getSession: () => AppSession | null;
   private isRunning = false;
   private activeClientId: string | null = null;
+  /** User IDs announced via TTS in the current recognition session */
+  private announcedUserIds = new Set<string>();
+  private readonly soundEnabled: boolean;
 
   constructor(params: {
     getSocketServer: () => SocketServer;
@@ -25,6 +28,7 @@ export class RecognitionController {
     this.getSocketServer = params.getSocketServer;
     this.backendClient = params.backendClient;
     this.getSession = params.getSession;
+    this.soundEnabled = process.env.RECOGNITION_SOUND_ENABLED !== 'false';
   }
 
   private get socketServer(): SocketServer {
@@ -64,6 +68,7 @@ export class RecognitionController {
 
     this.isRunning = true;
     this.activeClientId = clientId;
+    this.announcedUserIds.clear();
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'started' },
@@ -89,6 +94,7 @@ export class RecognitionController {
     }
 
     this.isRunning = false;
+    this.announcedUserIds.clear();
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'stopping' },
@@ -118,6 +124,10 @@ export class RecognitionController {
             result: response,
           },
         });
+
+        if (this.soundEnabled) {
+          await this.announceNewMatches(session, response.matches);
+        }
       } catch (error) {
         this.emitToActiveClient({
           type: 'recognition_error',
@@ -133,6 +143,22 @@ export class RecognitionController {
       payload: { status: 'stopped' },
     });
     this.activeClientId = null;
+  }
+
+  private async announceNewMatches(
+    session: AppSession,
+    matches: FrameDetectionResponse['matches'],
+  ): Promise<void> {
+    for (const match of matches) {
+      if (!match.user_id || this.announcedUserIds.has(match.user_id)) continue;
+      this.announcedUserIds.add(match.user_id);
+      const firstName = match.full_name?.split(' ')[0] ?? 'someone';
+      try {
+        await session.audio.speak(`${firstName} recognized`, { stopOtherAudio: false });
+      } catch {
+        // Audio failure is non-fatal
+      }
+    }
   }
 
   private emitToActiveClient(message: IncomingSocketMessage): void {
