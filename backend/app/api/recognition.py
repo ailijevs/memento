@@ -4,11 +4,17 @@ import logging
 import math
 import time
 from datetime import datetime, timezone
+from typing import Annotated
+from uuid import UUID
 
-from fastapi import APIRouter, HTTPException, status
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 
+from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
 from app.dals.event_dal import EventDAL
+from app.dals.profile_dal import ProfileDAL
 from app.db.supabase import get_admin_client
 from app.schemas import (
     EventProcessingStatus,
@@ -120,6 +126,122 @@ async def detect_faces_in_frame(
         )
 
 
+class EnrollRequest(BaseModel):
+    event_id: UUID
+
+
+class EnrollResponse(BaseModel):
+    enrolled: bool
+    faces_indexed: int
+    message: str
+
+
+@router.post("/enroll", response_model=EnrollResponse)
+async def enroll_face(
+    request: EnrollRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> EnrollResponse:
+    """
+    Index the current user's profile photo into the event's Rekognition collection.
+
+    The photo may be stored as an S3 key or a full URL (Supabase Storage, LinkedIn CDN, etc.).
+    In both cases the image bytes are fetched and sent to Rekognition for indexing.
+    Re-enrolling is safe — the same ExternalImageId overwrites the previous face record.
+    """
+    admin_client = get_admin_client()
+    profile_dal = ProfileDAL(admin_client)
+
+    profile = await profile_dal.get_by_user_id(current_user.id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found. Please complete onboarding first.",
+        )
+    if not profile.photo_path:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No profile photo found. Please upload a photo before enrolling.",
+        )
+
+    settings = get_settings()
+    image_bytes = await _fetch_photo_bytes(profile.photo_path, settings)
+
+    collection_id = build_event_collection_id(request.event_id)
+    rekognition = RekognitionService()
+
+    try:
+        rekognition.ensure_collection_exists(collection_id=collection_id)
+        # Remove any previous face records for this user before re-indexing
+        # to avoid accumulating duplicates across multiple enroll calls.
+        rekognition.delete_faces_by_user(
+            collection_id=collection_id,
+            user_id=current_user.id,
+        )
+        result = rekognition.index_face_from_bytes(
+            collection_id=collection_id,
+            image_bytes=image_bytes,
+            image_id=str(current_user.id),
+        )
+    except RekognitionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Face enrollment failed: {str(e)}",
+        )
+
+    faces_indexed = len(result.get("FaceRecords", []))
+    if faces_indexed == 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="No face detected in your profile photo. Please upload a clearer photo.",
+        )
+
+    return EnrollResponse(
+        enrolled=True,
+        faces_indexed=faces_indexed,
+        message="Face enrolled successfully.",
+    )
+
+
+async def _fetch_photo_bytes(photo_path: str, settings) -> bytes:
+    """Download photo bytes from an S3 key or a full URL."""
+    if photo_path.startswith("http://") or photo_path.startswith("https://"):
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            response = await client.get(photo_path)
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Could not fetch profile photo from storage.",
+            )
+        return response.content
+
+    # S3 key — generate a presigned URL then download
+    if not settings.s3_bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="S3 is not configured on this server.",
+        )
+    s3 = S3Service()
+    try:
+        presigned_url = s3.get_profile_picture_presigned_url(
+            s3_key=photo_path,
+            bucket_name=settings.s3_bucket_name,
+            expires_in_seconds=60,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Could not access profile photo in S3: {exc}",
+        )
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        response = await client.get(presigned_url)
+    if response.status_code != 200:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Could not download profile photo from S3.",
+        )
+    return response.content
+
+
 def _attach_presigned_profile_photo_urls(
     profile_cards: list[ProfileCard],
     *,
@@ -136,6 +258,11 @@ def _attach_presigned_profile_photo_urls(
 
     for card in profile_cards:
         if not card.photo_path:
+            cards_with_urls.append(card)
+            continue
+
+        # If already a full URL (e.g. Supabase Storage), use it directly
+        if card.photo_path.startswith("http://") or card.photo_path.startswith("https://"):
             cards_with_urls.append(card)
             continue
 
