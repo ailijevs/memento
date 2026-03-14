@@ -6,8 +6,6 @@ from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-import pytest
-
 from app.schemas import ProfileResponse
 from app.services.compatibility import (
     CompatibilityService,
