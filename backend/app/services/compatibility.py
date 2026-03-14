@@ -164,11 +164,14 @@ def _generate_with_dspy(
     predictor = _get_dspy_predictor(model, api_key)
     context = _build_context(viewer, target, shared_companies, shared_schools, shared_fields)
     prediction = predictor(context=context)
-    raw = str(getattr(prediction, "starters", "")).strip()
-    if not raw:
-        raise ValueError("DSPy returned empty starters field.")
-    starters = [s.strip().lstrip("•-123456789.) ").strip() for s in raw.splitlines() if s.strip()]
-    return [s for s in starters if s][:3]
+    starters = [
+        str(getattr(prediction, f"starter_{i}", "")).strip()
+        for i in range(1, 4)
+    ]
+    starters = [s for s in starters if s]
+    if not starters:
+        raise ValueError("DSPy returned empty starter fields.")
+    return starters
 
 
 @lru_cache(maxsize=4)
@@ -185,9 +188,9 @@ def _get_dspy_predictor(model: str, api_key: str):  # pragma: no cover - runtime
         """Generate natural ice-breaker conversation starters for a networking event."""
 
         context = dspy.InputField(desc="Profile context: who you are, who you met, and any shared background.")
-        starters = dspy.OutputField(
-            desc="Exactly 3 short, first-person conversation starters, one per line, no numbering or bullets."
-        )
+        starter_1 = dspy.OutputField(desc="First conversation starter, one sentence, first-person, natural.")
+        starter_2 = dspy.OutputField(desc="Second conversation starter, one sentence, first-person, natural.")
+        starter_3 = dspy.OutputField(desc="Third conversation starter, one sentence, first-person, natural.")
 
     lm = dspy.LM(model=model, api_key=api_key)
     dspy.configure(lm=lm)
