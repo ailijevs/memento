@@ -26,6 +26,8 @@ from app.schemas import (
     ProfileUpdate,
 )
 from app.services import (
+    CompatibilityResult,
+    CompatibilityService,
     LinkedInEnrichmentError,
     LinkedInEnrichmentService,
     ProfileImageError,
@@ -271,6 +273,59 @@ async def get_profile(
             detail="Profile not found or not visible.",
         )
     return profile
+
+
+class CompatibilityResponse(BaseModel):
+    """Compatibility score and conversation starters between two users."""
+
+    score: float
+    shared_companies: list[str]
+    shared_schools: list[str]
+    shared_fields: list[str]
+    conversation_starters: list[str]
+
+
+@router.get("/{user_id}/compatibility", response_model=CompatibilityResponse)
+async def get_compatibility(
+    user_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> CompatibilityResponse:
+    """
+    Compute a compatibility score between the current user and another user,
+    and generate conversation starters based on shared background.
+    """
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot compute compatibility with yourself.",
+        )
+
+    viewer_profile = await dal.get_by_user_id(current_user.id)
+    if not viewer_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Your profile was not found. Please create one first.",
+        )
+
+    target_profile = await dal.get_by_user_id(user_id)
+    if not target_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target profile not found or not visible.",
+        )
+
+    result: CompatibilityResult = await asyncio.to_thread(
+        CompatibilityService().compute, viewer_profile, target_profile
+    )
+
+    return CompatibilityResponse(
+        score=result.score,
+        shared_companies=result.shared_companies,
+        shared_schools=result.shared_schools,
+        shared_fields=result.shared_fields,
+        conversation_starters=result.conversation_starters,
+    )
 
 
 @router.get("/directory/{event_id}", response_model=list[ProfileDirectoryEntry])
