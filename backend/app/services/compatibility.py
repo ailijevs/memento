@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-import json
 import logging
+import os
 from dataclasses import dataclass, field
+from functools import lru_cache
 
 from app.config import get_settings
 from app.schemas import ProfileResponse
@@ -61,65 +62,19 @@ class CompatibilityService:
         settings = get_settings()
         if settings.openai_api_key:
             try:
-                return self._generate_with_openai(
-                    settings.openai_api_key,
-                    viewer,
-                    target,
-                    shared_companies,
-                    shared_schools,
-                    shared_fields,
+                return _generate_with_dspy(
+                    model=settings.profile_summary_model,
+                    api_key=settings.openai_api_key,
+                    viewer=viewer,
+                    target=target,
+                    shared_companies=shared_companies,
+                    shared_schools=shared_schools,
+                    shared_fields=shared_fields,
                 )
             except Exception as exc:
-                logger.warning("OpenAI conversation starter generation failed: %s", exc)
+                logger.warning("DSPy conversation starter generation failed: %s", exc)
 
         return _template_starters(target, shared_companies, shared_schools, shared_fields)
-
-    def _generate_with_openai(
-        self,
-        api_key: str,
-        viewer: ProfileResponse,
-        target: ProfileResponse,
-        shared_companies: list[str],
-        shared_schools: list[str],
-        shared_fields: list[str],
-    ) -> list[str]:
-        from openai import OpenAI
-
-        client = OpenAI(api_key=api_key)
-
-        context_parts = [
-            f"You just met {target.full_name} ({target.headline or 'no headline'}, {target.company or 'no company'}).",
-            f"Your name is {viewer.full_name}.",
-        ]
-        if shared_companies:
-            context_parts.append(f"You've both worked at: {', '.join(shared_companies)}.")
-        if shared_schools:
-            context_parts.append(f"You both attended: {', '.join(shared_schools)}.")
-        if shared_fields:
-            context_parts.append(f"You share fields of study: {', '.join(shared_fields)}.")
-        if target.bio:
-            context_parts.append(f"Their bio: {target.bio[:300]}")
-        if target.location:
-            context_parts.append(f"They're based in {target.location}.")
-
-        prompt = (
-            " ".join(context_parts)
-            + "\n\nWrite exactly 3 short, natural, first-person conversation starters to use when meeting them."
-            " Return a JSON array of strings, no keys, no explanation."
-        )
-
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
-            temperature=0.8,
-        )
-
-        raw = (response.choices[0].message.content or "").strip()
-        starters = json.loads(raw)
-        if isinstance(starters, list):
-            return [str(s).strip() for s in starters[:3] if s]
-        raise ValueError("Unexpected response shape from OpenAI")
 
 
 # ---------------------------------------------------------------------------
@@ -171,6 +126,72 @@ def _shared_schools(a: ProfileResponse, b: ProfileResponse) -> list[str]:
 def _shared_fields(a: ProfileResponse, b: ProfileResponse) -> list[str]:
     overlap = _fields_from_profile(a) & _fields_from_profile(b)
     return sorted(f.title() for f in overlap)
+
+
+def _build_context(
+    viewer: ProfileResponse,
+    target: ProfileResponse,
+    shared_companies: list[str],
+    shared_schools: list[str],
+    shared_fields: list[str],
+) -> str:
+    parts = [
+        f"You are {viewer.full_name}.",
+        f"You just met {target.full_name} ({target.headline or ''}, {target.company or ''}).",
+    ]
+    if shared_companies:
+        parts.append(f"Shared employers: {', '.join(shared_companies)}.")
+    if shared_schools:
+        parts.append(f"Shared schools: {', '.join(shared_schools)}.")
+    if shared_fields:
+        parts.append(f"Shared fields of study: {', '.join(shared_fields)}.")
+    if target.bio:
+        parts.append(f"Their bio: {target.bio[:300]}")
+    if target.location:
+        parts.append(f"Based in: {target.location}.")
+    return " ".join(p for p in parts if p.strip())
+
+
+def _generate_with_dspy(
+    model: str,
+    api_key: str,
+    viewer: ProfileResponse,
+    target: ProfileResponse,
+    shared_companies: list[str],
+    shared_schools: list[str],
+    shared_fields: list[str],
+) -> list[str]:
+    predictor = _get_dspy_predictor(model, api_key)
+    context = _build_context(viewer, target, shared_companies, shared_schools, shared_fields)
+    prediction = predictor(context=context)
+    raw = str(getattr(prediction, "starters", "")).strip()
+    if not raw:
+        raise ValueError("DSPy returned empty starters field.")
+    starters = [s.strip().lstrip("•-123456789.) ").strip() for s in raw.splitlines() if s.strip()]
+    return [s for s in starters if s][:3]
+
+
+@lru_cache(maxsize=4)
+def _get_dspy_predictor(model: str, api_key: str):  # pragma: no cover - runtime integration
+    cache_dir = os.environ.setdefault("DSPY_CACHEDIR", "/tmp/dspy_cache")
+    os.makedirs(cache_dir, exist_ok=True)
+
+    try:
+        import dspy
+    except ImportError as exc:
+        raise RuntimeError("DSPy is not installed. Install dspy-ai to enable AI starters.") from exc
+
+    class ConversationStarterSignature(dspy.Signature):
+        """Generate natural ice-breaker conversation starters for a networking event."""
+
+        context = dspy.InputField(desc="Profile context: who you are, who you met, and any shared background.")
+        starters = dspy.OutputField(
+            desc="Exactly 3 short, first-person conversation starters, one per line, no numbering or bullets."
+        )
+
+    lm = dspy.LM(model=model, api_key=api_key)
+    dspy.configure(lm=lm)
+    return dspy.Predict(ConversationStarterSignature)
 
 
 def _template_starters(
