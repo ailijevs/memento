@@ -62,6 +62,10 @@ class ApiClient {
     return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
   }
 
+  async getCompatibility(userId: string) {
+    return this.request<CompatibilityResponse>(`/api/v1/profiles/${userId}/compatibility`);
+  }
+
   async startCapture() {
     return this.request<{ capturing: boolean }>("/api/v1/capture/start", { method: "POST" });
   }
@@ -211,4 +215,12 @@ export interface ResumeParseResponse {
   message: string;
   extracted_data: Record<string, unknown>;
   profile_updated: boolean;
+}
+
+export interface CompatibilityResponse {
+  score: number;
+  shared_companies: string[];
+  shared_schools: string[];
+  shared_fields: string[];
+  conversation_starters: string[];
 }
