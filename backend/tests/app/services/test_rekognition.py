@@ -192,6 +192,49 @@ def test_index_face_from_s3_validates_inputs():
         )
 
 
+def test_index_face_from_bytes_sends_expected_payload():
+    """index_face_from_bytes forwards raw bytes and image ID to Rekognition."""
+    client = DummyRekognitionClient()
+    service = RekognitionService(rekognition_client=client)
+
+    image_bytes = b"fake-jpeg-bytes"
+    response = service.index_face_from_bytes(
+        collection_id="collection-1",
+        image_bytes=image_bytes,
+        image_id="user-abc",
+    )
+
+    assert response == {"FaceRecords": []}
+    assert len(client.index_calls) == 1
+    call = client.index_calls[0]
+    assert call["CollectionId"] == "collection-1"
+    assert call["Image"] == {"Bytes": image_bytes}
+    assert call["ExternalImageId"] == "user-abc"
+    assert call["DetectionAttributes"] == []
+
+
+def test_index_face_from_bytes_validates_empty_collection_id():
+    """index_face_from_bytes rejects a blank collection_id."""
+    service = RekognitionService(rekognition_client=DummyRekognitionClient())
+    with pytest.raises(ValueError, match="collection_id must not be empty"):
+        service.index_face_from_bytes(
+            collection_id="   ",
+            image_bytes=b"bytes",
+            image_id="user-1",
+        )
+
+
+def test_index_face_from_bytes_validates_empty_image_id():
+    """index_face_from_bytes rejects a blank image_id."""
+    service = RekognitionService(rekognition_client=DummyRekognitionClient())
+    with pytest.raises(ValueError, match="image_id must not be empty"):
+        service.index_face_from_bytes(
+            collection_id="collection-1",
+            image_bytes=b"bytes",
+            image_id="  ",
+        )
+
+
 def test_rekognition_service_uses_default_client_factory(monkeypatch):
     """Service uses boto3 client when no client is injected."""
     client = DummyRekognitionClient()
