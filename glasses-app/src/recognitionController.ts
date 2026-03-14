@@ -16,6 +16,10 @@ export class RecognitionController {
   private readonly getSession: () => AppSession | null;
   private isRunning = false;
   private activeClientId: string | null = null;
+  /** Timestamp of last sound played (ms). */
+  private lastSoundAt = 0;
+  private readonly soundEnabled: boolean;
+  private readonly announceCooldownMs: number;
 
   constructor(params: {
     getSocketServer: () => SocketServer;
@@ -25,6 +29,8 @@ export class RecognitionController {
     this.getSocketServer = params.getSocketServer;
     this.backendClient = params.backendClient;
     this.getSession = params.getSession;
+    this.soundEnabled = process.env.RECOGNITION_SOUND_ENABLED !== 'false';
+    this.announceCooldownMs = Number.parseInt(process.env.RECOGNITION_SOUND_COOLDOWN_MS ?? '5000', 10);
   }
 
   private get socketServer(): SocketServer {
@@ -64,6 +70,7 @@ export class RecognitionController {
 
     this.isRunning = true;
     this.activeClientId = clientId;
+    this.lastSoundAt = 0;
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'started' },
@@ -89,6 +96,7 @@ export class RecognitionController {
     }
 
     this.isRunning = false;
+    this.lastSoundAt = 0;
     this.socketServer.sendToClient(clientId, {
       type: 'recognition_status',
       payload: { status: 'stopping' },
@@ -118,6 +126,11 @@ export class RecognitionController {
             result: response,
           },
         });
+
+        if (this.soundEnabled) {
+          // Fire-and-forget — don't let TTS latency block the capture loop
+          void this.announceNewMatches(session, response.matches);
+        }
       } catch (error) {
         this.emitToActiveClient({
           type: 'recognition_error',
@@ -133,6 +146,22 @@ export class RecognitionController {
       payload: { status: 'stopped' },
     });
     this.activeClientId = null;
+  }
+
+  private async announceNewMatches(
+    session: AppSession,
+    matches: FrameDetectionResponse['matches'],
+  ): Promise<void> {
+    if (matches.length === 0) return;
+    const now = Date.now();
+    if (now - this.lastSoundAt < this.announceCooldownMs) return;
+    this.lastSoundAt = now;
+    const firstName = matches[0].full_name?.split(' ')[0] ?? 'someone';
+    try {
+      await session.audio.speak(`${firstName} recognized`, { stopOtherAudio: false });
+    } catch {
+      // Audio failure is non-fatal
+    }
   }
 
   private emitToActiveClient(message: IncomingSocketMessage): void {
