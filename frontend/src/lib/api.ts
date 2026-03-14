@@ -66,6 +66,13 @@ class ApiClient {
     return this.request<CompatibilityResponse>(`/api/v1/profiles/${userId}/compatibility`);
   }
 
+  async enrollFace(eventId: string) {
+    return this.request<{ enrolled: boolean; faces_indexed: number; message: string }>(
+      "/api/v1/recognition/enroll",
+      { method: "POST", body: JSON.stringify({ event_id: eventId }) }
+    );
+  }
+
   async startCapture() {
     return this.request<{ capturing: boolean }>("/api/v1/capture/start", { method: "POST" });
   }

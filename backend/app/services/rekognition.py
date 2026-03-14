@@ -91,6 +91,29 @@ class RekognitionService:
         )
         return cast(dict[str, Any], response)
 
+    def index_face_from_bytes(
+        self,
+        *,
+        collection_id: str,
+        image_bytes: bytes,
+        image_id: str,
+    ) -> dict[str, Any]:
+        """Index a face into a collection from raw image bytes."""
+        cleaned_collection_id = collection_id.strip()
+        cleaned_image_id = image_id.strip()
+        if not cleaned_collection_id:
+            raise ValueError("collection_id must not be empty.")
+        if not cleaned_image_id:
+            raise ValueError("image_id must not be empty.")
+
+        response = self.client.index_faces(
+            CollectionId=cleaned_collection_id,
+            Image={"Bytes": image_bytes},
+            ExternalImageId=cleaned_image_id,
+            DetectionAttributes=[],
+        )
+        return cast(dict[str, Any], response)
+
     def search_faces_by_image(
         self,
         image_bytes: bytes,
