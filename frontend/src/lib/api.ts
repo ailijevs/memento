@@ -62,16 +62,19 @@ class ApiClient {
     return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
   }
 
-  async startCapture() {
-    return this.request<{ capturing: boolean }>("/api/v1/capture/start", { method: "POST" });
+  async getEvents() {
+    return this.request<EventResponse[]>("/api/v1/events");
   }
 
-  async stopCapture() {
-    return this.request<{ capturing: boolean }>("/api/v1/capture/stop", { method: "POST" });
+  async getMyEvents() {
+    return this.request<EventResponse[]>("/api/v1/events/me");
   }
 
-  async getCaptureState() {
-    return this.request<{ capturing: boolean }>("/api/v1/capture/state");
+  async joinEvent(eventId: string) {
+    return this.request<MembershipResponse>("/api/v1/memberships/join", {
+      method: "POST",
+      body: JSON.stringify({ event_id: eventId }),
+    });
   }
 
   async onboardFromLinkedIn(linkedinUrl: string) {
@@ -211,4 +214,25 @@ export interface ResumeParseResponse {
   message: string;
   extracted_data: Record<string, unknown>;
   profile_updated: boolean;
+}
+
+export interface EventResponse {
+  event_id: string;
+  created_by: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  is_active: boolean;
+  indexing_status: "pending" | "in_progress" | "completed" | "failed";
+  cleanup_status: "pending" | "in_progress" | "completed" | "failed";
+  created_at: string;
+}
+
+export interface MembershipResponse {
+  event_id: string;
+  user_id: string;
+  role: "owner" | "member";
+  checked_in_at: string | null;
+  joined_at: string;
 }

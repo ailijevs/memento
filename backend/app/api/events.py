@@ -19,13 +19,21 @@ def get_event_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)
     return EventDAL(client)
 
 
-@router.get("/", response_model=list[EventResponse])
+@router.get("/me", response_model=list[EventResponse])
 async def list_my_events(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> list[EventResponse]:
     """Get all events the current user is a member of."""
     return await dal.get_user_events(current_user.id)
+
+
+@router.get("/", response_model=list[EventResponse])
+async def list_events(
+    dal: Annotated[EventDAL, Depends(get_event_dal)],
+) -> list[EventResponse]:
+    """Get all active events visible to the current user."""
+    return await dal.get_active_events()
 
 
 @router.post("/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
