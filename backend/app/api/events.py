@@ -28,7 +28,7 @@ async def list_my_events(
     return await dal.get_user_events(current_user.id)
 
 
-@router.get("/", response_model=list[EventResponse])
+@router.get("", response_model=list[EventResponse])
 async def list_events(
     dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> list[EventResponse]:
@@ -36,7 +36,7 @@ async def list_events(
     return await dal.get_active_events()
 
 
-@router.post("/", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=EventResponse, status_code=status.HTTP_201_CREATED)
 async def create_event(
     data: EventCreate,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
