@@ -4,7 +4,7 @@
 |-------|-------|
 | **Report ID** | MT-003 |
 | **Date** | 2026-03-15 |
-| **Tester** | noddiemgbodille |
+| **Tester** | Noddie Mgbodille |
 | **Test Case ID** | MT-03 |
 | **Requirement ID** | FR-Event-Indexer-Lambda |
 

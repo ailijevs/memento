@@ -4,7 +4,7 @@
 |-------|-------|
 | **Report ID** | MT-002 |
 | **Date** | 2026-03-15 |
-| **Tester** | noddiemgbodille |
+| **Tester** | Noddie Mgbodille |
 | **Test Case ID** | MT-02 |
 | **Requirement ID** | FR-Recognition-Storage (S3 image persistence) |
 

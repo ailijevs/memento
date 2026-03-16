@@ -4,7 +4,7 @@
 |-------|-------|
 | **Report ID** | MT-005 |
 | **Date** | 2026-03-15 |
-| **Tester** | noddiemgbodille |
+| **Tester** | Noddie Mgbodille |
 | **Test Case ID** | MT-05 |
 | **Requirement ID** | FR-WebSocket-Realtime-Recognition |
 

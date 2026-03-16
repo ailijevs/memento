@@ -4,7 +4,7 @@
 |-------|-------|
 | **Report ID** | MT-006 |
 | **Date** | 2026-03-15 |
-| **Tester** | noddiemgbodille |
+| **Tester** | Noddie Mgbodille |
 | **Test Case ID** | MT-06 |
 | **Requirement ID** | FR-MentraOS-End-to-End-Recognition |
 
