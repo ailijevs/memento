@@ -38,5 +38,5 @@
 
 ### Owner Key
 
-- **Marty** – Marty Ilijevski (tests authored or significantly modified by Marty)
+- **Marty** – Tests authored or significantly modified by Marty
 - **Team** – Shared ownership across team members

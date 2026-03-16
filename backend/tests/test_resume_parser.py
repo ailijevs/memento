@@ -102,7 +102,7 @@ class TestResumeUploadFieldPersistence:
     def mock_resume_data(self):
         """Full ResumeData with all fields populated."""
         return ResumeData(
-            full_name="Marty Ilijevski",
+            full_name="Marty",
             headline="Software Engineer at Memento",
             bio="Experienced full-stack developer.",
             location="West Lafayette, IN",
@@ -381,7 +381,7 @@ class TestResumeUploadEndpoint:
 
         parser_instance = MagicMock()
         parser_instance.parse.return_value = ResumeData(
-            full_name="Marty Ilijevski",
+            full_name="Marty",
             headline="Software Engineer",
             bio="Backend developer.",
             location="West Lafayette, IN",
@@ -410,7 +410,7 @@ class TestResumeUploadEndpoint:
         assert data["message"] == "Resume parsed successfully"
 
         ed = data["extracted_data"]
-        assert ed["full_name"] == "Marty Ilijevski"
+        assert ed["full_name"] == "Marty"
         assert ed["location"] == "West Lafayette, IN"
         assert ed["profile_one_liner"] == "Building AR networking."
         assert ed["profile_summary"] == "Full-stack engineer."
@@ -441,7 +441,7 @@ class TestResumeUploadEndpoint:
 
         parser_instance = MagicMock()
         parser_instance.parse.return_value = ResumeData(
-            full_name="Marty Ilijevski",
+            full_name="Marty",
             headline="Updated Headline",
             location="Indianapolis, IN",
             profile_one_liner="New one-liner.",
