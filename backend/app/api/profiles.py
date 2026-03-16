@@ -326,16 +326,12 @@ async def upload_resume(
             detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}",
         )
 
-    # Check file size (max 10MB)
     contents = await file.read()
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File too large. Maximum size is 10MB.",
         )
-
-    # Reset file position for parsing
-    await file.seek(0)
 
     # Parse the resume
     settings = get_settings()
@@ -380,7 +376,6 @@ async def upload_resume(
     profile_updated = False
     try:
         if existing_profile:
-            # Update existing profile (only non-None fields)
             update_data: dict[str, Any] = {}
             if resume_data.full_name:
                 update_data["full_name"] = resume_data.full_name
@@ -394,6 +389,16 @@ async def upload_resume(
                 update_data["major"] = resume_data.major
             if grad_year:
                 update_data["graduation_year"] = grad_year
+            if resume_data.location:
+                update_data["location"] = resume_data.location
+            if resume_data.profile_one_liner:
+                update_data["profile_one_liner"] = resume_data.profile_one_liner
+            if resume_data.profile_summary:
+                update_data["profile_summary"] = resume_data.profile_summary
+            if resume_data.experiences:
+                update_data["experiences"] = resume_data.experiences
+            if resume_data.education:
+                update_data["education"] = resume_data.education
 
             if update_data:
                 admin_client.table("profiles").update(update_data).eq(
@@ -401,7 +406,6 @@ async def upload_resume(
                 ).execute()
                 profile_updated = True
         else:
-            # Create new profile using admin client
             profile_data = {
                 "user_id": str(current_user.id),
                 "full_name": resume_data.full_name or "Unknown",
@@ -410,16 +414,18 @@ async def upload_resume(
                 "company": resume_data.company,
                 "major": resume_data.major,
                 "graduation_year": grad_year,
+                "location": resume_data.location,
+                "profile_one_liner": resume_data.profile_one_liner,
+                "profile_summary": resume_data.profile_summary,
+                "experiences": resume_data.experiences,
+                "education": resume_data.education,
             }
-            # Remove None values
             profile_data = {k: v for k, v in profile_data.items() if v is not None}
             admin_client.table("profiles").insert(profile_data).execute()
             profile_updated = True
     except Exception as e:
         logger.error(f"Resume profile save failed: {e}")
-        # Don't fail the whole request — parsed data is still returned
 
-    # Build response with extracted data
     extracted = {
         "full_name": resume_data.full_name,
         "headline": resume_data.headline,
@@ -427,9 +433,14 @@ async def upload_resume(
         "company": resume_data.company,
         "major": resume_data.major,
         "graduation_year": resume_data.graduation_year,
+        "location": resume_data.location,
         "email": resume_data.email,
         "phone": resume_data.phone,
         "skills": resume_data.skills,
+        "profile_one_liner": resume_data.profile_one_liner,
+        "profile_summary": resume_data.profile_summary,
+        "experiences": resume_data.experiences,
+        "education": resume_data.education,
     }
 
     return ResumeParseResponse(

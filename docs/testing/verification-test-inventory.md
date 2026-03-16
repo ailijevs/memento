@@ -1,38 +1,42 @@
 # Verification Test Inventory
 
-> **Instructions:** This table must include every test from your RVTM (Requirements Verification Traceability Matrix). Cross-check with your V&V document and add tests based on feedback or new requirements. Keep this document updated throughout the semester.
+> This table lists every test from the Requirements Verification Traceability Matrix (RVTM). Automated tests run in CI on every push and PR. Manual tests are documented in `docs/testing/manual-reports/`.
 
 ## Test Documentation Location
 
-Test documentation resides in:
-
-- **`docs/verification/`** – Verification Test Inventory, manual test template, manual test reports
-- **`backend/tests/`** – Automated unit/integration tests; README with defect/RCA tracking
-- **`backend/tests/manual/`** – Manual test reports and evidence
-
-This structure keeps V&V artifacts in `docs/verification/` while aligning with the backend-centric architecture of the project. Automated tests live next to the code they verify; manual test reports are grouped under `docs/verification/` for discoverability.
+- **`docs/testing/`** – Verification Test Inventory, manual test template, manual test reports
+- **`backend/tests/`** – Automated unit/integration tests (pytest)
+- **`docs/testing/manual-reports/`** – Manual test reports with evidence
 
 ---
 
 ## Table 1 – Verification Test Inventory
 
-| Test Case ID | Requirement ID | Tool | Automated? | CI Integrated? | Evidence Link | Frequency |
-|--------------|----------------|------|------------|----------------|---------------|-----------|
-| UT-01 | FR-3.1 | pytest | Yes | Yes | [GitHub Actions log](https://github.com/ailijevs/memento-1/actions) | Once per build |
-| UT-02 | FR-3.1 | pytest | Yes | Yes | [GitHub Actions log](https://github.com/ailijevs/memento-1/actions) | Once per build |
-| IT-01 | FR-1.x | pytest | Yes | Yes | [GitHub Actions log](https://github.com/ailijevs/memento-1/actions) | Once per build |
-| MT-01 | FR-3.1 | Manual | No | N/A | [docs/verification/manual-test-report-001.md](manual-test-report-001.md) | Every two weeks |
-| MT-02 | FR-1.x | Postman/curl | Partial | No | Not completed yet – target: 2026-02-14 | Every two weeks |
+| Test Case ID | Requirement ID | Description | Tool | Owner | Automated? | CI Integrated? | Evidence Link |
+|--------------|----------------|-------------|------|-------|------------|----------------|---------------|
+| UT-01 | FR-3.1 | Root and health endpoints return correct status | pytest | Team | Yes | Yes | [`backend/tests/test_main.py`](https://github.com/ailijevs/memento/blob/main/backend/tests/test_main.py) |
+| UT-02 | FR-1.1 | Auth endpoints require valid JWT | pytest | Team | Yes | Yes | [`backend/tests/test_auth.py`](https://github.com/ailijevs/memento/blob/main/backend/tests/test_auth.py) |
+| UT-03 | FR-2.1 | Resume parser regex fallback extracts name, email, phone | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeParserRegexFallback](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
+| UT-04 | FR-2.1 | Resume parser sanitizes strings correctly | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeParserSanitize](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
+| UT-05 | FR-2.1 | Resume upload saves ALL extracted fields to DB (Issue #195 fix) | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeUploadFieldPersistence](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
+| UT-06 | FR-4.1 | ProfileCardBuilder constructs cards from recognition matches | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestProfileCardBuilder](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
+| UT-07 | FR-4.1 | Recognition schemas validate FaceMatch and ProfileCard | pytest | Marty | Yes | Yes | [`backend/tests/test_recognition.py` — TestFaceMatchSchema, TestFrameDetectionResponseSchema](https://github.com/ailijevs/memento/blob/main/backend/tests/test_recognition.py) |
+| UT-08 | FR-4.2 | RekognitionService creates/deletes collections, searches faces | pytest | Team | Yes | Yes | [`backend/tests/test_recognition.py` — TestRekognitionService](https://github.com/ailijevs/memento/blob/main/backend/tests/test_recognition.py) |
+| IT-01 | FR-4.1 | /recognition/detect endpoint returns ProfileCards end-to-end | pytest | Marty | Yes | Yes | [`backend/tests/test_recognition.py` — TestDetectEndpoint](https://github.com/ailijevs/memento/blob/main/backend/tests/test_recognition.py) |
+| IT-02 | FR-2.1 | Resume file type validation rejects unsupported formats | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeParserFileType](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
+| IT-03 | FR-2.1 | Resume upload endpoint returns all fields (TestClient integration) | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeUploadEndpoint](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
+| MT-01 | FR-2.1 | Resume upload populates all profile fields in Supabase | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-001.md`](manual-reports/manual-test-report-001.md) |
+| MT-02 | FR-4.1 | Recognition endpoint returns ProfileCard data for known face | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-002.md`](manual-reports/manual-test-report-002.md) |
+| UAT-01 | FR-2.1, FR-2.3 | End-to-end resume upload onboarding user acceptance test | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-003-uat.md`](manual-reports/manual-test-report-003-uat.md) |
 
 ### Legend
 
 - **UT** – Unit test
 - **IT** – Integration test
 - **MT** – Manual test
-- **FR** – Functional requirement (align with your RVTM)
+- **FR** – Functional requirement (per RVTM)
 
-### Notes
+### Owner Key
 
-- Replace example rows above with your RVTM tests. Ensure every RVTM test is represented.
-- For CI integration: if not yet complete, write "Not completed yet" and put the expected date in Evidence Link.
-- For manual tests: put the expected date of first run in Evidence Link.
+- **Marty** – Tests authored or significantly modified by Marty
+- **Team** – Shared ownership across team members
