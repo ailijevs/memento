@@ -31,7 +31,6 @@ class MembershipUpdate(BaseModel):
     """Schema for updating a membership."""
 
     role: MembershipRole | None = None
-    checked_in_at: datetime | None = None
 
 
 class MembershipResponse(MembershipBase):
@@ -41,5 +40,4 @@ class MembershipResponse(MembershipBase):
 
     event_id: UUID
     user_id: UUID
-    checked_in_at: datetime | None = None
     created_at: datetime

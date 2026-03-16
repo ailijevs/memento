@@ -32,15 +32,6 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     return ConsentDAL(client)
 
 
-@router.get("/", response_model=list[MembershipResponse])
-async def list_my_memberships(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
-) -> list[MembershipResponse]:
-    """Get all events the current user is a member of."""
-    return await dal.get_user_memberships(current_user.id)
-
-
 @router.post("/join", response_model=MembershipResponse, status_code=status.HTTP_201_CREATED)
 async def join_event(
     data: MembershipCreate,
@@ -113,22 +104,6 @@ async def update_my_membership(
 ) -> MembershipResponse:
     """Update the current user's membership for an event."""
     membership = await dal.update(event_id, current_user.id, data)
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You are not a member of this event.",
-        )
-    return membership
-
-
-@router.post("/event/{event_id}/check-in", response_model=MembershipResponse)
-async def check_in_to_event(
-    event_id: UUID,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
-) -> MembershipResponse:
-    """Check in to an event. Sets checked_in_at timestamp."""
-    membership = await dal.check_in(event_id, current_user.id)
     if not membership:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

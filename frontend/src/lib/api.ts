@@ -233,6 +233,5 @@ export interface MembershipResponse {
   event_id: string;
   user_id: string;
   role: "owner" | "member";
-  checked_in_at: string | null;
   joined_at: string;
 }
