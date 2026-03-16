@@ -42,16 +42,27 @@ type MessageHandler = (message: SocketMessage) => void | Promise<void>;
  * Browser WebSocket client for the glasses-app websocket server.
  * Supports message fan-out to registered handlers.
  */
+const RECONNECT_DELAYS_MS = [2000, 4000, 8000, 15000, 30000];
+
 export class SocketClient {
   private readonly url: string;
   private socket: WebSocket | null = null;
   private readonly messageHandlers = new Set<MessageHandler>();
+  private shouldReconnect = false;
+  private reconnectAttempt = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(url?: string) {
     this.url = url || process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
   }
 
   connect(): void {
+    this.shouldReconnect = true;
+    this.reconnectAttempt = 0;
+    this._connect();
+  }
+
+  private _connect(): void {
     if (
       this.socket &&
       (this.socket.readyState === WebSocket.OPEN ||
@@ -64,6 +75,7 @@ export class SocketClient {
 
     this.socket.onopen = () => {
       console.log(`[SocketClient] Connected to ${this.url}`);
+      this.reconnectAttempt = 0;
     };
 
     this.socket.onmessage = (event) => {
@@ -93,13 +105,29 @@ export class SocketClient {
         console.warn(`[SocketClient] Connection lost (code ${event.code})`);
       }
       this.socket = null;
+      if (this.shouldReconnect) {
+        this._scheduleReconnect();
+      }
     };
   }
 
+  private _scheduleReconnect(): void {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    const delay = RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)];
+    this.reconnectAttempt++;
+    console.log(`[SocketClient] Reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempt})...`);
+    this.reconnectTimer = setTimeout(() => {
+      if (this.shouldReconnect) this._connect();
+    }, delay);
+  }
+
   disconnect(): void {
-    if (!this.socket) {
-      return;
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
+    if (!this.socket) return;
     this.socket.close();
     this.socket = null;
   }
