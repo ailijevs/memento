@@ -29,7 +29,7 @@ class MembershipDAL(BaseDAL):
             .execute()
         )
 
-        if response.data:
+        if response and response.data:
             return MembershipResponse(**response.data)
         return None
 
@@ -101,7 +101,7 @@ class MembershipDAL(BaseDAL):
             .execute()
         )
 
-        if response.data:
+        if response and response.data:
             return MembershipResponse(**response.data[0])
         return None
 
@@ -117,7 +117,7 @@ class MembershipDAL(BaseDAL):
             .execute()
         )
 
-        if response.data:
+        if response and response.data:
             return MembershipResponse(**response.data[0])
         return None
 
