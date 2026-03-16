@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
+from app.dals.membership_dal import MembershipDAL
 from app.schemas import EventCreate, EventResponse, EventUpdate
 from supabase import Client
 
@@ -37,24 +38,21 @@ class EventDAL(BaseDAL):
         """
         Get all events a user is a member of.
         """
-        # First get event IDs from memberships
-        memberships = (
-            self.client.table("event_memberships")
-            .select("event_id")
-            .eq("user_id", str(user_id))
-            .execute()
-        )
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-        if not memberships.data:
+        memberships = await MembershipDAL(self.client).get_user_memberships(user_id)
+        if not memberships:
             return []
 
-        event_ids = [m["event_id"] for m in memberships.data]
+        event_ids = [str(membership.event_id) for membership in memberships]
 
         # Then get event details
         response = (
             self.client.table(self.TABLE)
             .select("*")
             .in_("event_id", event_ids)
+            .eq("is_active", True)
+            .gte("ends_at", now_iso)
             .order("starts_at", desc=False)
             .execute()
         )
@@ -125,10 +123,12 @@ class EventDAL(BaseDAL):
         Get all active events (for discovery/listing).
         Respects RLS - only returns events user can see.
         """
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         response = (
             self.client.table(self.TABLE)
             .select("*")
             .eq("is_active", True)
+            .gte("ends_at", now_iso)
             .order("starts_at", desc=False)
             .execute()
         )
