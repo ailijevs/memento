@@ -4,7 +4,7 @@
 |-------|-------|
 | **Report ID** | MT-001 |
 | **Date** | 2026-02-01 |
-| **Tester** | Marty Ilijevski |
+| **Tester** | Marty |
 | **Test Case ID** | MT-01 |
 | **Requirement ID** | FR-2.1 (Resume upload populates profile fields) |
 
@@ -64,7 +64,7 @@ $ curl -s -X POST http://localhost:8000/api/v1/profiles/me/resume \
 {
   "message": "Resume parsed successfully",
   "extracted_data": {
-    "full_name": "Marty Ilijevski",
+    "full_name": "Marty",
     "headline": "Software Engineer",
     "bio": "Experienced full-stack developer...",
     "company": "Memento",
@@ -86,7 +86,7 @@ $ curl -s -X POST http://localhost:8000/api/v1/profiles/me/resume \
 {
   "message": "Resume parsed successfully",
   "extracted_data": {
-    "full_name": "Marty Ilijevski",
+    "full_name": "Marty",
     "headline": "Software Engineer",
     "bio": "Experienced full-stack developer...",
     "company": "Memento",

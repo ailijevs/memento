@@ -4,7 +4,7 @@
 |-------|-------|
 | **Report ID** | MT-002 |
 | **Date** | 2026-01-28 |
-| **Tester** | Marty Ilijevski |
+| **Tester** | Marty |
 | **Test Case ID** | MT-02 |
 | **Requirement ID** | FR-4.1 (Recognition returns profile card data) |
 
