@@ -2,9 +2,9 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, Mail, RefreshCw } from "lucide-react";
 import { Aurora } from "@/components/aurora";
 
 const FIELDS = [
@@ -53,8 +53,23 @@ function displayValue(val: string, type: string) {
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [values, setValues] = useState(["", "", ""]);
   const [activeIdx, setActiveIdx] = useState<number>(0);
+  const [pendingVerification, setPendingVerification] = useState(
+    searchParams.get("verify") === "pending",
+  );
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendMessage, setResendMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (searchParams.get("verify") === "pending" && !values[0]) {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data: { user } }) => {
+        if (user?.email) setValues((prev) => [user.email!, prev[1], prev[2]]);
+      });
+    }
+  }, [searchParams, values]);
 
   // Continue the zoom from wherever the "You" dot was on the welcome page
   const [enterOrigin] = useState<string>(() => {
@@ -189,17 +204,44 @@ export default function SignupPage() {
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: values[0],
       password: values[1],
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`,
+      },
     });
     if (error) {
       setError(error.message);
       setLoading(false);
       return;
     }
-    router.push("/onboarding");
-    router.refresh();
+    if (data.session) {
+      router.push("/onboarding");
+      router.refresh();
+    } else {
+      setPendingVerification(true);
+      setLoading(false);
+    }
+  }
+
+  async function handleResendVerification() {
+    setResendLoading(true);
+    setResendMessage(null);
+    const supabase = createClient();
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: values[0],
+      options: {
+        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback`,
+      },
+    });
+    setResendLoading(false);
+    if (error) {
+      setResendMessage(error.message);
+    } else {
+      setResendMessage("Verification email sent!");
+    }
   }
 
   async function handleGoogle() {
@@ -218,6 +260,86 @@ export default function SignupPage() {
 
   const activeField = FIELDS[activeIdx];
   const [cr, cg, cb] = activeField.color;
+
+  if (pendingVerification) {
+    return (
+      <div
+        className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6"
+        style={{
+          background: [
+            "radial-gradient(ellipse 80% 50% at 50% 20%, oklch(0.22 0.14 275) 0%, transparent 100%)",
+            "oklch(0.07 0.015 270)",
+          ].join(", "),
+        }}
+      >
+        <div className="absolute inset-0" style={{ opacity: 0.35 }}>
+          <Aurora className="h-full w-full" mode="focused" />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <div
+            className="mb-6 flex h-16 w-16 items-center justify-center rounded-full"
+            style={{
+              background: "rgba(100,75,240,0.12)",
+              border: "1.5px solid rgba(100,75,240,0.3)",
+            }}
+          >
+            <Mail className="h-7 w-7 text-[rgba(100,75,240,0.8)]" />
+          </div>
+
+          <h1
+            className="mb-3 text-white"
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 28,
+              fontWeight: 400,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Check your email
+          </h1>
+
+          <p className="mb-2 max-w-[280px] text-[15px] leading-relaxed text-white/45">
+            We sent a verification link to
+          </p>
+          <p className="mb-6 text-[15px] font-medium text-white/70">
+            {values[0]}
+          </p>
+          <p className="mb-8 max-w-[280px] text-[13px] leading-relaxed text-white/30">
+            Click the link in the email to verify your account and continue setting up your profile.
+          </p>
+
+          <button
+            onClick={handleResendVerification}
+            disabled={resendLoading}
+            className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-medium text-white/50 transition-all active:scale-95"
+            style={{
+              background: "rgba(255,255,255,0.04)",
+              border: "1px solid rgba(255,255,255,0.08)",
+            }}
+          >
+            {resendLoading ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            Resend email
+          </button>
+
+          {resendMessage && (
+            <p className="mt-3 text-[12px] text-white/35">{resendMessage}</p>
+          )}
+
+          <Link
+            href="/login"
+            className="mt-8 text-[13px] text-white/25 active:text-white/50"
+          >
+            Back to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
