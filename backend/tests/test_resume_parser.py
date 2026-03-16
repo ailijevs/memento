@@ -5,13 +5,16 @@ Tests cover:
 - ResumeParser sanitization
 - ProfileCardBuilder card construction
 - Resume upload endpoint field persistence (Issue #195 fix)
+- Integration test: resume upload endpoint via FastAPI TestClient
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from fastapi.testclient import TestClient
 
+from app.main import app
 from app.services.resume_parser import ResumeData, ResumeParser
 
 # --- ResumeParser unit tests -------------------------------------------------
@@ -302,3 +305,155 @@ class TestProfileCardBuilder:
 
         assert cards == []
         builder.consent_dal.get.assert_called_once()
+
+
+# --- Integration tests: resume upload endpoint via TestClient ----------------
+
+
+FAKE_USER_ID = str(uuid4())
+
+
+def _mock_current_user():
+    """Return a fake CurrentUser for dependency override."""
+    from app.auth import CurrentUser
+
+    return CurrentUser(
+        id=FAKE_USER_ID,
+        email="marty@test.com",
+        access_token="fake-token",
+    )
+
+
+class TestResumeUploadEndpoint:
+    """Integration tests for POST /api/v1/profiles/me/resume.
+
+    Uses FastAPI TestClient to exercise the full request lifecycle —
+    auth override, file upload parsing, ResumeParser invocation,
+    database write, and JSON response serialisation.
+    """
+
+    @pytest.fixture
+    def client(self):
+        from app.auth import get_current_user
+
+        app.dependency_overrides[get_current_user] = _mock_current_user
+        yield TestClient(app)
+        app.dependency_overrides.clear()
+
+    def test_rejects_unsupported_file_type(self, client):
+        """Uploading a .txt file returns 400."""
+        response = client.post(
+            "/api/v1/profiles/me/resume",
+            files={"file": ("resume.txt", b"plain text", "text/plain")},
+        )
+        assert response.status_code == 400
+        assert "Unsupported file type" in response.json()["detail"]
+
+    def test_rejects_missing_filename(self, client):
+        """Upload with empty filename returns 400 or 422."""
+        response = client.post(
+            "/api/v1/profiles/me/resume",
+            files={"file": ("", b"content", "application/pdf")},
+        )
+        assert response.status_code in (400, 422)
+
+    @patch("app.db.supabase.get_admin_client")
+    @patch("app.api.profiles.ResumeParser")
+    def test_resume_upload_returns_all_fields_in_response(
+        self,
+        mock_parser_cls,
+        mock_get_admin,
+        client,
+    ):
+        """Full integration: upload PDF, parser returns data, response
+        includes all fields including the Issue #195 additions."""
+        mock_admin = MagicMock()
+        mock_get_admin.return_value = mock_admin
+
+        select_chain = MagicMock()
+        select_chain.eq.return_value = select_chain
+        select_chain.execute.return_value = MagicMock(data=[])
+        mock_admin.table.return_value.select.return_value = select_chain
+
+        insert_chain = MagicMock()
+        insert_chain.execute.return_value = MagicMock(data=[{"user_id": FAKE_USER_ID}])
+        mock_admin.table.return_value.insert.return_value = insert_chain
+
+        parser_instance = MagicMock()
+        parser_instance.parse.return_value = ResumeData(
+            full_name="Marty Ilijevski",
+            headline="Software Engineer",
+            bio="Backend developer.",
+            location="West Lafayette, IN",
+            company="Memento",
+            major="Computer Science",
+            graduation_year=2026,
+            email="marty@purdue.edu",
+            phone="555-000-1234",
+            skills=["Python", "FastAPI"],
+            profile_one_liner="Building AR networking.",
+            profile_summary="Full-stack engineer.",
+            experiences=[{"company": "Memento", "title": "Lead"}],
+            education=[{"school": "Purdue", "degree": "BS"}],
+        )
+        mock_parser_cls.return_value = parser_instance
+
+        pdf_bytes = b"%PDF-1.4 fake content for testing" * 10
+        response = client.post(
+            "/api/v1/profiles/me/resume",
+            files={"file": ("resume.pdf", pdf_bytes, "application/pdf")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["profile_updated"] is True
+        assert data["message"] == "Resume parsed successfully"
+
+        ed = data["extracted_data"]
+        assert ed["full_name"] == "Marty Ilijevski"
+        assert ed["location"] == "West Lafayette, IN"
+        assert ed["profile_one_liner"] == "Building AR networking."
+        assert ed["profile_summary"] == "Full-stack engineer."
+        assert ed["experiences"] == [{"company": "Memento", "title": "Lead"}]
+        assert ed["education"] == [{"school": "Purdue", "degree": "BS"}]
+
+    @patch("app.db.supabase.get_admin_client")
+    @patch("app.api.profiles.ResumeParser")
+    def test_resume_upload_updates_existing_profile(
+        self,
+        mock_parser_cls,
+        mock_get_admin,
+        client,
+    ):
+        """When profile exists, the endpoint updates rather than inserts."""
+        mock_admin = MagicMock()
+        mock_get_admin.return_value = mock_admin
+
+        select_chain = MagicMock()
+        select_chain.eq.return_value = select_chain
+        select_chain.execute.return_value = MagicMock(data=[{"user_id": FAKE_USER_ID}])
+        mock_admin.table.return_value.select.return_value = select_chain
+
+        update_chain = MagicMock()
+        update_chain.eq.return_value = update_chain
+        update_chain.execute.return_value = MagicMock(data=[])
+        mock_admin.table.return_value.update.return_value = update_chain
+
+        parser_instance = MagicMock()
+        parser_instance.parse.return_value = ResumeData(
+            full_name="Marty Ilijevski",
+            headline="Updated Headline",
+            location="Indianapolis, IN",
+            profile_one_liner="New one-liner.",
+        )
+        mock_parser_cls.return_value = parser_instance
+
+        pdf_bytes = b"%PDF-1.4 fake" * 10
+        response = client.post(
+            "/api/v1/profiles/me/resume",
+            files={"file": ("resume.pdf", pdf_bytes, "application/pdf")},
+        )
+
+        assert response.status_code == 200
+        assert response.json()["profile_updated"] is True
+        mock_admin.table.return_value.update.assert_called_once()
