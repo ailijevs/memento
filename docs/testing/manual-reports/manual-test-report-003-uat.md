@@ -4,7 +4,7 @@
 |-------|-------|
 | **Report ID** | MT-003 (UAT) |
 | **Date** | 2026-02-01 |
-| **Tester** | Marty Ilijevski |
+| **Tester** | Marty |
 | **Test Case ID** | UAT-01 |
 | **Requirement ID** | FR-2.1, FR-2.3 (User can upload resume during onboarding and profile is populated) |
 
