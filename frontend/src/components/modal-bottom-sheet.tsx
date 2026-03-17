@@ -97,13 +97,14 @@ export function ModalBottomSheet({
       />
 
       <div
-        className="relative z-[121] w-full max-w-[430px] rounded-t-3xl border p-4 pb-6 shadow-2xl will-change-transform"
+        className="relative z-[121] w-full max-w-[430px] rounded-t-3xl border p-4 shadow-2xl will-change-transform overflow-hidden overscroll-contain flex flex-col"
         style={{
           backgroundColor: "#10131a",
           borderColor: "rgba(255, 255, 255, 0.12)",
-          maxHeight,
+          height: maxHeight,
           transform: `translateY(${translateY})`,
           transition: isDragging ? "none" : `transform ${SHEET_ANIMATION_MS}ms cubic-bezier(0.22, 1, 0.36, 1)`,
+          paddingBottom: "max(env(safe-area-inset-bottom), 16px)",
         }}
       >
         <div
@@ -141,7 +142,7 @@ export function ModalBottomSheet({
           </div>
         ) : null}
 
-        {children}
+        <div className="min-h-0 flex-1 flex flex-col">{children}</div>
       </div>
     </div>
   );

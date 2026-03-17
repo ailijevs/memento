@@ -1,13 +1,15 @@
 "use client";
 
 import { type EventResponse } from "@/lib/api";
-import { CalendarDays, Loader2, MapPin, Search } from "lucide-react";
+import { CalendarDays, Loader2, MapPin, Search, UserPlus } from "lucide-react";
 
 interface DiscoverEventsSheetContentProps {
   loading: boolean;
   searchText: string;
   onSearchTextChange: (value: string) => void;
   events: EventResponse[];
+  joiningEventId: string | null;
+  onJoinEvent: (event: EventResponse) => void;
 }
 
 export function DiscoverEventsSheetContent({
@@ -15,9 +17,13 @@ export function DiscoverEventsSheetContent({
   searchText,
   onSearchTextChange,
   events,
+  joiningEventId,
+  onJoinEvent,
 }: DiscoverEventsSheetContentProps) {
+  const hasQuery = searchText.trim().length > 0;
+
   return (
-    <>
+    <div className="min-h-0 flex-1 flex flex-col">
       <div
         className="mb-3 flex items-center gap-2 rounded-full px-3"
         style={{
@@ -34,7 +40,7 @@ export function DiscoverEventsSheetContent({
         />
       </div>
 
-      <div className="max-h-[62dvh] overflow-y-auto pr-1">
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pb-2">
         {loading ? (
           <div className="flex items-center justify-center py-10">
             <Loader2 className="h-5 w-5 animate-spin text-white/45" />
@@ -47,8 +53,12 @@ export function DiscoverEventsSheetContent({
               border: "1px solid oklch(1 0 0 / 8%)",
             }}
           >
-            <p className="text-[16px] text-white/75">No new events found</p>
-            <p className="mt-1 text-[13px] text-white/35">Try another search term.</p>
+            <p className="text-[16px] text-white/75">
+              {hasQuery ? "No new events found" : "Search for events"}
+            </p>
+            <p className="mt-1 text-[13px] text-white/35">
+              {hasQuery ? "Try another search term." : "Start typing to discover events."}
+            </p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -80,12 +90,31 @@ export function DiscoverEventsSheetContent({
                     </div>
                   </div>
                 </div>
+
+                <div className="mt-3">
+                  <button
+                    onClick={() => onJoinEvent(event)}
+                    disabled={joiningEventId === event.event_id}
+                    className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/80 transition-transform active:scale-95 disabled:opacity-55"
+                    style={{
+                      background: "oklch(1 0 0 / 5%)",
+                      border: "1px solid oklch(1 0 0 / 11%)",
+                    }}
+                  >
+                    {joiningEventId === event.event_id ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <UserPlus className="h-3.5 w-3.5" />
+                    )}
+                    {joiningEventId === event.event_id ? "Joining" : "Join Event"}
+                  </button>
+                </div>
               </article>
             ))}
           </div>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

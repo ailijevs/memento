@@ -21,6 +21,7 @@ export default function DashboardPage() {
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverEvents, setDiscoverEvents] = useState<EventResponse[]>([]);
   const [discoverSearchText, setDiscoverSearchText] = useState("");
+  const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -61,16 +62,8 @@ export default function DashboardPage() {
   }, [myEvents]);
 
   const filteredUpcomingEvents = useMemo(() => {
-    const query = searchText.trim().toLowerCase();
-    if (!query) {
-      return upcomingEvents;
-    }
-
-    return upcomingEvents.filter((event) => {
-      const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
-      return haystack.includes(query);
-    });
-  }, [upcomingEvents, searchText]);
+    return upcomingEvents;
+  }, [upcomingEvents]);
 
   const discoveredUpcomingEvents = useMemo(() => {
     const query = discoverSearchText.trim().toLowerCase();
@@ -90,7 +83,7 @@ export default function DashboardPage() {
       });
 
     if (!query) {
-      return base;
+      return [];
     }
 
     return base.filter((event) => {
@@ -114,10 +107,6 @@ export default function DashboardPage() {
     setIsDiscoverOpen(true);
     setDiscoverSearchText("");
 
-    if (discoverEvents.length > 0) {
-      return;
-    }
-
     setDiscoverLoading(true);
     try {
       const events = await api.getEvents();
@@ -127,6 +116,23 @@ export default function DashboardPage() {
       setDiscoverEvents([]);
     } finally {
       setDiscoverLoading(false);
+    }
+  }
+
+  async function handleJoinDiscoverEvent(event: EventResponse) {
+    setJoiningDiscoverEventId(event.event_id);
+    try {
+      await api.joinEvent(event.event_id);
+      setMyEvents((previous) => {
+        if (previous.some((existing) => existing.event_id === event.event_id)) {
+          return previous;
+        }
+        return [...previous, event];
+      });
+    } catch (error) {
+      console.error("Failed to join event:", error);
+    } finally {
+      setJoiningDiscoverEventId(null);
     }
   }
 
@@ -353,6 +359,8 @@ export default function DashboardPage() {
           searchText={discoverSearchText}
           onSearchTextChange={setDiscoverSearchText}
           events={discoveredUpcomingEvents}
+          joiningEventId={joiningDiscoverEventId}
+          onJoinEvent={handleJoinDiscoverEvent}
         />
       </ModalBottomSheet>
     </div>
