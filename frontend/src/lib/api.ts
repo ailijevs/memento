@@ -71,9 +71,8 @@ class ApiClient {
   }
 
   async joinEvent(eventId: string) {
-    return this.request<MembershipResponse>("/api/v1/memberships/join", {
+    return this.request<MembershipResponse>(`/api/v1/events/${eventId}/join`, {
       method: "POST",
-      body: JSON.stringify({ event_id: eventId }),
     });
   }
 

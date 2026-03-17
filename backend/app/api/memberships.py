@@ -8,14 +8,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth import CurrentUser, get_current_user
 from app.dals import ConsentDAL, MembershipDAL
 from app.db import get_supabase_client
-from app.schemas import (
-    ConsentCreate,
-    MembershipCreate,
-    MembershipResponse,
-    MembershipUpdate,
-)
+from app.schemas import ConsentCreate, MembershipCreate, MembershipResponse
 
-router = APIRouter(prefix="/memberships", tags=["memberships"])
+router = APIRouter(tags=["events"])
 
 
 def get_membership_dal(
@@ -32,9 +27,11 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     return ConsentDAL(client)
 
 
-@router.post("/join", response_model=MembershipResponse, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{event_id}/join", response_model=MembershipResponse, status_code=status.HTTP_201_CREATED
+)
 async def join_event(
-    data: MembershipCreate,
+    event_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     membership_dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
     consent_dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
@@ -44,7 +41,7 @@ async def join_event(
     Consent defaults to False (explicit opt-in required).
     """
     # Check if already a member
-    existing = await membership_dal.get(data.event_id, current_user.id)
+    existing = await membership_dal.get(event_id, current_user.id)
     if existing:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
@@ -52,13 +49,15 @@ async def join_event(
         )
 
     # Create membership
-    membership = await membership_dal.join_event(current_user.id, data)
+    membership = await membership_dal.join_event(
+        current_user.id, MembershipCreate(event_id=event_id)
+    )
 
     # Create default consent (both False)
     await consent_dal.create(
         current_user.id,
         ConsentCreate(
-            event_id=data.event_id,
+            event_id=event_id,
             allow_profile_display=False,
             allow_recognition=False,
         ),
@@ -67,7 +66,7 @@ async def join_event(
     return membership
 
 
-@router.get("/event/{event_id}", response_model=list[MembershipResponse])
+@router.get("/{event_id}/members", response_model=list[MembershipResponse])
 async def list_event_members(
     event_id: UUID,
     dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
@@ -79,40 +78,7 @@ async def list_event_members(
     return await dal.get_event_members(event_id)
 
 
-@router.get("/event/{event_id}/me", response_model=MembershipResponse)
-async def get_my_membership(
-    event_id: UUID,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
-) -> MembershipResponse:
-    """Get the current user's membership for a specific event."""
-    membership = await dal.get(event_id, current_user.id)
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You are not a member of this event.",
-        )
-    return membership
-
-
-@router.patch("/event/{event_id}/me", response_model=MembershipResponse)
-async def update_my_membership(
-    event_id: UUID,
-    data: MembershipUpdate,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
-) -> MembershipResponse:
-    """Update the current user's membership for an event."""
-    membership = await dal.update(event_id, current_user.id, data)
-    if not membership:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="You are not a member of this event.",
-        )
-    return membership
-
-
-@router.delete("/event/{event_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{event_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
 async def leave_event(
     event_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],

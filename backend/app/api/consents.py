@@ -10,7 +10,7 @@ from app.dals import ConsentDAL
 from app.db import get_supabase_client
 from app.schemas import ConsentResponse, ConsentUpdate
 
-router = APIRouter(prefix="/consents", tags=["consents"])
+router = APIRouter(tags=["events"])
 
 
 def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> ConsentDAL:
@@ -19,16 +19,7 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     return ConsentDAL(client)
 
 
-@router.get("/", response_model=list[ConsentResponse])
-async def list_my_consents(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
-) -> list[ConsentResponse]:
-    """Get all consent settings for the current user across all events."""
-    return await dal.get_user_consents(current_user.id)
-
-
-@router.get("/event/{event_id}", response_model=ConsentResponse)
+@router.get("/{event_id}/consents/me", response_model=ConsentResponse)
 async def get_my_consent(
     event_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -44,7 +35,7 @@ async def get_my_consent(
     return consent
 
 
-@router.patch("/event/{event_id}", response_model=ConsentResponse)
+@router.patch("/{event_id}/consents/me", response_model=ConsentResponse)
 async def update_my_consent(
     event_id: UUID,
     data: ConsentUpdate,
@@ -58,42 +49,6 @@ async def update_my_consent(
     - revoked_at is set when revoking consent
     """
     consent = await dal.update(event_id, current_user.id, data)
-    if not consent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Consent not found. Are you a member of this event?",
-        )
-    return consent
-
-
-@router.post("/event/{event_id}/grant-all", response_model=ConsentResponse)
-async def grant_all_consents(
-    event_id: UUID,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
-) -> ConsentResponse:
-    """Grant all consent permissions for an event."""
-    consent = await dal.grant_all(event_id, current_user.id)
-    if not consent:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Consent not found. Are you a member of this event?",
-        )
-    return consent
-
-
-@router.post("/event/{event_id}/revoke-all", response_model=ConsentResponse)
-async def revoke_all_consents(
-    event_id: UUID,
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
-) -> ConsentResponse:
-    """
-    Revoke all consent permissions for an event.
-    This is a privacy-first action that immediately hides the user
-    from the event directory and disables face recognition.
-    """
-    consent = await dal.revoke_all(event_id, current_user.id)
     if not consent:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

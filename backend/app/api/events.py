@@ -46,24 +46,6 @@ async def create_event(
     return await dal.create(current_user.id, data)
 
 
-@router.get("/{event_id}", response_model=EventResponse)
-async def get_event(
-    event_id: UUID,
-    dal: Annotated[EventDAL, Depends(get_event_dal)],
-) -> EventResponse:
-    """
-    Get event details.
-    RLS enforces: only visible if user is creator or member.
-    """
-    event = await dal.get_by_id(event_id)
-    if not event:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Event not found or not accessible.",
-        )
-    return event
-
-
 @router.patch("/{event_id}", response_model=EventResponse)
 async def update_event(
     event_id: UUID,
