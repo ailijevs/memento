@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { api, type EventResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
-import { DiscoverEventsSheetContent } from "./discover-events-sheet-content";
+import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { CalendarDays, Loader2, LogOut, MapPin, Plus, ScanFace, Search } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
@@ -65,7 +65,7 @@ export default function DashboardPage() {
     return upcomingEvents;
   }, [upcomingEvents]);
 
-  const discoveredUpcomingEvents = useMemo(() => {
+  const discoveredUpcomingEvents = useMemo<DiscoverEventItem[]>(() => {
     const query = discoverSearchText.trim().toLowerCase();
     const myEventIds = new Set(myEvents.map((event) => event.event_id));
     const now = Date.now();
@@ -86,10 +86,18 @@ export default function DashboardPage() {
       return [];
     }
 
-    return base.filter((event) => {
-      const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
-      return haystack.includes(query);
-    });
+    return base
+      .filter((event) => {
+        const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
+        return haystack.includes(query);
+      })
+      .map((event) => {
+        const startsAt = Date.parse(event.starts_at ?? "");
+        return {
+          event,
+          canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 30 * 60 * 1000,
+        };
+      });
   }, [discoverEvents, discoverSearchText, myEvents]);
 
   async function handleSignOut() {

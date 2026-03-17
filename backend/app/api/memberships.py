@@ -1,12 +1,13 @@
 """API endpoints for event memberships."""
 
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth import CurrentUser, get_current_user
-from app.dals import ConsentDAL, MembershipDAL
+from app.dals import ConsentDAL, EventDAL, MembershipDAL
 from app.db import get_supabase_client
 from app.schemas import ConsentCreate, MembershipCreate, MembershipResponse
 
@@ -27,6 +28,12 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     return ConsentDAL(client)
 
 
+def get_event_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> EventDAL:
+    """Dependency to get EventDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return EventDAL(client)
+
+
 @router.post(
     "/{event_id}/join", response_model=MembershipResponse, status_code=status.HTTP_201_CREATED
 )
@@ -35,6 +42,7 @@ async def join_event(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     membership_dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
     consent_dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> MembershipResponse:
     """
     Join an event. Creates both membership and consent records.
@@ -46,6 +54,28 @@ async def join_event(
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="You are already a member of this event.",
+        )
+
+    event = await event_dal.get_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    event_start = event.starts_at
+    if event_start is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Event start time is unexpectedly missing.",
+        )
+
+    join_cutoff = event_start - timedelta(minutes=30)
+    now = datetime.now(timezone.utc)
+    if now > join_cutoff:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only join an event at least 30 minutes before it starts.",
         )
 
     # Create membership
