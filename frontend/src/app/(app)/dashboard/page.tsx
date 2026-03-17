@@ -5,15 +5,16 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, type EventResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
-import { CalendarDays, Loader2, LogOut, MapPin, Plus, ScanFace, Search, UserPlus } from "lucide-react";
+import { CalendarDays, Loader2, LogOut, MapPin, Plus, ScanFace, Search } from "lucide-react";
+
+type DashboardTab = "attendee" | "organizer";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
-  const [events, setEvents] = useState<EventResponse[]>([]);
-  const [joinedEventIds, setJoinedEventIds] = useState<Set<string>>(new Set());
+  const [myEvents, setMyEvents] = useState<EventResponse[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [joiningEventId, setJoiningEventId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<DashboardTab>("attendee");
 
   useEffect(() => {
     async function load() {
@@ -21,18 +22,16 @@ export default function DashboardPage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
+
       if (!session) {
-        accessTokenRef.current = null;
         setLoading(false);
         return;
       }
 
-      accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
       try {
-        const [allEvents, myEvents] = await Promise.all([api.getEvents(), api.getMyEvents()]);
-        setEvents(allEvents);
-        setJoinedEventIds(new Set(myEvents.map((event) => event.event_id)));
+        const events = await api.getMyEvents();
+        setMyEvents(events);
       } finally {
         setLoading(false);
       }
@@ -41,47 +40,37 @@ export default function DashboardPage() {
     void load();
   }, []);
 
-  const filteredEvents = useMemo(() => {
-    const query = searchText.trim().toLowerCase();
-    const sorted = [...events].sort((a, b) => {
-      const left = a.starts_at ? Date.parse(a.starts_at) : Number.POSITIVE_INFINITY;
-      const right = b.starts_at ? Date.parse(b.starts_at) : Number.POSITIVE_INFINITY;
-      return left - right;
-    });
+  const upcomingEvents = useMemo(() => {
+    const now = Date.now();
+    return [...myEvents]
+      .filter((event) => {
+        const endsAt = event.ends_at ? Date.parse(event.ends_at) : Number.NaN;
+        return Number.isFinite(endsAt) ? endsAt >= now : true;
+      })
+      .sort((a, b) => {
+        const left = a.starts_at ? Date.parse(a.starts_at) : Number.POSITIVE_INFINITY;
+        const right = b.starts_at ? Date.parse(b.starts_at) : Number.POSITIVE_INFINITY;
+        return left - right;
+      });
+  }, [myEvents]);
 
+  const filteredUpcomingEvents = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
     if (!query) {
-      return sorted;
+      return upcomingEvents;
     }
 
-    return sorted.filter((event) => {
+    return upcomingEvents.filter((event) => {
       const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
       return haystack.includes(query);
     });
-  }, [events, searchText]);
-
-  const joinedCount = joinedEventIds.size;
+  }, [upcomingEvents, searchText]);
 
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
-  }
-
-  async function handleJoin(event: EventResponse) {
-    if (joinedEventIds.has(event.event_id)) {
-      return;
-    }
-
-    setJoiningEventId(event.event_id);
-    try {
-      await api.joinEvent(event.event_id);
-      setJoinedEventIds((previous) => new Set(previous).add(event.event_id));
-    } catch (error) {
-      console.error("Failed to join event:", error);
-    } finally {
-      setJoiningEventId(null);
-    }
   }
 
   function handleCreateEventClick() {
@@ -120,7 +109,7 @@ export default function DashboardPage() {
               Events
             </h1>
             <p className="mt-1 text-[13px] text-white/45">
-              {joinedCount} joined {joinedCount === 1 ? "event" : "events"}
+              {upcomingEvents.length} upcoming {upcomingEvents.length === 1 ? "event" : "events"}
             </p>
           </div>
 
@@ -137,7 +126,64 @@ export default function DashboardPage() {
           </button>
         </div>
 
-        <div className="mb-3 flex gap-2">
+        <div
+          className="mb-3 grid grid-cols-2 gap-2 rounded-full p-1"
+          style={{
+            background: "oklch(1 0 0 / 4%)",
+            border: "1px solid oklch(1 0 0 / 10%)",
+          }}
+        >
+          <button
+            onClick={() => setActiveTab("attendee")}
+            className="flex items-center justify-center gap-2 rounded-full px-3 py-2 text-[11px] font-medium uppercase tracking-[0.1em] transition-transform active:scale-95"
+            style={
+              activeTab === "attendee"
+                ? {
+                    background: "oklch(0.23 0.1 215 / 62%)",
+                    border: "1px solid oklch(0.6 0.17 215 / 35%)",
+                    color: "oklch(0.94 0.01 250)",
+                  }
+                : { color: "oklch(0.87 0.01 250 / 55%)" }
+            }
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            Attendee
+          </button>
+          <button
+            onClick={() => setActiveTab("organizer")}
+            className="flex items-center justify-center gap-2 rounded-full px-3 py-2 text-[11px] font-medium uppercase tracking-[0.1em] transition-transform active:scale-95"
+            style={
+              activeTab === "organizer"
+                ? {
+                    background: "oklch(0.23 0.1 35 / 62%)",
+                    border: "1px solid oklch(0.62 0.16 35 / 35%)",
+                    color: "oklch(0.94 0.01 250)",
+                  }
+                : { color: "oklch(0.87 0.01 250 / 55%)" }
+            }
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Organizer
+          </button>
+        </div>
+
+        {activeTab === "attendee" ? (
+          <div
+            className="flex items-center gap-2 rounded-full px-3"
+            style={{
+              background: "oklch(1 0 0 / 4%)",
+              border: "1px solid oklch(1 0 0 / 10%)",
+            }}
+          >
+            <Search className="h-3.5 w-3.5 text-white/35" />
+            <input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Search your events"
+              className="h-9 w-full bg-transparent text-[13px] text-white outline-none placeholder:text-white/35"
+            />
+          </div>
+        ) : (
           <button
             onClick={handleCreateEventClick}
             className="flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-medium uppercase tracking-[0.1em] text-white/75 transition-transform active:scale-95"
@@ -149,31 +195,11 @@ export default function DashboardPage() {
             <Plus className="h-3.5 w-3.5" />
             Create Event
           </button>
-
-          <div
-            className="flex flex-1 items-center gap-2 rounded-full px-3"
-            style={{
-              background: "oklch(1 0 0 / 4%)",
-              border: "1px solid oklch(1 0 0 / 10%)",
-            }}
-          >
-            <Search className="h-3.5 w-3.5 text-white/35" />
-            <input
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="Search events"
-              className="h-9 w-full bg-transparent text-[13px] text-white outline-none placeholder:text-white/35"
-            />
-          </div>
-        </div>
+        )}
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 pb-4">
-        {loading ? (
-          <div className="flex items-center justify-center py-16">
-            <Loader2 className="h-6 w-6 animate-spin text-white/45" />
-          </div>
-        ) : filteredEvents.length === 0 ? (
+        {activeTab === "organizer" ? (
           <div
             className="rounded-3xl px-5 py-8 text-center"
             style={{
@@ -181,14 +207,27 @@ export default function DashboardPage() {
               border: "1px solid oklch(1 0 0 / 8%)",
             }}
           >
-            <p className="text-[16px] text-white/75">No events found</p>
+            <p className="text-[16px] text-white/75">Organizer tools</p>
+            <p className="mt-1 text-[13px] text-white/35">Use the create button above to add a new event. (Coming soon)</p>
+          </div>
+        ) : loading ? (
+          <div className="flex items-center justify-center py-16">
+            <Loader2 className="h-6 w-6 animate-spin text-white/45" />
+          </div>
+        ) : filteredUpcomingEvents.length === 0 ? (
+          <div
+            className="rounded-3xl px-5 py-8 text-center"
+            style={{
+              background: "oklch(1 0 0 / 4%)",
+              border: "1px solid oklch(1 0 0 / 8%)",
+            }}
+          >
+            <p className="text-[16px] text-white/75">No upcoming events found</p>
             <p className="mt-1 text-[13px] text-white/35">Try another search term.</p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredEvents.map((event) => {
-              const isJoined = joinedEventIds.has(event.event_id);
-              const isJoining = joiningEventId === event.event_id;
+            {filteredUpcomingEvents.map((event) => {
               return (
                 <article
                   key={event.event_id}
@@ -216,48 +255,20 @@ export default function DashboardPage() {
                         ) : null}
                       </div>
                     </div>
-
-                    {isJoined ? (
-                      <span
-                        className="rounded-full px-2.5 py-1 text-[10px] font-medium uppercase tracking-[0.08em]"
-                        style={{
-                          background: "oklch(0.24 0.1 150 / 60%)",
-                          color: "oklch(0.82 0.13 150)",
-                          border: "1px solid oklch(0.55 0.16 150 / 35%)",
-                        }}
-                      >
-                        Joined
-                      </span>
-                    ) : null}
                   </div>
 
                   <div className="mt-3">
-                    {isJoined ? (
-                      <button
-                        onClick={() => handleStartRecognition(event)}
-                        className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/85 transition-transform active:scale-95"
-                        style={{
-                          background: "oklch(0.22 0.11 25 / 62%)",
-                          border: "1px solid oklch(0.58 0.19 25 / 36%)",
-                        }}
-                      >
-                        <ScanFace className="h-3.5 w-3.5" />
-                        Start Recognition
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => void handleJoin(event)}
-                        disabled={isJoining}
-                        className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/80 transition-transform active:scale-95 disabled:opacity-55"
-                        style={{
-                          background: "oklch(1 0 0 / 5%)",
-                          border: "1px solid oklch(1 0 0 / 11%)",
-                        }}
-                      >
-                        {isJoining ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserPlus className="h-3.5 w-3.5" />}
-                        {isJoining ? "Joining" : "Join Event"}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleStartRecognition(event)}
+                      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/85 transition-transform active:scale-95"
+                      style={{
+                        background: "oklch(0.22 0.11 25 / 62%)",
+                        border: "1px solid oklch(0.58 0.19 25 / 36%)",
+                      }}
+                    >
+                      <ScanFace className="h-3.5 w-3.5" />
+                      Start Recognition
+                    </button>
                   </div>
                 </article>
               );
