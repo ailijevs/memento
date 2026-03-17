@@ -43,15 +43,15 @@ type MessageHandler = (message: SocketMessage) => void | Promise<void>;
  * Supports message fan-out to registered handlers.
  */
 export class SocketClient {
-  private readonly url: string;
+  private readonly baseUrl: string;
   private socket: WebSocket | null = null;
   private readonly messageHandlers = new Set<MessageHandler>();
 
   constructor(url?: string) {
-    this.url = url || process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
+    this.baseUrl = url || process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
   }
 
-  connect(): void {
+  connect(token?: string): void {
     if (
       this.socket &&
       (this.socket.readyState === WebSocket.OPEN ||
@@ -60,10 +60,11 @@ export class SocketClient {
       return;
     }
 
-    this.socket = new WebSocket(this.url);
+    const connectionUrl = this.buildConnectionUrl(token);
+    this.socket = new WebSocket(connectionUrl);
 
     this.socket.onopen = () => {
-      console.log(`[SocketClient] Connected to ${this.url}`);
+      console.log(`[SocketClient] Connected to ${connectionUrl}`);
     };
 
     this.socket.onmessage = (event) => {
@@ -82,8 +83,8 @@ export class SocketClient {
 
     this.socket.onerror = () => {
       // Browser WebSocket error events intentionally contain no detail.
-      // The most common cause is the glasses-app server not running at this.url.
-      console.warn(`[SocketClient] Could not connect to ${this.url} — is the glasses-app running?`);
+      // The most common cause is the glasses-app server not running at connectionUrl.
+      console.warn(`[SocketClient] Could not connect to ${connectionUrl} — is the glasses-app running?`);
     };
 
     this.socket.onclose = (event) => {
@@ -121,6 +122,16 @@ export class SocketClient {
 
   isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  private buildConnectionUrl(token?: string): string {
+    const url = new URL(this.baseUrl, typeof window === "undefined" ? undefined : window.location.href);
+
+    if (token) {
+      url.searchParams.set("token", token);
+    }
+
+    return url.toString();
   }
 
   private parseMessage(raw: unknown): SocketMessage | null {
