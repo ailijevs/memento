@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, type EventResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
+import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
+import { DiscoverEventsSheetContent } from "./discover-events-sheet-content";
 import { CalendarDays, Loader2, LogOut, MapPin, Plus, ScanFace, Search } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
@@ -15,6 +17,10 @@ export default function DashboardPage() {
   const [myEvents, setMyEvents] = useState<EventResponse[]>([]);
   const [searchText, setSearchText] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("attendee");
+  const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
+  const [discoverLoading, setDiscoverLoading] = useState(false);
+  const [discoverEvents, setDiscoverEvents] = useState<EventResponse[]>([]);
+  const [discoverSearchText, setDiscoverSearchText] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -66,6 +72,33 @@ export default function DashboardPage() {
     });
   }, [upcomingEvents, searchText]);
 
+  const discoveredUpcomingEvents = useMemo(() => {
+    const query = discoverSearchText.trim().toLowerCase();
+    const myEventIds = new Set(myEvents.map((event) => event.event_id));
+    const now = Date.now();
+
+    const base = [...discoverEvents]
+      .filter((event) => !myEventIds.has(event.event_id))
+      .filter((event) => {
+        const endsAt = event.ends_at ? Date.parse(event.ends_at) : Number.NaN;
+        return Number.isFinite(endsAt) ? endsAt >= now : true;
+      })
+      .sort((a, b) => {
+        const left = a.starts_at ? Date.parse(a.starts_at) : Number.POSITIVE_INFINITY;
+        const right = b.starts_at ? Date.parse(b.starts_at) : Number.POSITIVE_INFINITY;
+        return left - right;
+      });
+
+    if (!query) {
+      return base;
+    }
+
+    return base.filter((event) => {
+      const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
+      return haystack.includes(query);
+    });
+  }, [discoverEvents, discoverSearchText, myEvents]);
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -75,6 +108,26 @@ export default function DashboardPage() {
 
   function handleCreateEventClick() {
     // Intentionally left blank for now.
+  }
+
+  async function handleOpenDiscover() {
+    setIsDiscoverOpen(true);
+    setDiscoverSearchText("");
+
+    if (discoverEvents.length > 0) {
+      return;
+    }
+
+    setDiscoverLoading(true);
+    try {
+      const events = await api.getEvents();
+      setDiscoverEvents(events);
+    } catch (error) {
+      console.error("Failed to load discover events:", error);
+      setDiscoverEvents([]);
+    } finally {
+      setDiscoverLoading(false);
+    }
   }
 
   function handleStartRecognition(event: EventResponse) {
@@ -168,20 +221,33 @@ export default function DashboardPage() {
         </div>
 
         {activeTab === "attendee" ? (
-          <div
-            className="flex items-center gap-2 rounded-full px-3"
-            style={{
-              background: "oklch(1 0 0 / 4%)",
-              border: "1px solid oklch(1 0 0 / 10%)",
-            }}
-          >
-            <Search className="h-3.5 w-3.5 text-white/35" />
-            <input
-              value={searchText}
-              onChange={(event) => setSearchText(event.target.value)}
-              placeholder="Search your events"
-              className="h-9 w-full bg-transparent text-[13px] text-white outline-none placeholder:text-white/35"
-            />
+          <div className="flex items-center gap-2">
+            <div
+              className="flex flex-1 items-center gap-2 rounded-full px-3"
+              style={{
+                background: "oklch(1 0 0 / 4%)",
+                border: "1px solid oklch(1 0 0 / 10%)",
+              }}
+            >
+              <Search className="h-3.5 w-3.5 text-white/35" />
+              <input
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Search your events"
+                className="h-9 w-full bg-transparent text-[13px] text-white outline-none placeholder:text-white/35"
+              />
+            </div>
+            <button
+              onClick={() => void handleOpenDiscover()}
+              className="shrink-0 flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-medium uppercase tracking-[0.1em] text-white/75 transition-transform active:scale-95"
+              style={{
+                background: "oklch(0.22 0.08 190 / 58%)",
+                border: "1px solid oklch(0.58 0.12 190 / 32%)",
+              }}
+            >
+              <Search className="h-3.5 w-3.5" />
+              Discover Events
+            </button>
           </div>
         ) : (
           <button
@@ -276,6 +342,19 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      <ModalBottomSheet
+        isOpen={isDiscoverOpen}
+        onClose={() => setIsDiscoverOpen(false)}
+        title="Discover Events"
+      >
+        <DiscoverEventsSheetContent
+          loading={discoverLoading}
+          searchText={discoverSearchText}
+          onSearchTextChange={setDiscoverSearchText}
+          events={discoveredUpcomingEvents}
+        />
+      </ModalBottomSheet>
     </div>
   );
 }
