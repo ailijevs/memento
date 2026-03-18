@@ -9,6 +9,7 @@ import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
+import { CreateEventSheetContent, type CreateEventInput } from "./create-event-sheet-content";
 import { CalendarDays, LogOut, Plus } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
@@ -24,6 +25,8 @@ export default function DashboardPage() {
   const [discoverLoading, setDiscoverLoading] = useState(false);
   const [discoverEvents, setDiscoverEvents] = useState<EventResponse[]>([]);
   const [discoverSearchText, setDiscoverSearchText] = useState("");
+  const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
+  const [creatingEvent, setCreatingEvent] = useState(false);
   const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
   const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
@@ -155,7 +158,18 @@ export default function DashboardPage() {
   }
 
   function handleCreateEventClick() {
-    // Intentionally left blank for now.
+    setIsCreateEventOpen(true);
+  }
+
+  async function handleCreateEvent(input: CreateEventInput) {
+    setCreatingEvent(true);
+    try {
+      const createdEvent = await api.createEvent(input);
+      setOrganizedEvents((previous) => [createdEvent, ...previous]);
+      setIsCreateEventOpen(false);
+    } finally {
+      setCreatingEvent(false);
+    }
   }
 
   async function handleOpenDiscover() {
@@ -359,6 +373,21 @@ export default function DashboardPage() {
           events={discoveredUpcomingEvents}
           joiningEventId={joiningDiscoverEventId}
           onJoinEvent={handleJoinDiscoverEvent}
+        />
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={isCreateEventOpen}
+        onClose={() => {
+          if (!creatingEvent) {
+            setIsCreateEventOpen(false);
+          }
+        }}
+        title="Create Event"
+      >
+        <CreateEventSheetContent
+          isSubmitting={creatingEvent}
+          onSubmit={handleCreateEvent}
         />
       </ModalBottomSheet>
     </div>

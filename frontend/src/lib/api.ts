@@ -74,6 +74,13 @@ class ApiClient {
     return this.request<EventResponse[]>("/api/v1/events/organized");
   }
 
+  async createEvent(data: EventCreateRequest) {
+    return this.request<EventResponse>("/api/v1/events", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
   async joinEvent(eventId: string) {
     return this.request<MembershipResponse>(`/api/v1/events/${eventId}/join`, {
       method: "POST",
@@ -166,6 +173,14 @@ export interface EducationInput {
   field_of_study?: string | null;
   start_date?: string | null;
   end_date?: string | null;
+}
+
+export interface EventCreateRequest {
+  name: string;
+  starts_at?: string;
+  ends_at?: string;
+  location?: string;
+  is_active?: boolean;
 }
 
 // ─── Response types ───────────────────────────────────────────────────────────
