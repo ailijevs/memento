@@ -17,6 +17,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [myEvents, setMyEvents] = useState<EventResponse[]>([]);
+  const [organizedEvents, setOrganizedEvents] = useState<EventResponse[]>([]);
   const [searchText, setSearchText] = useState("");
   const [activeTab, setActiveTab] = useState<DashboardTab>("attendee");
   const [isDiscoverOpen, setIsDiscoverOpen] = useState(false);
@@ -43,8 +44,12 @@ export default function DashboardPage() {
 
       api.setToken(session.access_token);
       try {
-        const events = await api.getMyEvents();
+        const [events, organized] = await Promise.all([
+          api.getMyEvents(),
+          api.getMyOrganizedEvents(),
+        ]);
         setMyEvents(events);
+        setOrganizedEvents(organized);
       } finally {
         setLoading(false);
       }
@@ -294,7 +299,7 @@ export default function DashboardPage() {
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 pb-4">
         {activeTab === "organizer" ? (
-          <OrganizerContent />
+          <OrganizerContent events={organizedEvents} formatEventDate={formatEventDate} />
         ) : (
           <AttendeeContent
             loading={loading}

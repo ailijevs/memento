@@ -70,6 +70,10 @@ class ApiClient {
     return this.request<EventResponse[]>("/api/v1/events/me");
   }
 
+  async getMyOrganizedEvents() {
+    return this.request<EventResponse[]>("/api/v1/events/organized");
+  }
+
   async joinEvent(eventId: string) {
     return this.request<MembershipResponse>(`/api/v1/events/${eventId}/join`, {
       method: "POST",
