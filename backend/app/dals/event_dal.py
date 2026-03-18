@@ -59,6 +59,22 @@ class EventDAL(BaseDAL):
 
         return [EventResponse(**event) for event in response.data]
 
+    async def get_organized_events(self, user_id: UUID) -> list[EventResponse]:
+        """
+        Get all not-yet-ended events (active and inactive) created by the user.
+        """
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        response = (
+            self.client.table(self.TABLE)
+            .select("*")
+            .eq("created_by", str(user_id))
+            .gte("ends_at", now_iso)
+            .order("starts_at", desc=False)
+            .execute()
+        )
+
+        return [EventResponse(**event) for event in response.data]
+
     async def create(self, created_by: UUID, data: EventCreate) -> EventResponse:
         """
         Create a new event.
