@@ -76,6 +76,12 @@ class ApiClient {
     });
   }
 
+  async leaveEvent(eventId: string) {
+    return this.request<void>(`/api/v1/events/${eventId}/leave`, {
+      method: "DELETE",
+    });
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",

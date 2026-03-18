@@ -1,13 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, type EventResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
-import { CalendarDays, Loader2, LogOut, MapPin, Plus, ScanFace, Search } from "lucide-react";
+import { CalendarDays, Loader2, LogOut, MapPin, MoreHorizontal, Plus, ScanFace, Search, ShieldCheck, UserMinus } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
 
@@ -22,6 +22,9 @@ export default function DashboardPage() {
   const [discoverEvents, setDiscoverEvents] = useState<EventResponse[]>([]);
   const [discoverSearchText, setDiscoverSearchText] = useState("");
   const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
+  const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
+  const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
+  const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -46,6 +49,31 @@ export default function DashboardPage() {
 
     void load();
   }, []);
+
+  useEffect(() => {
+    if (!openEventMenuId) {
+      return;
+    }
+
+    function handlePointerDown(event: MouseEvent | TouchEvent) {
+      const target = event.target as Node | null;
+      if (!target) {
+        return;
+      }
+      if (openMenuContainerRef.current?.contains(target)) {
+        return;
+      }
+      setOpenEventMenuId(null);
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("touchstart", handlePointerDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("touchstart", handlePointerDown);
+    };
+  }, [openEventMenuId]);
 
   const upcomingEvents = useMemo(() => {
     const now = Date.now();
@@ -147,6 +175,25 @@ export default function DashboardPage() {
   function handleStartRecognition(event: EventResponse) {
     const params = new URLSearchParams({ event_id: event.event_id });
     router.push(`/recognition?${params.toString()}`);
+  }
+
+  async function handleLeaveEvent(event: EventResponse) {
+    setOpenEventMenuId(null);
+    setLeavingEventId(event.event_id);
+    try {
+      await api.leaveEvent(event.event_id);
+      setMyEvents((previous) => previous.filter((existing) => existing.event_id !== event.event_id));
+    } catch (error) {
+      console.error("Failed to leave event:", error);
+    } finally {
+      setLeavingEventId(null);
+    }
+  }
+
+  function handleEditConsents(event: EventResponse) {
+    setOpenEventMenuId(null);
+    // Intentionally left blank for now.
+    void event;
   }
 
   return (
@@ -334,6 +381,57 @@ export default function DashboardPage() {
                           </span>
                         ) : null}
                       </div>
+                    </div>
+
+                    <div
+                      className="relative"
+                      ref={openEventMenuId === event.event_id ? openMenuContainerRef : null}
+                    >
+                      <button
+                        onClick={() =>
+                          setOpenEventMenuId((current) =>
+                            current === event.event_id ? null : event.event_id,
+                          )
+                        }
+                        className="inline-flex items-center rounded-full p-1.5 text-white/70 transition-transform active:scale-95"
+                        style={{
+                          background: "oklch(1 0 0 / 5%)",
+                          border: "1px solid oklch(1 0 0 / 11%)",
+                        }}
+                        aria-label="Event actions"
+                      >
+                        <MoreHorizontal className="h-4 w-4" />
+                      </button>
+
+                      {openEventMenuId === event.event_id ? (
+                        <div
+                          className="absolute right-0 z-30 mt-2 w-40 rounded-2xl p-1"
+                          style={{
+                            background: "oklch(0.12 0.02 265)",
+                            border: "1px solid oklch(1 0 0 / 12%)",
+                          }}
+                        >
+                          <button
+                            onClick={() => handleEditConsents(event)}
+                            className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                          >
+                            <ShieldCheck className="h-3.5 w-3.5" />
+                            Edit Consents
+                          </button>
+                          <button
+                            onClick={() => void handleLeaveEvent(event)}
+                            disabled={leavingEventId === event.event_id}
+                            className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15 disabled:opacity-55"
+                          >
+                            {leavingEventId === event.event_id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <UserMinus className="h-3.5 w-3.5" />
+                            )}
+                            {leavingEventId === event.event_id ? "Leaving" : "Leave Event"}
+                          </button>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
 
