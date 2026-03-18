@@ -350,6 +350,8 @@ export default function DashboardPage() {
         ) : (
           <div className="space-y-3">
             {filteredUpcomingEvents.map((event) => {
+              const startsAtMs = event.starts_at ? Date.parse(event.starts_at) : Number.NaN;
+              const hasStarted = Number.isFinite(startsAtMs) && startsAtMs <= Date.now();
               return (
                 <article
                   key={event.event_id}
@@ -431,17 +433,23 @@ export default function DashboardPage() {
                   </div>
 
                   <div className="mt-3">
-                    <button
-                      onClick={() => handleStartRecognition(event)}
-                      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/85 transition-transform active:scale-95"
-                      style={{
-                        background: "oklch(0.22 0.11 25 / 62%)",
-                        border: "1px solid oklch(0.58 0.19 25 / 36%)",
-                      }}
-                    >
-                      <ScanFace className="h-3.5 w-3.5" />
-                      Start Recognition
-                    </button>
+                    {hasStarted ? (
+                      <button
+                        onClick={() => handleStartRecognition(event)}
+                        className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/85 transition-transform active:scale-95"
+                        style={{
+                          background: "oklch(0.22 0.11 25 / 62%)",
+                          border: "1px solid oklch(0.58 0.19 25 / 36%)",
+                        }}
+                      >
+                        <ScanFace className="h-3.5 w-3.5" />
+                        Start Recognition
+                      </button>
+                    ) : (
+                      <p className="text-[12px] text-white/55">
+                        Recognition opens when this event starts
+                      </p>
+                    )}
                   </div>
                 </article>
               );
