@@ -1,5 +1,7 @@
 """API endpoints for event memberships."""
 
+import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Annotated
 from uuid import UUID
@@ -9,9 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth import CurrentUser, get_current_user
 from app.dals import ConsentDAL, EventDAL, MembershipDAL
 from app.db import get_supabase_client
-from app.schemas import ConsentCreate, MembershipCreate, MembershipResponse
+from app.schemas import ConsentCreate, EventProcessingStatus, MembershipCreate, MembershipResponse
+from app.services.rekognition import RekognitionError, RekognitionService
+from app.utils.rekognition_helpers import build_event_collection_id
 
 router = APIRouter(tags=["events"])
+logger = logging.getLogger(__name__)
 
 
 def get_membership_dal(
@@ -114,10 +119,81 @@ async def leave_event(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     membership_dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
     consent_dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> None:
     """
-    Leave an event. Deletes both membership and consent records.
+    Leave an event with indexing-aware cleanup behavior.
+
+    - If indexing is pending: delete consent + membership immediately.
+    - If indexing is in progress: wait for terminal status.
+    - If indexing completes: delete user's faces from collection, then delete rows.
+    - If indexing fails: apply a short grace wait/recheck, then allow row deletion.
     """
+    event = await event_dal.get_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    membership = await membership_dal.get(event_id, current_user.id)
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="You are not a member of this event.",
+        )
+
+    indexing_status = event.indexing_status
+
+    if indexing_status == EventProcessingStatus.IN_PROGRESS:
+        max_wait_seconds = 90
+        poll_interval_seconds = 3
+        attempts = max_wait_seconds // poll_interval_seconds
+
+        for _ in range(attempts):
+            await asyncio.sleep(poll_interval_seconds)
+            refreshed_event = await event_dal.get_by_id(event_id)
+            if not refreshed_event:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Event not found.",
+                )
+            indexing_status = refreshed_event.indexing_status
+            if indexing_status != EventProcessingStatus.IN_PROGRESS:
+                break
+
+        if indexing_status == EventProcessingStatus.IN_PROGRESS:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Event indexing is still in progress. Please try leaving again shortly.",
+            )
+
+    if indexing_status == EventProcessingStatus.FAILED:
+        # Short grace period for eventual consistency in status propagation.
+        await asyncio.sleep(5)
+        refreshed_event = await event_dal.get_by_id(event_id)
+        if refreshed_event:
+            indexing_status = refreshed_event.indexing_status
+
+    if indexing_status == EventProcessingStatus.COMPLETED:
+        collection_id = build_event_collection_id(event_id)
+        try:
+            RekognitionService().delete_faces_by_user(
+                collection_id=collection_id,
+                user_id=current_user.id,
+            )
+        except RekognitionError as exc:
+            logger.error(
+                "Failed to delete faces for user=%s event=%s before leave: %s",
+                current_user.id,
+                event_id,
+                exc,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to remove user face data from event collection.",
+            ) from exc
+
     # Delete consent first (foreign key reference)
     await consent_dal.delete(event_id, current_user.id)
 
