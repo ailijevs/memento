@@ -52,6 +52,18 @@ async def create_event(
     dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> EventResponse:
     """Create a new event. The current user becomes the creator."""
+    duplicate_exists = await dal.exists_duplicate(
+        name=data.name,
+        starts_at=data.starts_at,
+        ends_at=data.ends_at,
+        location=data.location,
+    )
+    if duplicate_exists:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="An event with same name, start/end time, and location already exists.",
+        )
+
     return await dal.create(current_user.id, data)
 
 

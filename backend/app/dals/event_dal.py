@@ -94,6 +94,37 @@ class EventDAL(BaseDAL):
 
         return EventResponse(**response.data[0])
 
+    async def exists_duplicate(
+        self,
+        *,
+        name: str,
+        starts_at: datetime,
+        ends_at: datetime,
+        location: str | None,
+    ) -> bool:
+        """
+        Check whether an event already exists with same name, time window, and location.
+        """
+        starts_at_iso = starts_at.isoformat()
+        ends_at_iso = ends_at.isoformat()
+
+        query = (
+            self.client.table(self.TABLE)
+            .select("event_id")
+            .eq("name", name)
+            .eq("starts_at", starts_at_iso)
+            .eq("ends_at", ends_at_iso)
+            .limit(1)
+        )
+
+        if location is None:
+            query = query.is_("location", "null")
+        else:
+            query = query.eq("location", location)
+
+        response = query.execute()
+        return bool(response.data)
+
     async def update(self, event_id: UUID, data: EventUpdate) -> EventResponse | None:
         """
         Update an event.
