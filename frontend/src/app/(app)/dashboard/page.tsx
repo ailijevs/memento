@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { api, type EventResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { CalendarDays, Loader2, LogOut, MapPin, MoreHorizontal, Plus, ScanFace, Search, ShieldCheck, UserMinus } from "lucide-react";
 
@@ -24,6 +25,8 @@ export default function DashboardPage() {
   const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
   const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
+  const [isSignOutDialogOpen, setIsSignOutDialogOpen] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -129,10 +132,16 @@ export default function DashboardPage() {
   }, [discoverEvents, discoverSearchText, myEvents]);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/");
-    router.refresh();
+    setIsSigningOut(true);
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      setIsSignOutDialogOpen(false);
+      router.push("/");
+      router.refresh();
+    } finally {
+      setIsSigningOut(false);
+    }
   }
 
   function handleCreateEventClick() {
@@ -197,7 +206,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-hidden">
+    <div className="relative flex h-dvh flex-col overflow-hidden">
       <div className="absolute inset-0" style={{ opacity: 0.42 }}>
         <Aurora className="h-full w-full" mode="focused" />
       </div>
@@ -209,7 +218,7 @@ export default function DashboardPage() {
       />
 
       <div className="relative z-10 px-6 pt-14 pb-4">
-        <div className="mb-4 flex items-center justify-between">
+        <div className="mb-4">
           <div>
             <h1
               className="text-white"
@@ -220,24 +229,10 @@ export default function DashboardPage() {
                 letterSpacing: "-0.02em",
               }}
             >
-              Events
+              Your Lineup
             </h1>
-            <p className="mt-1 text-[13px] text-white/45">
-              {upcomingEvents.length} upcoming {upcomingEvents.length === 1 ? "event" : "events"}
-            </p>
+            <p className="mt-1 text-[13px] text-white/45">Check your schedule or find something new.</p>
           </div>
-
-          <button
-            onClick={handleSignOut}
-            className="flex h-10 w-10 items-center justify-center rounded-full transition-all active:scale-95"
-            style={{
-              background: "oklch(1 0 0 / 4%)",
-              border: "1px solid oklch(1 0 0 / 10%)",
-            }}
-            title="Sign out"
-          >
-            <LogOut className="h-4 w-4 text-white/65" />
-          </button>
         </div>
 
         <div
@@ -454,6 +449,42 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      <div
+        className="fixed left-1/2 z-20 w-full max-w-[430px] -translate-x-1/2 px-6"
+        style={{
+          bottom: "calc(env(safe-area-inset-bottom) + 88px)",
+        }}
+      >
+        <button
+          onClick={() => setIsSignOutDialogOpen(true)}
+          className="mx-auto inline-flex items-center gap-2 rounded-full px-3 py-2 text-[11px] font-medium uppercase tracking-[0.1em] text-white/70 transition-transform active:scale-95"
+          style={{
+            background: "oklch(1 0 0 / 4%)",
+            border: "1px solid oklch(1 0 0 / 10%)",
+          }}
+          title="Sign out"
+        >
+          <LogOut className="h-3.5 w-3.5" />
+          Sign Out
+        </button>
+      </div>
+
+      <ConfirmationDialog
+        open={isSignOutDialogOpen}
+        title="Sign out?"
+        message="Are you sure you want to sign out of your account?"
+        confirmLabel={isSigningOut ? "Signing Out" : "Sign Out"}
+        cancelLabel="Cancel"
+        confirmIcon={isSigningOut ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <LogOut className="h-3.5 w-3.5" />}
+        confirmDisabled={isSigningOut}
+        onCancel={() => {
+          if (!isSigningOut) {
+            setIsSignOutDialogOpen(false);
+          }
+        }}
+        onConfirm={() => void handleSignOut()}
+      />
 
       <ModalBottomSheet
         isOpen={isDiscoverOpen}
