@@ -98,29 +98,41 @@ class EventDAL(BaseDAL):
         self,
         *,
         name: str,
-        starts_at: datetime,
-        ends_at: datetime,
+        starts_at: datetime | None,
+        ends_at: datetime | None,
         location: str | None,
+        created_by: UUID | None = None,
+        exclude_event_id: UUID | None = None,
     ) -> bool:
         """
         Check whether an event already exists with same name, time window, and location.
-        """
-        starts_at_iso = starts_at.isoformat()
-        ends_at_iso = ends_at.isoformat()
 
-        query = (
-            self.client.table(self.TABLE)
-            .select("event_id")
-            .eq("name", name)
-            .eq("starts_at", starts_at_iso)
-            .eq("ends_at", ends_at_iso)
-            .limit(1)
-        )
+        Rules:
+        - If location is set, duplicates are global across creators.
+        - If location is null, duplicates are scoped to the same creator only.
+        """
+        query = self.client.table(self.TABLE).select("event_id").eq("name", name).limit(1)
+
+        if starts_at is None:
+            query = query.is_("starts_at", "null")
+        else:
+            query = query.eq("starts_at", starts_at.isoformat())
+
+        if ends_at is None:
+            query = query.is_("ends_at", "null")
+        else:
+            query = query.eq("ends_at", ends_at.isoformat())
 
         if location is None:
             query = query.is_("location", "null")
+            if created_by is None:
+                raise ValueError("created_by must be provided when location is null.")
+            query = query.eq("created_by", str(created_by))
         else:
             query = query.eq("location", location)
+
+        if exclude_event_id is not None:
+            query = query.neq("event_id", str(exclude_event_id))
 
         response = query.execute()
         return bool(response.data)
