@@ -73,7 +73,7 @@ async def create_event(
     if duplicate_exists:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="An event with same name, start/end time, and location already exists.",
+            detail="An event with the same info already exists.",
         )
 
     return await dal.create(current_user.id, data)
@@ -113,7 +113,7 @@ async def update_event(
     if duplicate_exists:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="An event with same name, start/end time, and location already exists.",
+            detail="An event with the same info already exists.",
         )
 
     event = await dal.update(event_id, data)
