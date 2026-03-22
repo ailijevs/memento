@@ -81,6 +81,19 @@ class ApiClient {
     });
   }
 
+  async deleteEvent(eventId: string) {
+    return this.request<void>(`/api/v1/events/${eventId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async updateEvent(eventId: string, data: EventUpdateRequest) {
+    return this.request<EventResponse>(`/api/v1/events/${eventId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   async joinEvent(eventId: string) {
     return this.request<MembershipResponse>(`/api/v1/events/${eventId}/join`, {
       method: "POST",
@@ -177,6 +190,14 @@ export interface EducationInput {
 
 export interface EventCreateRequest {
   name: string;
+  starts_at?: string;
+  ends_at?: string;
+  location?: string;
+  is_active?: boolean;
+}
+
+export interface EventUpdateRequest {
+  name?: string;
   starts_at?: string;
   ends_at?: string;
   location?: string;

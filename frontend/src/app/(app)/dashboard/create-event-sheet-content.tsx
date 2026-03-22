@@ -24,8 +24,8 @@ export function CreateEventSheetContent({ isSubmitting, onSubmit }: CreateEventS
   const [location, setLocation] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  const isInvalid = useMemo(() => {
-    return (
+  const hasRequiredFields = useMemo(() => {
+    return !(
       name.trim().length === 0 ||
       startDate.trim().length === 0 ||
       startTime.trim().length === 0 ||
@@ -33,6 +33,20 @@ export function CreateEventSheetContent({ isSubmitting, onSubmit }: CreateEventS
       endTime.trim().length === 0
     );
   }, [endDate, endTime, name, startDate, startTime]);
+
+  const hasValidDateOrder = useMemo(() => {
+    if (!hasRequiredFields) {
+      return true;
+    }
+    const startsAtDate = new Date(`${startDate}T${startTime}:00`);
+    const endsAtDate = new Date(`${endDate}T${endTime}:00`);
+    if (Number.isNaN(startsAtDate.getTime()) || Number.isNaN(endsAtDate.getTime())) {
+      return false;
+    }
+    return endsAtDate > startsAtDate;
+  }, [endDate, endTime, hasRequiredFields, startDate, startTime]);
+
+  const isInvalid = !hasRequiredFields || !hasValidDateOrder;
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -163,6 +177,9 @@ export function CreateEventSheetContent({ isSubmitting, onSubmit }: CreateEventS
         </div>
 
         {error ? <p className="text-[12px] text-red-300/90">{error}</p> : null}
+        {!error && hasRequiredFields && !hasValidDateOrder ? (
+          <p className="text-[12px] text-red-300/90">End time must be after start time.</p>
+        ) : null}
         <div className="mt-2">
           <button
             type="submit"

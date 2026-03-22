@@ -27,6 +27,9 @@ export default function DashboardPage() {
   const [discoverSearchText, setDiscoverSearchText] = useState("");
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [deletingOrganizedEventId, setDeletingOrganizedEventId] = useState<string | null>(null);
+  const [archivingOrganizedEventId, setArchivingOrganizedEventId] = useState<string | null>(null);
+  const [unarchivingOrganizedEventId, setUnarchivingOrganizedEventId] = useState<string | null>(null);
   const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
   const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
@@ -172,6 +175,46 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleDeleteOrganizedEvent(event: EventResponse) {
+    setDeletingOrganizedEventId(event.event_id);
+    try {
+      await api.deleteEvent(event.event_id);
+      setOrganizedEvents((previous) => previous.filter((existing) => existing.event_id !== event.event_id));
+    } catch (error) {
+      console.error("Failed to delete event:", error);
+    } finally {
+      setDeletingOrganizedEventId(null);
+    }
+  }
+
+  async function handleArchiveOrganizedEvent(event: EventResponse) {
+    setArchivingOrganizedEventId(event.event_id);
+    try {
+      const updated = await api.updateEvent(event.event_id, { is_active: false });
+      setOrganizedEvents((previous) =>
+        previous.map((existing) => (existing.event_id === event.event_id ? updated : existing))
+      );
+    } catch (error) {
+      console.error("Failed to archive event:", error);
+    } finally {
+      setArchivingOrganizedEventId(null);
+    }
+  }
+
+  async function handleUnarchiveOrganizedEvent(event: EventResponse) {
+    setUnarchivingOrganizedEventId(event.event_id);
+    try {
+      const updated = await api.updateEvent(event.event_id, { is_active: true });
+      setOrganizedEvents((previous) =>
+        previous.map((existing) => (existing.event_id === event.event_id ? updated : existing))
+      );
+    } catch (error) {
+      console.error("Failed to unarchive event:", error);
+    } finally {
+      setUnarchivingOrganizedEventId(null);
+    }
+  }
+
   async function handleOpenDiscover() {
     setIsDiscoverOpen(true);
     setDiscoverSearchText("");
@@ -313,7 +356,16 @@ export default function DashboardPage() {
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 pb-4">
         {activeTab === "organizer" ? (
-          <OrganizerContent events={organizedEvents} formatEventDate={formatEventDate} />
+          <OrganizerContent
+            events={organizedEvents}
+            formatEventDate={formatEventDate}
+            deletingEventId={deletingOrganizedEventId}
+            archivingEventId={archivingOrganizedEventId}
+            unarchivingEventId={unarchivingOrganizedEventId}
+            onArchiveEvent={handleArchiveOrganizedEvent}
+            onUnarchiveEvent={handleUnarchiveOrganizedEvent}
+            onDeleteEvent={handleDeleteOrganizedEvent}
+          />
         ) : (
           <AttendeeContent
             loading={loading}
