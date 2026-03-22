@@ -166,14 +166,9 @@ class EventDAL(BaseDAL):
 
     async def delete(self, event_id: UUID) -> bool:
         """
-        Delete an event (soft delete by setting is_active=False).
+        Delete an event (hard delete).
         """
-        response = (
-            self.client.table(self.TABLE)
-            .update({"is_active": False})
-            .eq("event_id", str(event_id))
-            .execute()
-        )
+        response = self.client.table(self.TABLE).delete().eq("event_id", str(event_id)).execute()
 
         return len(response.data) > 0
 
