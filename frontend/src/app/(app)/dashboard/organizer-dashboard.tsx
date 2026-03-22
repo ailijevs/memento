@@ -33,6 +33,7 @@ interface OrganizerContentProps {
   deletingEventId: string | null;
   archivingEventId: string | null;
   unarchivingEventId: string | null;
+  onEditEventRequest: (event: EventResponse) => void;
   onArchiveEvent: (event: EventResponse) => Promise<void>;
   onUnarchiveEvent: (event: EventResponse) => Promise<void>;
   onDeleteEvent: (event: EventResponse) => Promise<void>;
@@ -44,6 +45,7 @@ export function OrganizerContent({
   deletingEventId,
   archivingEventId,
   unarchivingEventId,
+  onEditEventRequest,
   onArchiveEvent,
   onUnarchiveEvent,
   onDeleteEvent,
@@ -89,7 +91,7 @@ export function OrganizerContent({
 
   function handleEditEvent(event: EventResponse) {
     setOpenEventMenuId(null);
-    void event;
+    onEditEventRequest(event);
   }
 
   function handleArchiveEventClick(event: EventResponse) {

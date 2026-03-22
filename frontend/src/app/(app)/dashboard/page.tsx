@@ -9,7 +9,12 @@ import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
-import { CreateEventSheetContent, type CreateEventInput } from "./create-event-sheet-content";
+import {
+  CreateEventSheetContent,
+  EditEventSheetContent,
+  type CreateEventInput,
+  type EditEventInput,
+} from "./create-event-sheet-content";
 import { CalendarDays, LogOut, Plus } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
@@ -27,6 +32,8 @@ export default function DashboardPage() {
   const [discoverSearchText, setDiscoverSearchText] = useState("");
   const [isCreateEventOpen, setIsCreateEventOpen] = useState(false);
   const [creatingEvent, setCreatingEvent] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<EventResponse | null>(null);
+  const [updatingEvent, setUpdatingEvent] = useState(false);
   const [deletingOrganizedEventId, setDeletingOrganizedEventId] = useState<string | null>(null);
   const [archivingOrganizedEventId, setArchivingOrganizedEventId] = useState<string | null>(null);
   const [unarchivingOrganizedEventId, setUnarchivingOrganizedEventId] = useState<string | null>(null);
@@ -172,6 +179,29 @@ export default function DashboardPage() {
       setIsCreateEventOpen(false);
     } finally {
       setCreatingEvent(false);
+    }
+  }
+
+  function handleEditEventRequest(event: EventResponse) {
+    setEditingEvent(event);
+  }
+
+  async function handleUpdateEvent(input: EditEventInput) {
+    if (!editingEvent) {
+      return;
+    }
+    setUpdatingEvent(true);
+    try {
+      const updatedEvent = await api.updateEvent(editingEvent.event_id, input);
+      setOrganizedEvents((previous) =>
+        previous.map((existing) => (existing.event_id === updatedEvent.event_id ? updatedEvent : existing))
+      );
+      setEditingEvent(null);
+    } catch (error) {
+      console.error("Failed to update event:", error);
+      throw error;
+    } finally {
+      setUpdatingEvent(false);
     }
   }
 
@@ -362,6 +392,7 @@ export default function DashboardPage() {
             deletingEventId={deletingOrganizedEventId}
             archivingEventId={archivingOrganizedEventId}
             unarchivingEventId={unarchivingOrganizedEventId}
+            onEditEventRequest={handleEditEventRequest}
             onArchiveEvent={handleArchiveOrganizedEvent}
             onUnarchiveEvent={handleUnarchiveOrganizedEvent}
             onDeleteEvent={handleDeleteOrganizedEvent}
@@ -441,6 +472,24 @@ export default function DashboardPage() {
           isSubmitting={creatingEvent}
           onSubmit={handleCreateEvent}
         />
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={Boolean(editingEvent)}
+        onClose={() => {
+          if (!updatingEvent) {
+            setEditingEvent(null);
+          }
+        }}
+        title="Edit Event"
+      >
+        {editingEvent ? (
+          <EditEventSheetContent
+            isSubmitting={updatingEvent}
+            initialValues={editingEvent}
+            onSubmit={handleUpdateEvent}
+          />
+        ) : null}
       </ModalBottomSheet>
     </div>
   );
