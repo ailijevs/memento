@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -52,6 +52,20 @@ function displayValue(val: string, type: string) {
 }
 
 export default function SignupPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center" style={{ background: "oklch(0.07 0.015 270)" }}>
+          <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+        </div>
+      }
+    >
+      <SignupContent />
+    </Suspense>
+  );
+}
+
+function SignupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [values, setValues] = useState(["", "", ""]);
