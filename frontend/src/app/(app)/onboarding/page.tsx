@@ -542,7 +542,65 @@ export default function OnboardingPage() {
 }
 
 // ─────────────────────────────────────────
-// Profile preview
+// Inline editable field
+// ─────────────────────────────────────────
+function EditableField({
+  value,
+  onChange,
+  placeholder,
+  multiline,
+  className,
+  style,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder: string;
+  multiline?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (editing) inputRef.current?.focus();
+  }, [editing]);
+
+  if (!editing) {
+    return (
+      <span
+        onClick={() => setEditing(true)}
+        className={`cursor-pointer rounded-md px-1 -mx-1 transition-colors hover:bg-white/[0.06] ${className ?? ""}`}
+        style={style}
+        title="Tap to edit"
+      >
+        {value || <span className="italic text-white/20">{placeholder}</span>}
+      </span>
+    );
+  }
+
+  const shared = {
+    ref: inputRef as React.RefObject<HTMLInputElement>,
+    value,
+    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange(e.target.value),
+    onBlur: () => setEditing(false),
+    onKeyDown: (e: React.KeyboardEvent) => {
+      if (e.key === "Enter" && !multiline) setEditing(false);
+      if (e.key === "Escape") setEditing(false);
+    },
+    placeholder,
+    className: `w-full bg-white/[0.06] rounded-lg px-2 py-1 -mx-1 text-white outline-none ring-1 ring-white/15 ${className ?? ""}`,
+    style,
+  };
+
+  if (multiline) {
+    return <textarea {...shared} ref={inputRef as React.RefObject<HTMLTextAreaElement>} rows={3} />;
+  }
+  return <input {...shared} />;
+}
+
+// ─────────────────────────────────────────
+// Profile preview (editable confirmation)
 // ─────────────────────────────────────────
 function ProfilePreview({
   profile,
@@ -555,6 +613,44 @@ function ProfilePreview({
   onBack: () => void;
   onContinue: () => void;
 }) {
+  const [fullName, setFullName] = useState(profile.full_name);
+  const [headline, setHeadline] = useState(profile.headline ?? "");
+  const [bio, setBio] = useState(profile.bio ?? "");
+  const [location, setLocation] = useState(profile.location ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  async function handleContinue() {
+    const changed =
+      fullName !== profile.full_name ||
+      headline !== (profile.headline ?? "") ||
+      bio !== (profile.bio ?? "") ||
+      location !== (profile.location ?? "");
+
+    if (changed) {
+      setSaving(true);
+      setSaveError(null);
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) { setSaveError("Session expired"); setSaving(false); return; }
+        api.setToken(session.access_token);
+        await api.updateProfile({
+          full_name: fullName.trim() || undefined,
+          headline: headline.trim() || undefined,
+          bio: bio.trim() || undefined,
+          location: location.trim() || undefined,
+        });
+      } catch (err) {
+        setSaveError(err instanceof Error ? err.message : "Failed to save changes");
+        setSaving(false);
+        return;
+      }
+      setSaving(false);
+    }
+    onContinue();
+  }
+
   return (
     <div className="relative flex min-h-dvh flex-col px-6 pt-4 pb-8 overflow-hidden">
       <div className="absolute inset-0" style={{ opacity: 0.52 }}>
@@ -595,10 +691,10 @@ function ProfilePreview({
             lineHeight: 1.1,
           }}
         >
-          Looking good
+          Confirm your info
         </h1>
         <p className="mt-2 text-[14px] leading-relaxed text-white/38">
-          This is how you&apos;ll appear to others.
+          Tap any field to edit before continuing.
         </p>
       </div>
 
@@ -610,34 +706,52 @@ function ProfilePreview({
             {profile.photo_path ? (
               <img
                 src={profile.photo_path}
-                alt={profile.full_name}
+                alt={fullName}
                 className="h-[72px] w-[72px] shrink-0 rounded-full object-cover ring-2 ring-white/[0.15]"
               />
             ) : (
               <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center rounded-full bg-white/[0.10] text-title1 text-white/60">
-                {profile.full_name.charAt(0)}
+                {fullName.charAt(0)}
               </div>
             )}
-            <div className="min-w-0 pt-1">
-              <h2 className="text-title3 truncate text-white">{profile.full_name}</h2>
-              {profile.headline && (
-                <p className="text-subhead mt-0.5 text-white/65 line-clamp-2">{profile.headline}</p>
-              )}
-              {profile.location && (
-                <div className="text-caption1 mt-2 flex items-center gap-1.5 text-white/40">
-                  <MapPin className="h-3 w-3" />
-                  {profile.location}
-                </div>
-              )}
+            <div className="min-w-0 flex-1 pt-1">
+              <EditableField
+                value={fullName}
+                onChange={setFullName}
+                placeholder="Full name"
+                className="text-title3 text-white font-medium"
+              />
+              <EditableField
+                value={headline}
+                onChange={setHeadline}
+                placeholder="Professional headline"
+                className="text-subhead mt-0.5 text-white/65"
+              />
+              <div className="mt-2 flex items-center gap-1.5 text-white/40">
+                <MapPin className="h-3 w-3 shrink-0" />
+                <EditableField
+                  value={location}
+                  onChange={setLocation}
+                  placeholder="Location"
+                  className="text-caption1 text-white/40"
+                />
+              </div>
             </div>
           </div>
 
-          {profile.bio && (
-            <>
-              <div className="my-5 h-px bg-white/[0.10]" />
-              <p className="text-subhead leading-[1.6] text-white/60">{profile.bio}</p>
-            </>
-          )}
+          <div className="my-5 h-px bg-white/[0.10]" />
+          <div>
+            <h3 className="text-caption1 mb-2 font-medium uppercase tracking-[0.1em] text-white/35">
+              About
+            </h3>
+            <EditableField
+              value={bio}
+              onChange={setBio}
+              placeholder="Short bio"
+              multiline
+              className="text-subhead leading-[1.6] text-white/60"
+            />
+          </div>
 
           {profile.experiences && profile.experiences.length > 0 && (
             <>
@@ -724,15 +838,23 @@ function ProfilePreview({
 
       {/* Bottom action */}
       <div className="animate-fade-up delay-600 relative z-10 pt-6">
+        {saveError && (
+          <p className="mb-2 text-center text-[13px] text-red-400/80">{saveError}</p>
+        )}
         <button
-          className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-body font-semibold text-white/90 transition-all active:scale-[0.98] active:bg-white/[0.08]"
+          className="flex h-[56px] w-full items-center justify-center rounded-[16px] text-body font-semibold text-white/90 transition-all active:scale-[0.98] active:bg-white/[0.08] disabled:opacity-50"
           style={{
             background: "oklch(1 0 0 / 5%)",
             boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 20%), 0 0 30px oklch(0.4 0.12 275 / 12%)",
           }}
-          onClick={onContinue}
+          onClick={handleContinue}
+          disabled={saving || !fullName.trim()}
         >
-          Continue
+          {saving ? (
+            <Loader2 className="h-4 w-4 animate-spin text-white/60" />
+          ) : (
+            "Confirm & Continue"
+          )}
         </button>
       </div>
     </div>
