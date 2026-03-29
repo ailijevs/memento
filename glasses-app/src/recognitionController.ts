@@ -11,20 +11,24 @@ type StartRecognitionPayload = {
 };
 
 export class RecognitionController {
-  private readonly socketServer: SocketServer;
+  private readonly getSocketServer: () => SocketServer;
   private readonly backendClient: BackendClient;
   private readonly getSession: () => AppSession | null;
   private isRunning = false;
   private activeClientId: string | null = null;
 
   constructor(params: {
-    socketServer: SocketServer;
+    getSocketServer: () => SocketServer;
     backendClient: BackendClient;
     getSession: () => AppSession | null;
   }) {
-    this.socketServer = params.socketServer;
+    this.getSocketServer = params.getSocketServer;
     this.backendClient = params.backendClient;
     this.getSession = params.getSession;
+  }
+
+  private get socketServer(): SocketServer {
+    return this.getSocketServer();
   }
 
   async handleSocketCommand(clientId: string, message: IncomingSocketMessage): Promise<void> {

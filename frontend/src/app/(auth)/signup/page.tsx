@@ -9,17 +9,6 @@ import { Aurora } from "@/components/aurora";
 
 const FIELDS = [
   {
-    key: "name",
-    label: "Full Name",
-    type: "text" as const,
-    placeholder: "Jane Smith",
-    autoComplete: "name",
-    color: [155, 80, 255] as const,
-    glow: "rgba(155,80,255,0.45)",
-    pos: { left: 22, top: 36 },
-    float: "float-1 14s ease-in-out infinite",
-  },
-  {
     key: "email",
     label: "Email",
     type: "email" as const,
@@ -27,8 +16,8 @@ const FIELDS = [
     autoComplete: "email",
     color: [100, 75, 240] as const,
     glow: "rgba(100,75,240,0.45)",
-    pos: { left: 72, top: 33 },
-    float: "float-2 16s ease-in-out infinite",
+    pos: { left: 25, top: 36 },
+    float: "float-1 14s ease-in-out infinite",
   },
   {
     key: "password",
@@ -38,9 +27,20 @@ const FIELDS = [
     autoComplete: "new-password",
     color: [70, 110, 230] as const,
     glow: "rgba(70,110,230,0.45)",
-    pos: { left: 30, top: 56 },
-    float: "float-3 13s ease-in-out infinite",
+    pos: { left: 72, top: 33 },
+    float: "float-2 16s ease-in-out infinite",
     minLength: 6,
+  },
+  {
+    key: "confirm_password",
+    label: "Confirm Password",
+    type: "password" as const,
+    placeholder: "Repeat password",
+    autoComplete: "new-password",
+    color: [155, 80, 255] as const,
+    glow: "rgba(155,80,255,0.45)",
+    pos: { left: 45, top: 56 },
+    float: "float-3 13s ease-in-out infinite",
   },
 ];
 
@@ -182,13 +182,16 @@ export default function SignupPage() {
   }, []);
 
   async function handleSubmit() {
+    if (values[1] !== values[2]) {
+      setError("Passwords do not match");
+      return;
+    }
     setError(null);
     setLoading(true);
     const supabase = createClient();
     const { error } = await supabase.auth.signUp({
-      email: values[1],
-      password: values[2],
-      options: { data: { full_name: values[0] } },
+      email: values[0],
+      password: values[1],
     });
     if (error) {
       setError(error.message);

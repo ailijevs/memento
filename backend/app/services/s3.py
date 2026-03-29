@@ -96,6 +96,36 @@ class S3Service:
 
         self.client.delete_object(Bucket=cleaned_bucket_name, Key=cleaned_s3_key)
 
+    def get_profile_picture_presigned_url(
+        self,
+        *,
+        s3_key: str,
+        bucket_name: str,
+        expires_in_seconds: int = 3600,
+    ) -> Any:
+        """Return a pre-signed URL for a profile picture object."""
+        cleaned_bucket_name = bucket_name.strip()
+        if not cleaned_bucket_name:
+            raise ValueError("bucket_name must not be empty.")
+
+        if expires_in_seconds <= 0:
+            raise ValueError("expires_in_seconds must be greater than 0.")
+
+        cleaned_s3_key = s3_key.strip()
+        if not cleaned_s3_key:
+            raise ValueError("s3_key must not be empty.")
+
+        try:
+            return self.client.generate_presigned_url(
+                "get_object",
+                Params={"Bucket": cleaned_bucket_name, "Key": cleaned_s3_key},
+                ExpiresIn=expires_in_seconds,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to generate pre-signed URL for profile key '{cleaned_s3_key}'."
+            ) from exc
+
     def _create_client(self) -> Any:
         """Create a boto3 S3 client when one is not injected."""
         try:

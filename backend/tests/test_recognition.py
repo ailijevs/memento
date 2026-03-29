@@ -1,12 +1,17 @@
 """Tests for the facial recognition feature."""
 
 import base64
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
+from app.api.recognition import (
+    _attach_presigned_profile_photo_urls,
+    _resolve_presigned_url_ttl_seconds,
+)
 from app.main import app
 from app.schemas import (
     EventProcessingStatus,
@@ -478,6 +483,7 @@ class TestDetectEndpoint:
         dal.get_by_id.return_value = MagicMock(
             event_id=uuid4(),
             indexing_status=EventProcessingStatus.COMPLETED,
+            ends_at=None,
         )
         mock_dal_cls.return_value = dal
         svc = MagicMock()
@@ -499,3 +505,56 @@ class TestDetectEndpoint:
             image_bytes=b"bytes",
             collection_id="memento_event_abc",
         )
+
+
+class TestPresignedProfilePhotoUrls:
+    """Tests for pre-signed profile photo URL attachment."""
+
+    @patch("app.api.recognition.S3Service")
+    @patch("app.api.recognition.get_settings")
+    @patch("app.api.recognition._resolve_presigned_url_ttl_seconds")
+    def test_attach_passes_computed_ttl_to_s3_service(
+        self,
+        mock_resolve_ttl,
+        mock_get_settings,
+        mock_s3_service_cls,
+    ):
+        """Attach helper passes resolved TTL to S3 pre-sign call."""
+        mock_get_settings.return_value = MagicMock(s3_bucket_name="bucket")
+        mock_resolve_ttl.return_value = 321
+        mock_s3_service = MagicMock()
+        mock_s3_service.get_profile_picture_presigned_url.return_value = "https://example.com/url"
+        mock_s3_service_cls.return_value = mock_s3_service
+
+        cards = [
+            ProfileCard(
+                user_id="user-1",
+                full_name="Test User",
+                headline="Engineer",
+                face_similarity=90.0,
+                photo_path="profiles/user-1-onboarding.jpg",
+            )
+        ]
+        event_end_time = datetime.now(timezone.utc) + timedelta(hours=1)
+
+        result = _attach_presigned_profile_photo_urls(
+            profile_cards=cards,
+            event_end_time=event_end_time,
+        )
+
+        assert result[0].photo_path == "https://example.com/url"
+        mock_resolve_ttl.assert_called_once_with(event_end_time)
+        mock_s3_service.get_profile_picture_presigned_url.assert_called_once_with(
+            s3_key="profiles/user-1-onboarding.jpg",
+            bucket_name="bucket",
+            expires_in_seconds=321,
+        )
+
+    def test_resolve_ttl_defaults_to_ten_minutes_when_event_ended(self):
+        """Expired events use 10-minute fallback TTL."""
+        expired_end_time = datetime.now(timezone.utc) - timedelta(seconds=5)
+        assert _resolve_presigned_url_ttl_seconds(expired_end_time) == 600
+
+    def test_resolve_ttl_defaults_to_ten_minutes_when_event_end_missing(self):
+        """Missing event end time uses 10-minute fallback TTL."""
+        assert _resolve_presigned_url_ttl_seconds(None) == 600
