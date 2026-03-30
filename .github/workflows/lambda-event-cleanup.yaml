@@ -1,24 +1,55 @@
 name: Deploy Event Cleanup Lambda
 
 on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'backend/lambdas/event_cleanup/**'
+      - 'backend/app/**'
+      - '.github/workflows/lambda-event-cleanup.yaml'
   push:
     branches:
       - main
     paths:
-      - 'backend/lambdas/event_cleanup/handler.py'
-      - 'backend/lambdas/event_cleanup/requirements.txt'
-      - 'backend/app/config.py'
-      - 'backend/app/db/supabase.py'
-      - 'backend/app/dals/base_dal.py'
-      - 'backend/app/dals/event_dal.py'
-      - 'backend/app/services/rekognition.py'
-      - 'backend/app/schemas/__init__.py'
-      - 'backend/app/schemas/event.py'
+      - 'backend/lambdas/event_cleanup/**'
+      - 'backend/app/**'
       - '.github/workflows/lambda-event-cleanup.yaml'
 
 jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+
+    env:
+      ECR_REPOSITORY: memento-event-cleanup
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Lambda image
+        working-directory: backend
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            -t $ECR_REPOSITORY \
+            -f lambdas/event_cleanup/Dockerfile \
+            .
+
+      - name: Validate Lambda imports
+        run: |
+          docker run --rm \
+            --entrypoint python \
+            $ECR_REPOSITORY \
+            -c "import handler"
+
   deploy:
     runs-on: ubuntu-latest
+    needs: validate
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
       contents: read
