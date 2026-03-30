@@ -478,6 +478,7 @@ def _is_safe_image_url(url: str) -> bool:
     return True
 
 
+
 def _parse_graduation_year(end_date: str | None) -> int | None:
     """Best-effort parser for YYYY or YYYY-MM date strings."""
     if not end_date:
