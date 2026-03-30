@@ -42,13 +42,9 @@ export class BackendClient {
   }
 
   async recognizeFrame(payload: FrameDetectionRequest): Promise<FrameDetectionResponse> {
-    const serviceToken = process.env.RECOGNITION_SERVICE_TOKEN;
     const response = await fetch(this.recognitionUrl, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(serviceToken ? { Authorization: `Bearer ${serviceToken}` } : {}),
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 

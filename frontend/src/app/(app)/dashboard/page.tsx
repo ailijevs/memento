@@ -63,7 +63,6 @@ export default function DashboardPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const cameraActiveRef = useRef(false);
-  const accessTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -105,6 +104,7 @@ export default function DashboardPage() {
       accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
       socket.connect(session.access_token);
+
       setLoading(false);
     }
 
@@ -152,13 +152,9 @@ export default function DashboardPage() {
           const imageBase64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
           if (imageBase64) {
             try {
-              const accessToken = accessTokenRef.current;
               const res = await fetch(`${API_URL}/api/v1/recognition/detect`, {
                 method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   image_base64: imageBase64,
                   event_id: process.env.NEXT_PUBLIC_RECOGNITION_EVENT_ID ?? null,
