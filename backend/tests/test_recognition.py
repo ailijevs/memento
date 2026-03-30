@@ -341,6 +341,8 @@ class TestFrameDetectionResponseSchema:
 class TestDetectEndpoint:
     """Tests for POST /api/v1/recognition/detect."""
 
+    SERVICE_TOKEN = "test-service-token"
+
     @pytest.fixture
     def client(self):
         return TestClient(app)
@@ -350,8 +352,10 @@ class TestDetectEndpoint:
     @patch("app.api.recognition.build_event_collection_id")
     @patch("app.api.recognition.RekognitionService")
     @patch("app.api.recognition.get_admin_client")
+    @patch("app.auth.service_auth.get_settings")
     def test_detect_returns_200_with_matches(
         self,
+        mock_get_settings,
         mock_get_admin,
         mock_service_cls,
         mock_build_collection,
@@ -360,6 +364,7 @@ class TestDetectEndpoint:
         client,
     ):
         """Detect returns 200 and FrameDetectionResponse with profile cards."""
+        mock_get_settings.return_value = MagicMock(recognition_service_token=self.SERVICE_TOKEN)
         mock_get_admin.return_value = MagicMock()
         mock_decode.return_value = b"decoded-image-bytes"
         mock_build_collection.return_value = "memento_faces"
@@ -393,6 +398,7 @@ class TestDetectEndpoint:
                 "image_base64": SAMPLE_IMAGE_BASE64,
                 "event_id": None,
             },
+            headers={"Authorization": f"Bearer {self.SERVICE_TOKEN}"},
         )
 
         assert response.status_code == 200
@@ -411,14 +417,17 @@ class TestDetectEndpoint:
     @patch("app.api.recognition.decode_base64_image")
     @patch("app.api.recognition.RekognitionService")
     @patch("app.api.recognition.get_admin_client")
+    @patch("app.auth.service_auth.get_settings")
     def test_detect_invalid_base64_returns_400(
         self,
+        mock_get_settings,
         mock_get_admin,
         mock_service_cls,
         mock_decode,
         client,
     ):
         """Invalid base64 image returns 400."""
+        mock_get_settings.return_value = MagicMock(recognition_service_token=self.SERVICE_TOKEN)
         mock_get_admin.return_value = MagicMock()
         mock_decode.side_effect = ValueError("bad base64")
 
@@ -428,6 +437,7 @@ class TestDetectEndpoint:
                 "image_base64": SAMPLE_IMAGE_BASE64,
                 "event_id": None,
             },
+            headers={"Authorization": f"Bearer {self.SERVICE_TOKEN}"},
         )
 
         assert response.status_code == 400
@@ -436,14 +446,17 @@ class TestDetectEndpoint:
     @patch("app.api.recognition.decode_base64_image")
     @patch("app.api.recognition.RekognitionService")
     @patch("app.api.recognition.get_admin_client")
+    @patch("app.auth.service_auth.get_settings")
     def test_detect_rekognition_error_returns_502(
         self,
+        mock_get_settings,
         mock_get_admin,
         mock_service_cls,
         mock_decode,
         client,
     ):
         """RekognitionError from service returns 502."""
+        mock_get_settings.return_value = MagicMock(recognition_service_token=self.SERVICE_TOKEN)
         mock_get_admin.return_value = MagicMock()
         mock_decode.return_value = b"bytes"
         svc = MagicMock()
@@ -456,6 +469,7 @@ class TestDetectEndpoint:
                 "image_base64": SAMPLE_IMAGE_BASE64,
                 "event_id": None,
             },
+            headers={"Authorization": f"Bearer {self.SERVICE_TOKEN}"},
         )
 
         assert response.status_code == 502
@@ -466,8 +480,10 @@ class TestDetectEndpoint:
     @patch("app.api.recognition.build_event_collection_id")
     @patch("app.api.recognition.RekognitionService")
     @patch("app.api.recognition.get_admin_client")
+    @patch("app.auth.service_auth.get_settings")
     def test_detect_with_event_id_uses_event_collection(
         self,
+        mock_get_settings,
         mock_get_admin,
         mock_service_cls,
         mock_build_collection,
@@ -476,6 +492,7 @@ class TestDetectEndpoint:
         client,
     ):
         """When event_id is provided, collection_id is built from event."""
+        mock_get_settings.return_value = MagicMock(recognition_service_token=self.SERVICE_TOKEN)
         mock_get_admin.return_value = MagicMock()
         mock_decode.return_value = b"bytes"
         mock_build_collection.return_value = "memento_event_abc"
@@ -497,6 +514,7 @@ class TestDetectEndpoint:
                 "image_base64": SAMPLE_IMAGE_BASE64,
                 "event_id": str(event_id),
             },
+            headers={"Authorization": f"Bearer {self.SERVICE_TOKEN}"},
         )
 
         assert response.status_code == 200
@@ -505,6 +523,45 @@ class TestDetectEndpoint:
             image_bytes=b"bytes",
             collection_id="memento_event_abc",
         )
+
+    def test_detect_missing_authorization_returns_401(self, client):
+        """Missing Authorization header returns 401."""
+        response = client.post(
+            "/api/v1/recognition/detect",
+            json={
+                "image_base64": SAMPLE_IMAGE_BASE64,
+                "event_id": None,
+            },
+        )
+        assert response.status_code == 401
+
+    @patch("app.auth.service_auth.verify_jwt")
+    @patch("app.auth.service_auth.get_settings")
+    def test_detect_invalid_authorization_returns_401(
+        self,
+        mock_get_settings,
+        mock_verify_jwt,
+        client,
+    ):
+        """Invalid Authorization header returns 401."""
+        from fastapi import HTTPException
+
+        mock_get_settings.return_value = MagicMock(recognition_service_token=self.SERVICE_TOKEN)
+        mock_verify_jwt.side_effect = HTTPException(
+            status_code=401,
+            detail="Invalid token payload format",
+        )
+
+        response = client.post(
+            "/api/v1/recognition/detect",
+            json={
+                "image_base64": SAMPLE_IMAGE_BASE64,
+                "event_id": None,
+            },
+            headers={"Authorization": "Bearer not-a-token"},
+        )
+
+        assert response.status_code == 401
 
 
 class TestPresignedProfilePhotoUrls:

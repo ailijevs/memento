@@ -5,7 +5,7 @@ import math
 import time
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.config import get_settings
 from app.dals.event_dal import EventDAL
@@ -16,6 +16,7 @@ from app.schemas import (
     FrameDetectionResponse,
     ProfileCard,
 )
+from app.auth.service_auth import require_recognition_service_auth
 from app.services.profile_card_builder import ProfileCardBuilder
 from app.services.rekognition import (
     RekognitionError,
@@ -28,7 +29,11 @@ router = APIRouter(prefix="/recognition", tags=["recognition"])
 logger = logging.getLogger(__name__)
 
 
-@router.post("/detect", response_model=FrameDetectionResponse)
+@router.post(
+    "/detect",
+    response_model=FrameDetectionResponse,
+    dependencies=[Depends(require_recognition_service_auth)],
+)
 async def detect_faces_in_frame(
     request: FrameDetectionRequest,
 ) -> FrameDetectionResponse:
