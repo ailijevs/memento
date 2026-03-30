@@ -21,8 +21,12 @@ This structure keeps V&V artifacts in `docs/verification/` while aligning with t
 | UT-01 | FR-3.1 | pytest | Yes | Yes | [GitHub Actions log](https://github.com/ailijevs/memento-1/actions) | Once per build |
 | UT-02 | FR-3.1 | pytest | Yes | Yes | [GitHub Actions log](https://github.com/ailijevs/memento-1/actions) | Once per build |
 | IT-01 | FR-1.x | pytest | Yes | Yes | [GitHub Actions log](https://github.com/ailijevs/memento-1/actions) | Once per build |
-| MT-01 | FR-3.1 | Manual | No | N/A | [docs/verification/manual-test-report-001.md](manual-test-report-001.md) | Every two weeks |
-| MT-02 | FR-1.x | Postman/curl | Partial | No | Not completed yet – target: 2026-02-14 | Every two weeks |
+| MT-01 | FR-3.1 | Manual | No | N/A | [manual-test-report-001.md](manual-reports/manual-test-report-001.md) | Every two weeks |
+| MT-02 | FR-Recognition-Storage | AWS CLI + Manual API/UI | Partial | No | [manual-test-report-002.md](manual-reports/manual-test-report-002.md) | Every two weeks |
+| MT-03 | FR-Event-Indexer-Lambda | GitHub Actions + AWS Lambda + CloudWatch | Partial | Partial (validation in CI) | [manual-test-report-003.md](manual-reports/manual-test-report-003.md) | On Lambda workflow change |
+| MT-04 | FR-Event-Cleanup-Lambda | GitHub Actions + AWS Lambda + CloudWatch | Partial | Partial (validation in CI) | [manual-test-report-004.md](manual-reports/manual-test-report-004.md) | On Lambda workflow change |
+| MT-05 | FR-WebSocket-Realtime-Recognition | Browser DevTools + WebSocket server logs | No | No | [manual-test-report-005.md](manual-reports/manual-test-report-005.md) | Every two weeks |
+| MT-06 | FR-MentraOS-End-to-End-Recognition | MentraOS device/webview + proxy logs | No | No | [manual-test-report-006.md](manual-reports/manual-test-report-006.md) | Before release |
 
 ### Legend
 
