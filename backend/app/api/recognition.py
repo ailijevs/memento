@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from app.auth.service_auth import require_recognition_service_auth
 from app.config import get_settings
 from app.dals.event_dal import EventDAL
 from app.db.supabase import get_admin_client
@@ -16,7 +17,6 @@ from app.schemas import (
     FrameDetectionResponse,
     ProfileCard,
 )
-from app.auth.service_auth import require_recognition_service_auth
 from app.services.profile_card_builder import ProfileCardBuilder
 from app.services.rekognition import (
     RekognitionError,
