@@ -87,7 +87,6 @@ export default function DashboardPage() {
 
       accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
-      console.log("token: ", session.access_token);
       socket.connect(session.access_token);
       setLoading(false);
     }
