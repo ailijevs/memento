@@ -1,6 +1,7 @@
 import { createServer, IncomingMessage, Server as HttpServer } from 'http';
 import { randomUUID } from 'crypto';
 import { WebSocketServer, WebSocket } from 'ws';
+import { extractTokenFromQueryParams, verifyJwt } from './auth.ts';
 
 export type IncomingSocketMessage = {
   type: string;
@@ -10,6 +11,7 @@ export type IncomingSocketMessage = {
 type ClientSession = {
   id: string;
   socket: WebSocket;
+  userId: string;
 };
 
 type MessageHandler = (clientId: string, message: IncomingSocketMessage) => void | Promise<void>;
@@ -36,7 +38,7 @@ export class SocketServer {
     this.wsServer = new WebSocketServer({ server: this.httpServer });
 
     this.wsServer.on('connection', (socket, request) => {
-      this.handleConnection(socket, request);
+      void this.handleConnection(socket, request);
     });
   }
 
@@ -93,15 +95,45 @@ export class SocketServer {
   }
 
   /** Register event handlers for a newly connected websocket client. */
-  private handleConnection(socket: WebSocket, request: IncomingMessage): void {
+  private async handleConnection(socket: WebSocket, request: IncomingMessage): Promise<void> {
+    const token = extractTokenFromQueryParams(request.url ?? null);
+    if (!token) {
+      socket.send(
+        JSON.stringify({
+          type: 'error',
+          payload: { reason: 'missing_auth_token' },
+        } satisfies IncomingSocketMessage),
+      );
+      socket.close(1008, 'Missing auth token');
+      return;
+    }
+
+    let userId: string;
+    try {
+      const payload = await verifyJwt(token);
+      userId = payload.sub;
+    } catch (error) {
+      console.warn('Rejected websocket connection: invalid token', error);
+      socket.send(
+        JSON.stringify({
+          type: 'error',
+          payload: { reason: 'invalid_auth_token' },
+        } satisfies IncomingSocketMessage),
+      );
+      socket.close(1008, 'Invalid auth token');
+      return;
+    }
+
     const clientId = randomUUID();
-    this.clients.set(clientId, { id: clientId, socket });
-    console.log(`Client connected ${clientId} from ${request.socket.remoteAddress ?? 'unknown'}`);
+    this.clients.set(clientId, { id: clientId, socket, userId });
+    console.log(
+      `Client connected ${clientId} (user ${userId}) from ${request.socket.remoteAddress ?? 'unknown'}`,
+    );
 
     socket.send(
       JSON.stringify({
         type: 'connected',
-        payload: { clientId },
+        payload: { clientId, userId },
       } satisfies IncomingSocketMessage),
     );
 
