@@ -49,6 +49,7 @@ export default function DashboardPage() {
   const cameraActiveRef = useRef(false);
   // Cache compatibility results per user_id so we don't refetch on every frame
   const compatCacheRef = useRef<Map<string, CompatibilityResponse>>(new Map());
+  const accessTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -83,12 +84,14 @@ export default function DashboardPage() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
+        accessTokenRef.current = null;
         setLoading(false);
         return;
       }
 
+      accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
-      socket.connect();
+      socket.connect(session.access_token);
       setLoading(false);
     }
 
@@ -230,7 +233,9 @@ export default function DashboardPage() {
 
     setCaptureLoading(true);
     try {
-      if (!socket.isConnected()) socket.connect();
+      if (!socket.isConnected()) {
+        socket.connect(accessTokenRef.current ?? undefined);
+      }
       const connected = await waitForSocketConnection(socket);
       if (connected) {
         const sent = socket.send({
