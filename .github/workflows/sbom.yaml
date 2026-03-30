@@ -1,0 +1,80 @@
+# SBOM Generation and Vulnerability Scanning Pipeline
+# Generates a CycloneDX SBOM using Syft and runs vulnerability analysis with Grype
+# SBOM is committed back to docs/SBOM.json on every push
+
+name: SBOM
+
+on:
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  security-events: write
+
+jobs:
+  sbom:
+    name: Generate SBOM & Scan Vulnerabilities
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Syft
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Generate SBOM with Syft (CycloneDX JSON)
+        run: |
+          syft dir:. \
+            --config .syft.yaml \
+            -o cyclonedx-json=docs/SBOM.json
+        env:
+          SYFT_QUIET: false
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SBOM
+          path: docs/SBOM.json
+          retention-days: 30
+
+      - name: Install Grype
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+      - name: Run vulnerability scan with Grype
+        run: |
+          grype sbom:docs/SBOM.json \
+            --output table \
+            --fail-on critical \
+            || echo "::warning::Grype found vulnerabilities — review the output above"
+
+      - name: Upload Grype vulnerability report
+        if: always()
+        run: |
+          grype sbom:docs/SBOM.json --output json > grype-report.json || true
+
+      - name: Upload vulnerability report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vulnerability-report
+          path: grype-report.json
+          retention-days: 30
+
+      - name: Commit updated SBOM to repository
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/SBOM.json
+          git diff --cached --quiet || git commit -m "chore: update SBOM.json [skip ci]"
+          git push origin HEAD

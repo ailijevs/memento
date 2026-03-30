@@ -1,0 +1,28 @@
+# Syft configuration for Memento SBOM generation
+# See: https://github.com/anchore/syft#configuration
+
+file:
+  metadata:
+    digests:
+      - sha256
+
+catalogers:
+  include:
+    - python-requirements-cataloger
+    - python-package-cataloger
+    - javascript-package-cataloger
+    - node-modules-cataloger
+
+exclude:
+  - "**/.git/**"
+  - "**/node_modules/**"
+  - "**/venv/**"
+  - "**/.venv/**"
+  - "**/docs/**"
+  - "**/data/**"
+  - "**/__pycache__/**"
+  - "**/*.pyc"
+
+source:
+  name: memento
+  version: "1.0"
