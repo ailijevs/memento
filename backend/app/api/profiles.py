@@ -182,7 +182,7 @@ async def onboard_from_linkedin_url(
             )
             image_saved = True
         except (ProfileImageError, RuntimeError, ValueError):
-            photo_path = None
+            photo_path = enrichment.profile_image_url
             image_saved = False
 
     existing = await dal.get_by_user_id(current_user.id)
@@ -190,7 +190,7 @@ async def onboard_from_linkedin_url(
         saved_profile = await dal.update(
             current_user.id,
             ProfileUpdate(
-                full_name=enrichment.full_name,
+                full_name=existing.full_name or _title_case_name(enrichment.full_name),
                 headline=enrichment.headline,
                 bio=enrichment.bio,
                 location=enrichment.location,
@@ -213,7 +213,7 @@ async def onboard_from_linkedin_url(
         saved_profile = await dal.create(
             current_user.id,
             ProfileCreate(
-                full_name=enrichment.full_name,
+                full_name=_title_case_name(enrichment.full_name),
                 headline=enrichment.headline,
                 bio=enrichment.bio,
                 location=enrichment.location,
@@ -442,6 +442,11 @@ async def upload_resume(
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+
+def _title_case_name(name: str) -> str:
+    """Title-case a name string, e.g. 'aleksandar ilijevski' → 'Aleksandar Ilijevski'."""
+    return name.strip().title()
 
 
 def _parse_graduation_year(end_date: str | None) -> int | None:

@@ -51,10 +51,12 @@ export default function DashboardPage() {
       } = await supabase.auth.getSession();
 
       if (!session) {
+        accessTokenRef.current = null;
         setLoading(false);
         return;
       }
 
+      accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
       try {
         const [events, organized] = await Promise.all([

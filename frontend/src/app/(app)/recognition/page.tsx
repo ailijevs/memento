@@ -9,6 +9,7 @@ import { Camera, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const RESULTS_CACHE_KEY = "recognition_results_cache";
 
 type FrameDetectionResponse = {
   matches: ProfileCard[];
@@ -32,6 +33,23 @@ interface RecognitionResult {
   profile?: ProfileResponse;
 }
 
+function loadCachedResults(): RecognitionResult[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(RESULTS_CACHE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as RecognitionResult[];
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedResults(results: RecognitionResult[]) {
+  try {
+    sessionStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify(results));
+  } catch { /* storage full — silently ignore */ }
+}
+
 
 export default function RecognitionPage() {
   const router = useRouter();
@@ -43,7 +61,7 @@ export default function RecognitionPage() {
     }
     return process.env.NEXT_PUBLIC_RECOGNITION_EVENT_ID?.trim() ?? null;
   }, [searchParams]);
-  const [results, setResults] = useState<RecognitionResult[]>([]);
+  const [results, setResults] = useState<RecognitionResult[]>(loadCachedResults);
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
@@ -112,7 +130,10 @@ export default function RecognitionPage() {
     };
   }, []);
 
-  // Stop camera stream and capture loop
+  useEffect(() => {
+    saveCachedResults(results);
+  }, [results]);
+
   function stopCameraStream() {
     cameraActiveRef.current = false;
     if (streamRef.current) {
