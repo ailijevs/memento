@@ -16,6 +16,11 @@ export default async function AppLayout({
     redirect("/login");
   }
 
+  const isEmailProvider = user.app_metadata?.provider === "email";
+  if (isEmailProvider && !user.email_confirmed_at) {
+    redirect("/signup?verify=pending");
+  }
+
   return (
     <>
       <div className="pb-20">{children}</div>
