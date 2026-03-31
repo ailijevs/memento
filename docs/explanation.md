@@ -26,6 +26,10 @@ External services:
 | PDL / Exa.ai | LinkedIn profile enrichment |
 | OpenAI | AI-generated profile summaries |
 
+### Scalability
+
+The system is designed to scale horizontally at each layer. The FastAPI backend is stateless and can run multiple instances behind a load balancer since all state lives in Supabase and AWS. Rekognition collections are isolated per event, so adding more events does not degrade recognition performance for existing ones. The Lambda-based face indexing pipeline scales automatically with AWS, and each Lambda invocation processes one event independently. The main scalability constraint is Supabase connection limits on the free tier, which would need to be addressed before a high-traffic production deployment.
+
 ---
 
 ## Architecture Diagrams
