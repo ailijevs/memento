@@ -1,4 +1,4 @@
-# How-To Memento
+# How-To Guide for Memento
 
 ---
 
