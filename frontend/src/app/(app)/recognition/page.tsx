@@ -240,15 +240,14 @@ export default function RecognitionPage() {
     try {
       if (!socket.isConnected()) socket.connect(accessTokenRef.current ?? undefined);
       const connected = await waitForSocketConnection(socket);
-      if (!connected) return;
-
-      const sent = socket.send(
-        capturing
-          ? { type: "stop_recognition" }
-          : { type: "start_recognition", payload: selectedEventId ? { event_id: selectedEventId } : undefined },
-      );
-      if (!sent) return;
-      if (capturing) setCapturing(false);
+      if (connected) {
+        const sent = socket.send(
+          capturing
+            ? { type: "stop_recognition" }
+            : { type: "start_recognition", payload: selectedEventId ? { event_id: selectedEventId } : undefined },
+        );
+        if (sent && capturing) setCapturing(false);
+      }
     } catch { /* ignore */ }
     setCaptureLoading(false);
   }
