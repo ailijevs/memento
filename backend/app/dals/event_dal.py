@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
+from app.dals.membership_dal import MembershipDAL
 from app.schemas import EventCreate, EventResponse, EventUpdate
 from supabase import Client
 
@@ -37,24 +38,37 @@ class EventDAL(BaseDAL):
         """
         Get all events a user is a member of.
         """
-        # First get event IDs from memberships
-        memberships = (
-            self.client.table("event_memberships")
-            .select("event_id")
-            .eq("user_id", str(user_id))
-            .execute()
-        )
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-        if not memberships.data:
+        memberships = await MembershipDAL(self.client).get_user_memberships(user_id)
+        if not memberships:
             return []
 
-        event_ids = [m["event_id"] for m in memberships.data]
+        event_ids = [str(membership.event_id) for membership in memberships]
 
         # Then get event details
         response = (
             self.client.table(self.TABLE)
             .select("*")
             .in_("event_id", event_ids)
+            .eq("is_active", True)
+            .gte("ends_at", now_iso)
+            .order("starts_at", desc=False)
+            .execute()
+        )
+
+        return [EventResponse(**event) for event in response.data]
+
+    async def get_organized_events(self, user_id: UUID) -> list[EventResponse]:
+        """
+        Get all not-yet-ended events (active and inactive) created by the user.
+        """
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        response = (
+            self.client.table(self.TABLE)
+            .select("*")
+            .eq("created_by", str(user_id))
+            .gte("ends_at", now_iso)
             .order("starts_at", desc=False)
             .execute()
         )
@@ -79,6 +93,49 @@ class EventDAL(BaseDAL):
         response = self.client.table(self.TABLE).insert(insert_data).execute()
 
         return EventResponse(**response.data[0])
+
+    async def exists_duplicate(
+        self,
+        *,
+        name: str,
+        starts_at: datetime | None,
+        ends_at: datetime | None,
+        location: str | None,
+        created_by: UUID | None = None,
+        exclude_event_id: UUID | None = None,
+    ) -> bool:
+        """
+        Check whether an event already exists with same name, time window, and location.
+
+        Rules:
+        - If location is set, duplicates are global across creators.
+        - If location is null, duplicates are scoped to the same creator only.
+        """
+        query = self.client.table(self.TABLE).select("event_id").eq("name", name).limit(1)
+
+        if starts_at is None:
+            query = query.is_("starts_at", "null")
+        else:
+            query = query.eq("starts_at", starts_at.isoformat())
+
+        if ends_at is None:
+            query = query.is_("ends_at", "null")
+        else:
+            query = query.eq("ends_at", ends_at.isoformat())
+
+        if location is None:
+            query = query.is_("location", "null")
+            if created_by is None:
+                raise ValueError("created_by must be provided when location is null.")
+            query = query.eq("created_by", str(created_by))
+        else:
+            query = query.eq("location", location)
+
+        if exclude_event_id is not None:
+            query = query.neq("event_id", str(exclude_event_id))
+
+        response = query.execute()
+        return bool(response.data)
 
     async def update(self, event_id: UUID, data: EventUpdate) -> EventResponse | None:
         """
@@ -109,14 +166,9 @@ class EventDAL(BaseDAL):
 
     async def delete(self, event_id: UUID) -> bool:
         """
-        Delete an event (soft delete by setting is_active=False).
+        Delete an event (hard delete).
         """
-        response = (
-            self.client.table(self.TABLE)
-            .update({"is_active": False})
-            .eq("event_id", str(event_id))
-            .execute()
-        )
+        response = self.client.table(self.TABLE).delete().eq("event_id", str(event_id)).execute()
 
         return len(response.data) > 0
 
@@ -125,10 +177,12 @@ class EventDAL(BaseDAL):
         Get all active events (for discovery/listing).
         Respects RLS - only returns events user can see.
         """
+        now_iso = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         response = (
             self.client.table(self.TABLE)
             .select("*")
             .eq("is_active", True)
+            .gte("ends_at", now_iso)
             .order("starts_at", desc=False)
             .execute()
         )

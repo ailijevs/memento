@@ -1,6 +1,5 @@
 """Data Access Layer for event memberships."""
 
-from datetime import datetime, timezone
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
@@ -29,7 +28,7 @@ class MembershipDAL(BaseDAL):
             .execute()
         )
 
-        if response.data:
+        if response and response.data:
             return MembershipResponse(**response.data)
         return None
 
@@ -87,8 +86,6 @@ class MembershipDAL(BaseDAL):
 
         if data.role is not None:
             update_data["role"] = data.role.value
-        if data.checked_in_at is not None:
-            update_data["checked_in_at"] = data.checked_in_at.isoformat()
 
         if not update_data:
             return await self.get(event_id, user_id)
@@ -101,23 +98,7 @@ class MembershipDAL(BaseDAL):
             .execute()
         )
 
-        if response.data:
-            return MembershipResponse(**response.data[0])
-        return None
-
-    async def check_in(self, event_id: UUID, user_id: UUID) -> MembershipResponse | None:
-        """
-        Check in a user to an event.
-        """
-        response = (
-            self.client.table(self.TABLE)
-            .update({"checked_in_at": datetime.now(timezone.utc).isoformat()})
-            .eq("event_id", str(event_id))
-            .eq("user_id", str(user_id))
-            .execute()
-        )
-
-        if response.data:
+        if response and response.data:
             return MembershipResponse(**response.data[0])
         return None
 

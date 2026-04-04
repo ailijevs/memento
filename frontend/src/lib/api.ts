@@ -62,16 +62,48 @@ class ApiClient {
     return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
   }
 
-  async startCapture() {
-    return this.request<{ capturing: boolean }>("/api/v1/capture/start", { method: "POST" });
+  async getEvents() {
+    return this.request<EventResponse[]>("/api/v1/events");
   }
 
-  async stopCapture() {
-    return this.request<{ capturing: boolean }>("/api/v1/capture/stop", { method: "POST" });
+  async getMyEvents() {
+    return this.request<EventResponse[]>("/api/v1/events/me");
   }
 
-  async getCaptureState() {
-    return this.request<{ capturing: boolean }>("/api/v1/capture/state");
+  async getMyOrganizedEvents() {
+    return this.request<EventResponse[]>("/api/v1/events/organized");
+  }
+
+  async createEvent(data: EventCreateRequest) {
+    return this.request<EventResponse>("/api/v1/events", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteEvent(eventId: string) {
+    return this.request<void>(`/api/v1/events/${eventId}`, {
+      method: "DELETE",
+    });
+  }
+
+  async updateEvent(eventId: string, data: EventUpdateRequest) {
+    return this.request<EventResponse>(`/api/v1/events/${eventId}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async joinEvent(eventId: string) {
+    return this.request<MembershipResponse>(`/api/v1/events/${eventId}/join`, {
+      method: "POST",
+    });
+  }
+
+  async leaveEvent(eventId: string) {
+    return this.request<void>(`/api/v1/events/${eventId}/leave`, {
+      method: "DELETE",
+    });
   }
 
   async onboardFromLinkedIn(linkedinUrl: string) {
@@ -156,6 +188,22 @@ export interface EducationInput {
   end_date?: string | null;
 }
 
+export interface EventCreateRequest {
+  name: string;
+  starts_at?: string;
+  ends_at?: string;
+  location?: string;
+  is_active?: boolean;
+}
+
+export interface EventUpdateRequest {
+  name?: string;
+  starts_at?: string;
+  ends_at?: string;
+  location?: string;
+  is_active?: boolean;
+}
+
 // ─── Response types ───────────────────────────────────────────────────────────
 
 export interface ProfileResponse {
@@ -211,4 +259,24 @@ export interface ResumeParseResponse {
   message: string;
   extracted_data: Record<string, unknown>;
   profile_updated: boolean;
+}
+
+export interface EventResponse {
+  event_id: string;
+  created_by: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  is_active: boolean;
+  indexing_status: "pending" | "in_progress" | "completed" | "failed";
+  cleanup_status: "pending" | "in_progress" | "completed" | "failed";
+  created_at: string;
+}
+
+export interface MembershipResponse {
+  event_id: string;
+  user_id: string;
+  role: "owner" | "member";
+  joined_at: string;
 }

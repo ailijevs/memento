@@ -74,8 +74,8 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(profiles_router, prefix="/api/v1")
     app.include_router(events_router, prefix="/api/v1")
-    app.include_router(memberships_router, prefix="/api/v1")
-    app.include_router(consents_router, prefix="/api/v1")
+    app.include_router(memberships_router, prefix="/api/v1/events")
+    app.include_router(consents_router, prefix="/api/v1/events")
     app.include_router(recognition_router, prefix="/api/v1")
 
     @app.get("/")

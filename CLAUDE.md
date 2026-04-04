@@ -120,8 +120,7 @@ events
 
 event_memberships
 ├── (event_id, user_id) (PK)
-├── role (attendee | organizer | admin)
-└── checked_in_at
+└── role (attendee | organizer | admin)
 
 event_consents
 ├── (event_id, user_id) (PK)

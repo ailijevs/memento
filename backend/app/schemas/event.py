@@ -38,7 +38,8 @@ class EventBase(BaseModel):
 class EventCreate(EventBase):
     """Schema for creating a new event."""
 
-    pass
+    starts_at: datetime
+    ends_at: datetime
 
 
 class EventUpdate(BaseModel):
