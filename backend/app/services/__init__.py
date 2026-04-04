@@ -1,5 +1,6 @@
 """Service modules for external integrations."""
 
+from .compatibility import CompatibilityResult, CompatibilityService
 from .linkedin_enrichment import (
     LinkedInEnrichmentError,
     LinkedInEnrichmentService,
@@ -17,6 +18,8 @@ from .resume_parser import ResumeData, ResumeParser
 from .s3 import S3Service
 
 __all__ = [
+    "CompatibilityResult",
+    "CompatibilityService",
     "LinkedInEnrichmentError",
     "LinkedInEnrichmentService",
     "ProfileCardBuilder",
