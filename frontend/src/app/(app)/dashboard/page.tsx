@@ -101,10 +101,9 @@ export default function DashboardPage() {
         return;
       }
 
-      accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
-      socket.connect(session.access_token);
-
+      accessTokenRef.current = session.access_token;
+      socket.connect();
       setLoading(false);
     }
 
