@@ -41,10 +41,8 @@ export default function UserProfilePage() {
       api.setToken(session.access_token);
       try {
         const p = await api.getProfileById(userId);
-        if (!hadCache) {
-          setProfile(p);
-          sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(p));
-        }
+        setProfile(p);
+        sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(p));
       } catch {
         // If fetch fails and we already have cached data, keep showing it
       } finally {

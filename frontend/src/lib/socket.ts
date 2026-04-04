@@ -42,16 +42,29 @@ type MessageHandler = (message: SocketMessage) => void | Promise<void>;
  * Browser WebSocket client for the glasses-app websocket server.
  * Supports message fan-out to registered handlers.
  */
+const RECONNECT_DELAYS_MS = [2000, 4000, 8000, 15000, 30000];
+
 export class SocketClient {
-  private readonly url: string;
+  private readonly baseUrl: string;
   private socket: WebSocket | null = null;
   private readonly messageHandlers = new Set<MessageHandler>();
+  private shouldReconnect = false;
+  private reconnectAttempt = 0;
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private token: string | undefined = undefined;
 
   constructor(url?: string) {
-    this.url = url || process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8080";
+    this.baseUrl = url || process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:3001";
   }
 
-  connect(): void {
+  connect(token?: string): void {
+    this.shouldReconnect = true;
+    this.reconnectAttempt = 0;
+    this.token = token;
+    this._connect(token);
+  }
+
+  private _connect(token?: string): void {
     if (
       this.socket &&
       (this.socket.readyState === WebSocket.OPEN ||
@@ -60,10 +73,12 @@ export class SocketClient {
       return;
     }
 
-    this.socket = new WebSocket(this.url);
+    const connectionUrl = this.buildConnectionUrl(token);
+    this.socket = new WebSocket(connectionUrl);
 
     this.socket.onopen = () => {
-      console.log(`[SocketClient] Connected to ${this.url}`);
+      console.log(`[SocketClient] Connected to ${connectionUrl}`);
+      this.reconnectAttempt = 0;
     };
 
     this.socket.onmessage = (event) => {
@@ -82,8 +97,8 @@ export class SocketClient {
 
     this.socket.onerror = () => {
       // Browser WebSocket error events intentionally contain no detail.
-      // The most common cause is the glasses-app server not running at this.url.
-      console.warn(`[SocketClient] Could not connect to ${this.url} — is the glasses-app running?`);
+      // The most common cause is the glasses-app server not running at connectionUrl.
+      console.warn(`[SocketClient] Could not connect to ${connectionUrl} — is the glasses-app running?`);
     };
 
     this.socket.onclose = (event) => {
@@ -93,13 +108,29 @@ export class SocketClient {
         console.warn(`[SocketClient] Connection lost (code ${event.code})`);
       }
       this.socket = null;
+      if (this.shouldReconnect) {
+        this._scheduleReconnect();
+      }
     };
   }
 
+  private _scheduleReconnect(): void {
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    const delay = RECONNECT_DELAYS_MS[Math.min(this.reconnectAttempt, RECONNECT_DELAYS_MS.length - 1)];
+    this.reconnectAttempt++;
+    console.log(`[SocketClient] Reconnecting in ${delay / 1000}s (attempt ${this.reconnectAttempt})...`);
+    this.reconnectTimer = setTimeout(() => {
+      if (this.shouldReconnect) this._connect(this.token);
+    }, delay);
+  }
+
   disconnect(): void {
-    if (!this.socket) {
-      return;
+    this.shouldReconnect = false;
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
+    if (!this.socket) return;
     this.socket.close();
     this.socket = null;
   }
@@ -121,6 +152,16 @@ export class SocketClient {
 
   isConnected(): boolean {
     return this.socket?.readyState === WebSocket.OPEN;
+  }
+
+  private buildConnectionUrl(token?: string): string {
+    const url = new URL(this.baseUrl, typeof window === "undefined" ? undefined : window.location.href);
+
+    if (token) {
+      url.searchParams.set("token", token);
+    }
+
+    return url.toString();
   }
 
   private parseMessage(raw: unknown): SocketMessage | null {

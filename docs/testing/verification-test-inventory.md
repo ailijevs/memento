@@ -26,7 +26,12 @@
 | IT-02 | FR-2.1 | Resume file type validation rejects unsupported formats | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeParserFileType](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
 | IT-03 | FR-2.1 | Resume upload endpoint returns all fields (TestClient integration) | pytest | Marty | Yes | Yes | [`backend/tests/test_resume_parser.py` — TestResumeUploadEndpoint](https://github.com/ailijevs/memento/blob/main/backend/tests/test_resume_parser.py) |
 | MT-01 | FR-2.1 | Resume upload populates all profile fields in Supabase | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-001.md`](manual-reports/manual-test-report-001.md) |
-| MT-02 | FR-4.1 | Recognition endpoint returns ProfileCard data for known face | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-002.md`](manual-reports/manual-test-report-002.md) |
+| MT-02 | FR-Recognition-Storage | S3 image persistence | AWS CLI + Manual API/UI | Noddie | Partial | No | [`docs/testing/manual-reports/manual-test-report-002.md`](manual-reports/manual-test-report-002.md) |
+| MT-03 | FR-Event-Indexer-Lambda | Event indexer Lambda deployment | GitHub Actions + AWS Lambda + CloudWatch | Team | Partial | Partial (validation in CI) | [`docs/testing/manual-reports/manual-test-report-003.md`](manual-reports/manual-test-report-003.md) |
+| MT-04 | FR-Event-Cleanup-Lambda | Event cleanup Lambda deployment | GitHub Actions + AWS Lambda + CloudWatch | Team | Partial | Partial (validation in CI) | [`docs/testing/manual-reports/manual-test-report-004.md`](manual-reports/manual-test-report-004.md) |
+| MT-05 | FR-WebSocket-Realtime-Recognition | WebSocket real-time recognition | Browser DevTools + WebSocket server logs | Team | No | No | [`docs/testing/manual-reports/manual-test-report-005.md`](manual-reports/manual-test-report-005.md) |
+| MT-06 | FR-MentraOS-End-to-End-Recognition | MentraOS end-to-end recognition | MentraOS device/webview + proxy logs | Team | No | No | [`docs/testing/manual-reports/manual-test-report-006.md`](manual-reports/manual-test-report-006.md) |
+| MT-08 | FR-4.1 | Recognition endpoint returns ProfileCard data for known face | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-008.md`](manual-reports/manual-test-report-008.md) |
 | UAT-01 | FR-2.1, FR-2.3 | End-to-end resume upload onboarding user acceptance test | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-003-uat.md`](manual-reports/manual-test-report-003-uat.md) |
 
 ### Legend

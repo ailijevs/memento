@@ -9,6 +9,7 @@ import { Camera, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const RESULTS_CACHE_KEY = "recognition_results_cache";
 
 type FrameDetectionResponse = {
   matches: ProfileCard[];
@@ -32,10 +33,26 @@ interface RecognitionResult {
   profile?: ProfileResponse;
 }
 
+function loadCachedResults(): RecognitionResult[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = sessionStorage.getItem(RESULTS_CACHE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as RecognitionResult[];
+  } catch {
+    return [];
+  }
+}
+
+function saveCachedResults(results: RecognitionResult[]) {
+  try {
+    sessionStorage.setItem(RESULTS_CACHE_KEY, JSON.stringify(results));
+  } catch { /* storage full — silently ignore */ }
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const [results, setResults] = useState<RecognitionResult[]>([]);
+  const [results, setResults] = useState<RecognitionResult[]>(loadCachedResults);
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
@@ -46,6 +63,7 @@ export default function DashboardPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const cameraActiveRef = useRef(false);
+  const accessTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
@@ -79,12 +97,14 @@ export default function DashboardPage() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
+        accessTokenRef.current = null;
         setLoading(false);
         return;
       }
 
+      accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
-      socket.connect();
+      socket.connect(session.access_token);
       setLoading(false);
     }
 
@@ -101,7 +121,10 @@ export default function DashboardPage() {
     };
   }, []);
 
-  // Stop camera stream and capture loop
+  useEffect(() => {
+    saveCachedResults(results);
+  }, [results]);
+
   function stopCameraStream() {
     cameraActiveRef.current = false;
     if (streamRef.current) {
@@ -206,15 +229,16 @@ export default function DashboardPage() {
 
     setCaptureLoading(true);
     try {
-      if (!socket.isConnected()) socket.connect();
+      if (!socket.isConnected()) {
+        socket.connect(accessTokenRef.current ?? undefined);
+      }
       const connected = await waitForSocketConnection(socket);
-      if (!connected) return;
-
-      const sent = socket.send({
-        type: capturing ? "stop_recognition" : "start_recognition",
-      });
-      if (!sent) return;
-      if (capturing) setCapturing(false);
+      if (connected) {
+        const sent = socket.send({
+          type: capturing ? "stop_recognition" : "start_recognition",
+        });
+        if (sent && capturing) setCapturing(false);
+      }
     } catch { /* ignore */ }
     setCaptureLoading(false);
   }

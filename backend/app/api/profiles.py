@@ -1,8 +1,10 @@
 """API endpoints for user profiles."""
 
 import asyncio
+import ipaddress
 import logging
 from typing import Annotated, Any
+from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
@@ -166,7 +168,7 @@ async def onboard_from_linkedin_url(
 
     photo_path: str | None = None
     image_saved = False
-    if enrichment.profile_image_url:
+    if enrichment.profile_image_url and _is_safe_image_url(enrichment.profile_image_url):
         try:
             raw_image_bytes = await image_service.fetch_image_bytes(enrichment.profile_image_url)
             if not settings.s3_bucket_name:
@@ -182,7 +184,7 @@ async def onboard_from_linkedin_url(
             )
             image_saved = True
         except (ProfileImageError, RuntimeError, ValueError):
-            photo_path = enrichment.profile_image_url
+            photo_path = None
             image_saved = False
 
     existing = await dal.get_by_user_id(current_user.id)
@@ -458,6 +460,33 @@ async def upload_resume(
 def _title_case_name(name: str) -> str:
     """Title-case a name string, e.g. 'aleksandar ilijevski' → 'Aleksandar Ilijevski'."""
     return name.strip().title()
+
+
+def _is_safe_image_url(url: str) -> bool:
+    """Return True only for https URLs pointing to a public, non-private host."""
+    try:
+        parsed = urlparse(url.strip())
+    except Exception:
+        return False
+
+    if parsed.scheme != "https":
+        return False
+
+    host = parsed.hostname or ""
+    if not host:
+        return False
+
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return False
+
+    try:
+        addr = ipaddress.ip_address(host)
+        if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved:
+            return False
+    except ValueError:
+        pass  # domain name, not an IP — fine
+
+    return True
 
 
 def _parse_graduation_year(end_date: str | None) -> int | None:

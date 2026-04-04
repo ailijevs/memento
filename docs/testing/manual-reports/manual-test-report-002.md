@@ -3,21 +3,27 @@
 | Field | Value |
 |-------|-------|
 | **Report ID** | MT-002 |
-| **Date** | 2026-01-28 |
-| **Tester** | Marty |
+| **Date** | 2026-03-15 |
+| **Tester** | Noddie Mgbodille |
 | **Test Case ID** | MT-02 |
-| **Requirement ID** | FR-4.1 (Recognition returns profile card data) |
+| **Requirement ID** | FR-Recognition-Storage (S3 image persistence) |
 
 ---
 
 ## Test Steps
 
-1. Start the backend locally: `cd backend && uvicorn app.main:app --reload`
-2. Ensure at least one user is enrolled in the Rekognition collection (via seed data or manual enrollment)
-3. Capture a base64-encoded JPEG frame of a known enrolled user
-4. POST to `/api/v1/recognition/detect` with `{"image_base64": "<base64>", "event_id": null}`
-5. Verify the response contains `ProfileCard` objects (not raw `FaceMatch` data)
-6. Verify each `ProfileCard` includes condensed fields (`full_name`, `headline`, `company`, `photo_path`, `face_similarity`) and detail fields (`bio`, `experiences`, `education`, `linkedin_url`)
+1. Confirm AWS credentials and region used by backend are set (`AWS_REGION`, access key/secret, bucket env var).
+2. Verify target bucket exists and is reachable:
+   - `aws s3api head-bucket --bucket <bucket-name>`
+3. Start backend locally:
+   - `cd backend && uvicorn app.main:app --reload`
+4. Trigger image upload path used by recognition flow (via app UI or API route that writes to S3).
+5. Validate uploaded object appears in expected key prefix:
+   - `aws s3 ls s3://<bucket-name>/<prefix>/ --recursive | tail`
+6. Attempt retrieval using expected access path (presigned URL or backend retrieval endpoint).
+7. Negative test: intentionally use invalid bucket name in env and repeat upload; verify graceful failure and useful error message.
+8. Negative test: use unsupported file type or oversized payload and verify request validation behavior.
+9. Validate logs for request ID, bucket, key, and failure reason if upload fails.
 
 ---
 
@@ -25,17 +31,17 @@
 
 | Expected | Actual | Match? |
 |----------|--------|--------|
-| Response `matches` array contains `ProfileCard` objects | `matches` contains objects with `full_name`, `headline`, `face_similarity`, etc. | Yes |
-| Each card has `face_similarity` (renamed from `similarity`) | `face_similarity` field present with correct percentage | Yes |
-| Each card has `experience_similarity` (nullable) | Field present, value `null` (not yet implemented) | Yes |
-| Detail fields (`bio`, `location`, `experiences`, `education`) are populated from the profiles table | All fields populated for enrolled users | Yes |
-| Cards for users without `allow_profile_display` consent are excluded when `event_id` is provided | Tested with consent disabled; card correctly omitted | Yes |
+| Bucket connectivity check succeeds for configured bucket | _Fill in after run_ | _TBD_ |
+| Upload returns success and stores object in expected key path | _Fill in after run_ | _TBD_ |
+| Retrieval/presigned access works for uploaded object | _Fill in after run_ | _TBD_ |
+| Invalid bucket configuration fails with actionable error | _Fill in after run_ | _TBD_ |
+| Validation errors returned for invalid file payloads | _Fill in after run_ | _TBD_ |
 
 ---
 
 ## Outcome
 
-- [x] **Pass**
+- [ ] **Pass**
 - [ ] **Fail**
 
 ---
@@ -43,39 +49,21 @@
 ## Logs / Screenshots / Evidence
 
 ```bash
-$ curl -s -X POST http://localhost:8000/api/v1/recognition/detect \
-  -H "Content-Type: application/json" \
-  -d '{"image_base64": "'$(cat frame.b64)'", "event_id": null}' | python -m json.tool
+# Bucket health check
+aws s3api head-bucket --bucket <bucket-name>
 
-{
-  "matches": [
-    {
-      "user_id": "a1b2c3d4-...",
-      "full_name": "Akash Kumar",
-      "headline": "Computer Engineering Student at Purdue",
-      "company": null,
-      "photo_path": "profiles/a1b2c3d4-onboarding.jpg",
-      "profile_one_liner": "Aspiring embedded systems engineer.",
-      "face_similarity": 95.32,
-      "experience_similarity": null,
-      "bio": "Junior studying computer engineering...",
-      "location": "West Lafayette, IN",
-      "major": "Computer Engineering",
-      "graduation_year": 2027,
-      "linkedin_url": "https://linkedin.com/in/akashkumar",
-      "profile_summary": "Computer engineering student...",
-      "experiences": [{"company": "Purdue ECE", "title": "TA"}],
-      "education": [{"school": "Purdue University", "degree": "BS"}]
-    }
-  ],
-  "processing_time_ms": 487.2,
-  "event_id": null
-}
+# Verify recent uploads
+aws s3 ls s3://<bucket-name>/<prefix>/ --recursive | tail -n 20
 ```
+
+- Backend logs showing upload success/failure paths.
+- Screenshot or log snippet of object key created.
+- Evidence of negative test response bodies.
 
 ---
 
 ## Next Steps
 
-- No failures; profile card builder working as designed.
-- Automated regression tests exist in `backend/tests/test_recognition.py` (`TestDetectEndpoint`) and `backend/tests/test_resume_parser.py` (`TestProfileCardBuilder`).
+1. If failures occur, add integration tests that mock S3 and cover failed upload/retrieval paths.
+2. Add alerting for sustained S3 upload failure rates.
+3. Document bucket policy/KMS requirements near deployment docs.
