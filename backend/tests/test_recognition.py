@@ -593,7 +593,9 @@ class TestDetectEndpoint:
 
     @patch("app.auth.service_auth.get_settings")
     def test_detect_missing_service_token_returns_401(
-        self, mock_settings, raw_client,
+        self,
+        mock_settings,
+        raw_client,
     ):
         """Missing X-Service-Token returns 401 when token is configured."""
         mock_settings.return_value = MagicMock(
@@ -614,7 +616,9 @@ class TestDetectEndpoint:
 
     @patch("app.auth.service_auth.get_settings")
     def test_detect_invalid_service_token_returns_401(
-        self, mock_settings, raw_client,
+        self,
+        mock_settings,
+        raw_client,
     ):
         """Wrong X-Service-Token returns 401."""
         mock_settings.return_value = MagicMock(
