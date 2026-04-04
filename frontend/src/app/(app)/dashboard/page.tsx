@@ -63,6 +63,7 @@ export default function DashboardPage() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const cameraActiveRef = useRef(false);
+  const accessTokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     const supabase = createClient();
