@@ -41,10 +41,18 @@ export class BackendClient {
     this.recognitionUrl = recognitionUrl || `${backendUrl}/recognition/detect`;
   }
 
-  async recognizeFrame(payload: FrameDetectionRequest): Promise<FrameDetectionResponse> {
+  async recognizeFrame(
+    payload: FrameDetectionRequest,
+    userAccessToken?: string,
+  ): Promise<FrameDetectionResponse> {
+    const serviceToken = process.env.RECOGNITION_SERVICE_TOKEN;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (serviceToken) headers['X-Service-Token'] = serviceToken;
+    if (userAccessToken) headers['Authorization'] = `Bearer ${userAccessToken}`;
+
     const response = await fetch(this.recognitionUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify(payload),
     });
 

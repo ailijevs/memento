@@ -1,50 +1,48 @@
 """
-Service-to-service authentication helpers for internal endpoints.
+Service-to-service authentication for internal endpoints.
 
-This verifies `Authorization: Bearer <token>` against a shared secret stored
-in environment variables.
+Uses two separate credentials:
+- ``Authorization: Bearer <user JWT>`` — authenticates the end user
+  (reuses the existing ``get_current_user`` dependency).
+- ``X-Service-Token: <shared secret>`` — authenticates the calling
+  service (e.g. Mentra cloud app).
+
+The service token is compared with ``secrets.compare_digest`` to
+avoid timing-based side-channel leaks.
 """
 
 from __future__ import annotations
 
-from typing import Any
+import secrets
 
-from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import Header, HTTPException, status
 
-from app.auth.dependencies import verify_jwt
 from app.config import get_settings
 
-security = HTTPBearer(auto_error=False)
 
-
-def require_recognition_service_auth(
-    credentials: HTTPAuthorizationCredentials | None = Depends(security),
-) -> Any:
+def verify_service_token(
+    x_service_token: str | None = Header(None),
+) -> None:
     """
-    Authorize requests to recognition endpoints.
+    Verify the ``X-Service-Token`` header against the configured secret.
 
-    Allows either:
-    - a configured service token (preferred), or
-    - a valid Supabase JWT (fallback for dev/testing).
+    When ``RECOGNITION_SERVICE_TOKEN`` is **not** configured the check is
+    skipped so local development keeps working without extra setup.
     """
-    if credentials is None:
+    settings = get_settings()
+    expected = settings.recognition_service_token
+
+    if not expected:
+        return
+
+    if x_service_token is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Not authenticated",
-            headers={"WWW-Authenticate": "Bearer"},
+            detail="Missing X-Service-Token header",
         )
 
-    token = credentials.credentials
-    settings = get_settings()
-
-    expected_service_token = settings.recognition_service_token
-
-    # Preferred: shared service token
-    if expected_service_token and token == expected_service_token:
-        return {"auth_type": "service"}
-
-    # Fallback: accept Supabase JWT (keeps local/manual testing working).
-    # This will raise 401 on invalid tokens.
-    verify_jwt(token)
-    return {"auth_type": "jwt"}
+    if not secrets.compare_digest(x_service_token, expected):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid service token",
+        )

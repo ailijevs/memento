@@ -7,7 +7,8 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.auth.service_auth import require_recognition_service_auth
+from app.auth.dependencies import CurrentUser, get_current_user
+from app.auth.service_auth import verify_service_token
 from app.config import get_settings
 from app.dals.event_dal import EventDAL
 from app.db.supabase import get_admin_client
@@ -32,10 +33,11 @@ logger = logging.getLogger(__name__)
 @router.post(
     "/detect",
     response_model=FrameDetectionResponse,
-    dependencies=[Depends(require_recognition_service_auth)],
+    dependencies=[Depends(verify_service_token)],
 )
 async def detect_faces_in_frame(
     request: FrameDetectionRequest,
+    current_user: CurrentUser = Depends(get_current_user),
 ) -> FrameDetectionResponse:
     """
     Detect and identify faces in a frame from MentraOS smart glasses.
