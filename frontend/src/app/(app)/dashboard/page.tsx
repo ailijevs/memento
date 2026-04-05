@@ -156,7 +156,7 @@ export default function DashboardPage() {
         const startsAt = Date.parse(event.starts_at ?? "");
         return {
           event,
-          canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 30 * 60 * 1000,
+          canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 20 * 60 * 1000,
         };
       });
   }, [discoverEvents, discoverSearchText, myEvents]);

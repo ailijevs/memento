@@ -75,12 +75,12 @@ async def join_event(
             detail="Event start time is unexpectedly missing.",
         )
 
-    join_cutoff = event_start - timedelta(minutes=30)
+    join_cutoff = event_start - timedelta(minutes=20)
     now = datetime.now(timezone.utc)
     if now > join_cutoff:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only join an event at least 30 minutes before it starts.",
+            detail="You can only join an event at least 20 minutes before it starts.",
         )
 
     # Create membership
