@@ -233,7 +233,7 @@ def main():
     # Process each HAR file individually
     for har_file in har_files:
         har_name = har_file.stem  # filename without extension
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Processing: {har_file.name}")
 
         pics = extract_profile_pics_from_har(str(har_file))
@@ -303,7 +303,7 @@ def main():
     with open(mapping_path, "w") as f:
         json.dump(results, f, indent=2)
 
-    print(f"\n{'='*50}")
+    print(f"\n{'=' * 50}")
     print(f"Processed {len(results)} profile(s)")
     print(f"Images saved to: {OUTPUT_DIR}")
 

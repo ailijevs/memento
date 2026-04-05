@@ -7,7 +7,6 @@ import argparse
 import base64
 from pathlib import Path
 
-
 DEFAULT_OUTPUT_NAME = "image_base64.txt"
 
 

@@ -343,7 +343,7 @@ async def main():
         # Save results
         with open(OUTPUT_PATH, "w") as f:
             json.dump(profiles, f, indent=2)
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"Scraped {len(profiles)} profiles")
         print(f"Saved to: {OUTPUT_PATH}")
 

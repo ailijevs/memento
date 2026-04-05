@@ -26,6 +26,8 @@ from app.schemas import (
     ProfileUpdate,
 )
 from app.services import (
+    CompatibilityResult,
+    CompatibilityService,
     LinkedInEnrichmentError,
     LinkedInEnrichmentService,
     ProfileImageError,
@@ -273,6 +275,59 @@ async def get_profile(
     return profile
 
 
+class CompatibilityResponse(BaseModel):
+    """Compatibility score and conversation starters between two users."""
+
+    score: float
+    shared_companies: list[str]
+    shared_schools: list[str]
+    shared_fields: list[str]
+    conversation_starters: list[str]
+
+
+@router.get("/{user_id}/compatibility", response_model=CompatibilityResponse)
+async def get_compatibility(
+    user_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> CompatibilityResponse:
+    """
+    Compute a compatibility score between the current user and another user,
+    and generate conversation starters based on shared background.
+    """
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot compute compatibility with yourself.",
+        )
+
+    viewer_profile = await dal.get_by_user_id(current_user.id)
+    if not viewer_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Your profile was not found. Please create one first.",
+        )
+
+    target_profile = await dal.get_by_user_id(user_id)
+    if not target_profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Target profile not found or not visible.",
+        )
+
+    result: CompatibilityResult = await asyncio.to_thread(
+        CompatibilityService().compute, viewer_profile, target_profile
+    )
+
+    return CompatibilityResponse(
+        score=result.score,
+        shared_companies=result.shared_companies,
+        shared_schools=result.shared_schools,
+        shared_fields=result.shared_fields,
+        conversation_starters=result.conversation_starters,
+    )
+
+
 @router.get("/directory/{event_id}", response_model=list[ProfileDirectoryEntry])
 async def get_event_directory(
     event_id: UUID,
@@ -328,16 +383,12 @@ async def upload_resume(
             detail=f"Unsupported file type. Allowed: {', '.join(allowed_extensions)}",
         )
 
-    # Check file size (max 10MB)
     contents = await file.read()
     if len(contents) > 10 * 1024 * 1024:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="File too large. Maximum size is 10MB.",
         )
-
-    # Reset file position for parsing
-    await file.seek(0)
 
     # Parse the resume
     settings = get_settings()
@@ -382,7 +433,6 @@ async def upload_resume(
     profile_updated = False
     try:
         if existing_profile:
-            # Update existing profile (only non-None fields)
             update_data: dict[str, Any] = {}
             if resume_data.full_name:
                 update_data["full_name"] = resume_data.full_name
@@ -396,6 +446,16 @@ async def upload_resume(
                 update_data["major"] = resume_data.major
             if grad_year:
                 update_data["graduation_year"] = grad_year
+            if resume_data.location:
+                update_data["location"] = resume_data.location
+            if resume_data.profile_one_liner:
+                update_data["profile_one_liner"] = resume_data.profile_one_liner
+            if resume_data.profile_summary:
+                update_data["profile_summary"] = resume_data.profile_summary
+            if resume_data.experiences:
+                update_data["experiences"] = resume_data.experiences
+            if resume_data.education:
+                update_data["education"] = resume_data.education
 
             if update_data:
                 admin_client.table("profiles").update(update_data).eq(
@@ -403,7 +463,6 @@ async def upload_resume(
                 ).execute()
                 profile_updated = True
         else:
-            # Create new profile using admin client
             profile_data = {
                 "user_id": str(current_user.id),
                 "full_name": resume_data.full_name or "Unknown",
@@ -412,16 +471,18 @@ async def upload_resume(
                 "company": resume_data.company,
                 "major": resume_data.major,
                 "graduation_year": grad_year,
+                "location": resume_data.location,
+                "profile_one_liner": resume_data.profile_one_liner,
+                "profile_summary": resume_data.profile_summary,
+                "experiences": resume_data.experiences,
+                "education": resume_data.education,
             }
-            # Remove None values
             profile_data = {k: v for k, v in profile_data.items() if v is not None}
             admin_client.table("profiles").insert(profile_data).execute()
             profile_updated = True
     except Exception as e:
         logger.error(f"Resume profile save failed: {e}")
-        # Don't fail the whole request — parsed data is still returned
 
-    # Build response with extracted data
     extracted = {
         "full_name": resume_data.full_name,
         "headline": resume_data.headline,
@@ -429,9 +490,14 @@ async def upload_resume(
         "company": resume_data.company,
         "major": resume_data.major,
         "graduation_year": resume_data.graduation_year,
+        "location": resume_data.location,
         "email": resume_data.email,
         "phone": resume_data.phone,
         "skills": resume_data.skills,
+        "profile_one_liner": resume_data.profile_one_liner,
+        "profile_summary": resume_data.profile_summary,
+        "experiences": resume_data.experiences,
+        "education": resume_data.education,
     }
 
     return ResumeParseResponse(

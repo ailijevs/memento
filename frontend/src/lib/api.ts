@@ -62,6 +62,10 @@ class ApiClient {
     return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
   }
 
+  async getCompatibility(userId: string) {
+    return this.request<CompatibilityResponse>(`/api/v1/profiles/${userId}/compatibility`);
+  }
+
   async getEvents() {
     return this.request<EventResponse[]>("/api/v1/events");
   }
@@ -279,4 +283,12 @@ export interface MembershipResponse {
   user_id: string;
   role: "owner" | "member";
   joined_at: string;
+}
+
+export interface CompatibilityResponse {
+  score: number;
+  shared_companies: string[];
+  shared_schools: string[];
+  shared_fields: string[];
+  conversation_starters: string[];
 }

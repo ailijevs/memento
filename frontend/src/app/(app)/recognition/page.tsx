@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, type ProfileResponse } from "@/lib/api";
+import { api, type ProfileResponse, type CompatibilityResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { Camera, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
@@ -31,6 +31,7 @@ interface RecognitionResult {
   confidence: number | null;
   created_at: string;
   profile?: ProfileResponse;
+  compatibility?: CompatibilityResponse;
 }
 
 function loadCachedResults(): RecognitionResult[] {
@@ -73,6 +74,8 @@ export default function RecognitionPage() {
   const streamRef = useRef<MediaStream | null>(null);
   const cameraActiveRef = useRef(false);
   const accessTokenRef = useRef<string | null>(null);
+  // Cache compatibility results per user_id so we don't refetch on every frame
+  const compatCacheRef = useRef<Map<string, CompatibilityResponse>>(new Map());
 
   useEffect(() => {
     const supabase = createClient();
@@ -93,6 +96,7 @@ export default function RecognitionPage() {
         const parsed = parseRecognitionResult(message);
         if (!parsed) return;
         setResults((prev) => upsertRecognitionResult(prev, parsed));
+        if (parsed.matched_user_id) void attachCompatibility(parsed.matched_user_id);
         return;
       }
 
@@ -181,6 +185,7 @@ export default function RecognitionPage() {
                     profile: toProfileResponse(match),
                   };
                   setResults((prev) => upsertRecognitionResult(prev, result));
+                  void attachCompatibility(match.user_id);
                 }
               }
             } catch (err) {
@@ -200,6 +205,25 @@ export default function RecognitionPage() {
     return () => { stopCameraStream(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function attachCompatibility(userId: string) {
+    if (compatCacheRef.current.has(userId)) {
+      const cached = compatCacheRef.current.get(userId)!;
+      setResults((prev) =>
+        prev.map((r) => (r.matched_user_id === userId ? { ...r, compatibility: cached } : r))
+      );
+      return;
+    }
+    try {
+      const compat = await api.getCompatibility(userId);
+      compatCacheRef.current.set(userId, compat);
+      setResults((prev) =>
+        prev.map((r) => (r.matched_user_id === userId ? { ...r, compatibility: compat } : r))
+      );
+    } catch {
+      // Not fatal — compatibility is a nice-to-have
+    }
+  }
 
   async function toggleCapture() {
     if (cameraMode) {
@@ -451,10 +475,18 @@ function RecognitionCard({
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const profile = result.profile;
+  const compat = result.compatibility;
   const name = profile?.full_name ?? "Unknown person";
   const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   const confidencePct = result.confidence != null ? Math.round(result.confidence) : null;
   const photoUrl = resolvePhotoUrl(profile?.photo_path ?? null);
+
+  const sharedThings = [
+  ...(compat?.shared_companies ?? []),
+  ...(compat?.shared_schools ?? []),
+  ...(compat?.shared_fields ?? []),
+];
+const firstStarter = compat?.conversation_starters?.[0];
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr);
@@ -504,20 +536,44 @@ function RecognitionCard({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="truncate text-[15px] font-semibold text-white">{name}</p>
-                {confidencePct != null && (
-                  <span
-                    className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium"
-                    style={{
-                      background: "oklch(0.35 0.12 275 / 40%)",
-                      border: "1px solid oklch(0.5 0.15 275 / 25%)",
-                      color: "oklch(0.8 0.1 275)",
-                    }}
-                  >
-                    {confidencePct}%
-                  </span>
-                )}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {confidencePct != null && (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        background: "oklch(0.35 0.12 275 / 40%)",
+                        border: "1px solid oklch(0.5 0.15 275 / 25%)",
+                        color: "oklch(0.8 0.1 275)",
+                      }}
+                    >
+                      {confidencePct}%
+                    </span>
+                  )}
+                  {compat && compat.score > 0 && (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        background: "oklch(0.30 0.12 145 / 40%)",
+                        border: "1px solid oklch(0.5 0.15 145 / 30%)",
+                        color: "oklch(0.78 0.14 145)",
+                      }}
+                    >
+                      {Math.round(compat.score)}% match
+                    </span>
+                  )}
+                </div>
               </div>
-              {profile?.headline && (
+              {sharedThings.length > 0 && (
+                <p className="text-[11px] mt-1.5 leading-snug" style={{ color: "oklch(0.7 0.12 145)" }}>
+                  Also: {sharedThings.slice(0, 2).join(" · ")}
+                </p>
+              )}
+              {firstStarter && (
+                <p className="text-[11px] text-white/30 mt-1.5 leading-snug line-clamp-2 italic">
+                  &ldquo;{firstStarter}&rdquo;
+                </p>
+              )}
+              {!sharedThings.length && !firstStarter && profile?.profile_one_liner && (
                 <p className="truncate text-[13px] text-white/50 mt-0.5">{profile.headline}</p>
               )}
               {profile?.profile_one_liner && (
