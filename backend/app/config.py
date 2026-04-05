@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     profile_summary_provider: str = "auto"  # auto | dspy | template
     profile_summary_model: str = "openai/gpt-4o-mini"
+    # Service-to-service auth for recognition endpoints (e.g., Mentra cloud app)
+    recognition_service_token: str | None = None
 
     # AWS/S3 Configuration
     aws_region: str = "us-east-2"

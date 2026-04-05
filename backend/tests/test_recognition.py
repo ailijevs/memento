@@ -3,15 +3,18 @@
 import base64
 from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.api.recognition import (
     _attach_presigned_profile_photo_urls,
     _resolve_presigned_url_ttl_seconds,
 )
+from app.auth.dependencies import CurrentUser, get_current_user
+from app.auth.service_auth import verify_service_token
 from app.main import app
 from app.schemas import (
     EventProcessingStatus,
@@ -335,15 +338,84 @@ class TestFrameDetectionResponseSchema:
         assert response.processing_time_ms == 100.0
 
 
+# --- verify_service_token (unit) ---------------------------------------------
+
+
+FAKE_USER = CurrentUser(
+    id=UUID("11111111-1111-1111-1111-111111111111"),
+    email="test@example.com",
+    access_token="fake-jwt",
+)
+
+
+class TestVerifyServiceToken:
+    """Unit tests for the X-Service-Token dependency."""
+
+    @patch("app.auth.service_auth.get_settings")
+    def test_skips_check_when_not_configured(self, mock_settings):
+        """When no RECOGNITION_SERVICE_TOKEN is set, all requests pass."""
+        mock_settings.return_value = MagicMock(recognition_service_token=None)
+        verify_service_token(x_service_token=None)
+
+    @patch("app.auth.service_auth.get_settings")
+    def test_passes_when_token_matches(self, mock_settings):
+        """Correct X-Service-Token passes validation."""
+        mock_settings.return_value = MagicMock(
+            recognition_service_token="secret-123",
+        )
+        verify_service_token(x_service_token="secret-123")
+
+    @patch("app.auth.service_auth.get_settings")
+    def test_rejects_missing_header(self, mock_settings):
+        """Missing header returns 401 when token is configured."""
+        mock_settings.return_value = MagicMock(
+            recognition_service_token="secret-123",
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            verify_service_token(x_service_token=None)
+        assert exc_info.value.status_code == 401
+        assert "Missing" in exc_info.value.detail
+
+    @patch("app.auth.service_auth.get_settings")
+    def test_rejects_wrong_token(self, mock_settings):
+        """Incorrect X-Service-Token returns 401."""
+        mock_settings.return_value = MagicMock(
+            recognition_service_token="secret-123",
+        )
+        with pytest.raises(HTTPException) as exc_info:
+            verify_service_token(x_service_token="wrong-token")
+        assert exc_info.value.status_code == 401
+        assert "Invalid" in exc_info.value.detail
+
+
 # --- API /recognition/detect --------------------------------------------------
 
 
 class TestDetectEndpoint:
-    """Tests for POST /api/v1/recognition/detect."""
+    """Tests for POST /api/v1/recognition/detect.
+
+    Functional tests use ``client`` which overrides both auth dependencies
+    so they can focus on business logic.  Auth-specific tests use
+    ``raw_client`` with targeted patches.
+    """
+
+    SERVICE_TOKEN = "test-service-token"
 
     @pytest.fixture
     def client(self):
+        """TestClient with both auth dependencies bypassed."""
+        app.dependency_overrides[get_current_user] = lambda: FAKE_USER
+        app.dependency_overrides[verify_service_token] = lambda: None
+        yield TestClient(app)
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(verify_service_token, None)
+
+    @pytest.fixture
+    def raw_client(self):
+        """TestClient without auth overrides."""
         return TestClient(app)
+
+    # -- functional tests (auth bypassed) --
 
     @patch("app.api.recognition.ProfileCardBuilder")
     @patch("app.api.recognition.decode_base64_image")
@@ -505,6 +577,66 @@ class TestDetectEndpoint:
             image_bytes=b"bytes",
             collection_id="memento_event_abc",
         )
+
+    # -- auth tests (no overrides) --
+
+    def test_detect_missing_jwt_returns_401(self, raw_client):
+        """Missing Authorization header (no JWT) returns 401."""
+        response = raw_client.post(
+            "/api/v1/recognition/detect",
+            json={
+                "image_base64": SAMPLE_IMAGE_BASE64,
+                "event_id": None,
+            },
+        )
+        assert response.status_code == 401
+
+    @patch("app.auth.service_auth.get_settings")
+    def test_detect_missing_service_token_returns_401(
+        self,
+        mock_settings,
+        raw_client,
+    ):
+        """Missing X-Service-Token returns 401 when token is configured."""
+        mock_settings.return_value = MagicMock(
+            recognition_service_token=self.SERVICE_TOKEN,
+        )
+        app.dependency_overrides[get_current_user] = lambda: FAKE_USER
+        try:
+            response = raw_client.post(
+                "/api/v1/recognition/detect",
+                json={
+                    "image_base64": SAMPLE_IMAGE_BASE64,
+                    "event_id": None,
+                },
+            )
+            assert response.status_code == 401
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
+    @patch("app.auth.service_auth.get_settings")
+    def test_detect_invalid_service_token_returns_401(
+        self,
+        mock_settings,
+        raw_client,
+    ):
+        """Wrong X-Service-Token returns 401."""
+        mock_settings.return_value = MagicMock(
+            recognition_service_token=self.SERVICE_TOKEN,
+        )
+        app.dependency_overrides[get_current_user] = lambda: FAKE_USER
+        try:
+            response = raw_client.post(
+                "/api/v1/recognition/detect",
+                json={
+                    "image_base64": SAMPLE_IMAGE_BASE64,
+                    "event_id": None,
+                },
+                headers={"X-Service-Token": "wrong-token"},
+            )
+            assert response.status_code == 401
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
 
 
 class TestPresignedProfilePhotoUrls:
