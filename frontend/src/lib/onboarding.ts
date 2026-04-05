@@ -36,16 +36,16 @@ export function saveMissingSteps(backendMissingFields: string[]) {
   }
 }
 
-/** Returns the route for the first missing step, or /onboarding/enroll if none. */
+/** Returns the route for the first missing step, or /dashboard if none. */
 export function getFirstMissingRoute(backendMissingFields: string[]): string {
   const steps = backendMissingFields
     .map((f) => BACKEND_FIELD_MAP[f])
     .filter(Boolean) as OnboardingStep[];
   const first = STEP_ORDER.find((s) => steps.includes(s));
-  return first ? STEP_ROUTES[first] : "/onboarding/enroll";
+  return first ? STEP_ROUTES[first] : "/dashboard";
 }
 
-/** Returns the next route after `currentStep` that is still missing, or /onboarding/enroll. */
+/** Returns the next route after `currentStep` that is still missing, or /dashboard. */
 export function getNextRoute(currentStep: OnboardingStep): string {
   let missingSteps: OnboardingStep[] = [...STEP_ORDER]; // fallback: show all
   if (typeof localStorage !== "undefined") {
@@ -54,5 +54,5 @@ export function getNextRoute(currentStep: OnboardingStep): string {
   }
   const currentIdx = STEP_ORDER.indexOf(currentStep);
   const next = STEP_ORDER.slice(currentIdx + 1).find((s) => missingSteps.includes(s));
-  return next ? STEP_ROUTES[next] : "/onboarding/enroll";
+  return next ? STEP_ROUTES[next] : "/dashboard";
 }
