@@ -4,9 +4,6 @@ import logging
 import math
 import time
 from datetime import datetime, timezone
-from typing import Annotated
-from uuid import UUID
-
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import CurrentUser, get_current_user
@@ -127,8 +124,6 @@ async def detect_faces_in_frame(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Recognition service error: {str(e)}",
         )
-
-
 
 
 def _attach_presigned_profile_photo_urls(
