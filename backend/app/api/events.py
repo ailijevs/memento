@@ -144,27 +144,10 @@ async def delete_event(
     indexing_status = event.indexing_status
 
     if indexing_status == EventProcessingStatus.IN_PROGRESS:
-        max_wait_seconds = 90
-        poll_interval_seconds = 3
-        attempts = max_wait_seconds // poll_interval_seconds
-
-        for _ in range(attempts):
-            await asyncio.sleep(poll_interval_seconds)
-            refreshed_event = await dal.get_by_id(event_id)
-            if not refreshed_event:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Event not found or you don't have permission to delete.",
-                )
-            indexing_status = refreshed_event.indexing_status
-            if indexing_status != EventProcessingStatus.IN_PROGRESS:
-                break
-
-        if indexing_status == EventProcessingStatus.IN_PROGRESS:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Event indexing is still in progress. Please try deleting again shortly.",
-            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Event indexing is still in progress. Please try deleting again shortly.",
+        )
 
     if indexing_status == EventProcessingStatus.FAILED:
         # Short grace period for eventual consistency in status propagation.

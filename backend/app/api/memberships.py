@@ -125,7 +125,7 @@ async def leave_event(
     Leave an event with indexing-aware cleanup behavior.
 
     - If indexing is pending: delete consent + membership immediately.
-    - If indexing is in progress: wait for terminal status.
+    - If indexing is in progress: return 409 so the client can retry.
     - If indexing completes: delete user's faces from collection, then delete rows.
     - If indexing fails: apply a short grace wait/recheck, then allow row deletion.
     """
@@ -146,27 +146,10 @@ async def leave_event(
     indexing_status = event.indexing_status
 
     if indexing_status == EventProcessingStatus.IN_PROGRESS:
-        max_wait_seconds = 90
-        poll_interval_seconds = 3
-        attempts = max_wait_seconds // poll_interval_seconds
-
-        for _ in range(attempts):
-            await asyncio.sleep(poll_interval_seconds)
-            refreshed_event = await event_dal.get_by_id(event_id)
-            if not refreshed_event:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Event not found.",
-                )
-            indexing_status = refreshed_event.indexing_status
-            if indexing_status != EventProcessingStatus.IN_PROGRESS:
-                break
-
-        if indexing_status == EventProcessingStatus.IN_PROGRESS:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Event indexing is still in progress. Please try leaving again shortly.",
-            )
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Event indexing is still in progress. Please try leaving again shortly.",
+        )
 
     if indexing_status == EventProcessingStatus.FAILED:
         # Short grace period for eventual consistency in status propagation.

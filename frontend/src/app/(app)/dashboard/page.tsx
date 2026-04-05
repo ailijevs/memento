@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, type EventResponse } from "@/lib/api";
+import { api, isApiErrorWithStatus, type EventResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
@@ -41,6 +41,7 @@ export default function DashboardPage() {
   const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -207,11 +208,17 @@ export default function DashboardPage() {
 
   async function handleDeleteOrganizedEvent(event: EventResponse) {
     setDeletingOrganizedEventId(event.event_id);
+    setActionError(null);
     try {
       await api.deleteEvent(event.event_id);
       setOrganizedEvents((previous) => previous.filter((existing) => existing.event_id !== event.event_id));
     } catch (error) {
       console.error("Failed to delete event:", error);
+      if (isApiErrorWithStatus(error, 409)) {
+        setActionError(error.message || "Event indexing is in progress. Please retry in a few seconds.");
+      } else {
+        setActionError("Could not delete event right now. Please try again.");
+      }
     } finally {
       setDeletingOrganizedEventId(null);
     }
@@ -286,11 +293,17 @@ export default function DashboardPage() {
   async function handleLeaveEvent(event: EventResponse) {
     setOpenEventMenuId(null);
     setLeavingEventId(event.event_id);
+    setActionError(null);
     try {
       await api.leaveEvent(event.event_id);
       setMyEvents((previous) => previous.filter((existing) => existing.event_id !== event.event_id));
     } catch (error) {
       console.error("Failed to leave event:", error);
+      if (isApiErrorWithStatus(error, 409)) {
+        setActionError(error.message || "Event indexing is in progress. Please retry in a few seconds.");
+      } else {
+        setActionError("Could not leave event right now. Please try again.");
+      }
     } finally {
       setLeavingEventId(null);
     }
@@ -331,6 +344,17 @@ export default function DashboardPage() {
             <p className="mt-1 text-[13px] text-white/45">Check your schedule or find something new.</p>
           </div>
         </div>
+        {actionError ? (
+          <div
+            className="mb-3 rounded-2xl px-3 py-2 text-[12px] text-amber-200/90"
+            style={{
+              background: "oklch(0.3 0.09 70 / 22%)",
+              border: "1px solid oklch(0.72 0.14 70 / 38%)",
+            }}
+          >
+            {actionError}
+          </div>
+        ) : null}
 
         <div
           className="mb-3 grid grid-cols-2 gap-2 rounded-full p-1"

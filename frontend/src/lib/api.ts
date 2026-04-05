@@ -159,6 +159,10 @@ export class ApiError extends Error {
   }
 }
 
+export function isApiErrorWithStatus(error: unknown, status: number): error is ApiError {
+  return error instanceof ApiError && error.status === status;
+}
+
 // ─── Request types ────────────────────────────────────────────────────────────
 
 export interface ProfileUpdateRequest {
