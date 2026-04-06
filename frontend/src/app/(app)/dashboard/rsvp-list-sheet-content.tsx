@@ -70,7 +70,7 @@ export function RsvpListSheetContent({
                 border: "1px solid oklch(1 0 0 / 8%)",
               }}
             >
-              <p className="text-[16px] text-white/75">No visible attendees</p>
+              <p className="text-[16px] text-white/75">No RSVPs yet</p>
             </div>
             {hiddenCount > 0 ? (
               <HiddenAttendeesCard hiddenCount={hiddenCount} />
