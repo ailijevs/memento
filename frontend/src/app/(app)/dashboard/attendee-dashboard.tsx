@@ -2,7 +2,17 @@
 
 import type { RefObject } from "react";
 import { type EventResponse } from "@/lib/api";
-import { CalendarDays, Loader2, MapPin, MoreHorizontal, ScanFace, Search, ShieldCheck, UserMinus } from "lucide-react";
+import {
+  CalendarDays,
+  Loader2,
+  MapPin,
+  MoreHorizontal,
+  ScanFace,
+  Search,
+  ShieldCheck,
+  UserMinus,
+  Users,
+} from "lucide-react";
 
 export interface AttendeeEventItem {
   event: EventResponse;
@@ -59,6 +69,7 @@ interface AttendeeContentProps {
   openMenuContainerRef: RefObject<HTMLDivElement | null>;
   leavingEventId: string | null;
   onToggleEventMenu: (eventId: string) => void;
+  onViewRsvpList: (event: EventResponse) => void;
   onEditConsents: (event: EventResponse) => void;
   onLeaveEvent: (event: EventResponse) => void;
   onStartRecognition: (event: EventResponse) => void;
@@ -72,6 +83,7 @@ export function AttendeeContent({
   openMenuContainerRef,
   leavingEventId,
   onToggleEventMenu,
+  onViewRsvpList,
   onEditConsents,
   onLeaveEvent,
   onStartRecognition,
@@ -155,6 +167,13 @@ export function AttendeeContent({
                       border: "1px solid oklch(1 0 0 / 12%)",
                     }}
                   >
+                    <button
+                      onClick={() => onViewRsvpList(event)}
+                      className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      RSVP List
+                    </button>
                     <button
                       onClick={() => onEditConsents(event)}
                       className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"

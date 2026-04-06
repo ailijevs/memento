@@ -3,7 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { type EventResponse } from "@/lib/api";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
-import { Archive, CalendarDays, Loader2, MapPin, MoreHorizontal, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
+import {
+  Archive,
+  CalendarDays,
+  Loader2,
+  MapPin,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  Undo2,
+  Users,
+} from "lucide-react";
 
 interface OrganizerControlsProps {
   onCreateEvent: () => void;
@@ -34,6 +45,7 @@ interface OrganizerContentProps {
   archivingEventId: string | null;
   unarchivingEventId: string | null;
   onEditEventRequest: (event: EventResponse) => void;
+  onViewRsvpList: (event: EventResponse) => void;
   onArchiveEvent: (event: EventResponse) => Promise<void>;
   onUnarchiveEvent: (event: EventResponse) => Promise<void>;
   onDeleteEvent: (event: EventResponse) => Promise<void>;
@@ -46,6 +58,7 @@ export function OrganizerContent({
   archivingEventId,
   unarchivingEventId,
   onEditEventRequest,
+  onViewRsvpList,
   onArchiveEvent,
   onUnarchiveEvent,
   onDeleteEvent,
@@ -204,6 +217,16 @@ export function OrganizerContent({
                           Edit Event
                         </button>
                         <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            onViewRsvpList(event);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          RSVP List
+                        </button>
+                        <button
                           onClick={() => handleArchiveEventClick(event)}
                           className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
                         >
@@ -292,6 +315,16 @@ export function OrganizerContent({
                         >
                           <Pencil className="h-3.5 w-3.5" />
                           Edit Event
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            onViewRsvpList(event);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          RSVP List
                         </button>
                         <button
                           onClick={() => void handleUnarchiveEvent(event)}

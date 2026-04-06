@@ -11,7 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth import CurrentUser, get_current_user
 from app.dals import ConsentDAL, EventDAL, MembershipDAL
 from app.db import get_supabase_client
-from app.schemas import ConsentCreate, EventProcessingStatus, MembershipCreate, MembershipResponse
+from app.schemas import (
+    ConsentCreate,
+    EventProcessingStatus,
+    MembershipCreate,
+    MembershipResponse,
+)
 from app.services.rekognition import RekognitionError, RekognitionService
 from app.utils.rekognition_helpers import build_event_collection_id
 
@@ -99,18 +104,6 @@ async def join_event(
     )
 
     return membership
-
-
-@router.get("/{event_id}/members", response_model=list[MembershipResponse])
-async def list_event_members(
-    event_id: UUID,
-    dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
-) -> list[MembershipResponse]:
-    """
-    Get all members of an event.
-    RLS enforces: only visible if caller is also a member.
-    """
-    return await dal.get_event_members(event_id)
 
 
 @router.delete("/{event_id}/leave", status_code=status.HTTP_204_NO_CONTENT)

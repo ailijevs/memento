@@ -110,6 +110,14 @@ class ApiClient {
     });
   }
 
+  async getMyEventConsent(eventId: string) {
+    return this.request<ConsentResponse>(`/api/v1/events/${eventId}/consents/me`);
+  }
+
+  async getEventDirectory(eventId: string) {
+    return this.request<ProfileDirectoryResponse>(`/api/v1/profiles/directory/${eventId}`);
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",
@@ -295,4 +303,30 @@ export interface CompatibilityResponse {
   shared_schools: string[];
   shared_fields: string[];
   conversation_starters: string[];
+}
+
+export interface ProfileDirectoryEntry {
+  user_id: string;
+  full_name: string;
+  headline: string | null;
+  company: string | null;
+  school: string | null;
+  major: string | null;
+  photo_path: string | null;
+}
+
+export interface ProfileDirectoryResponse {
+  entries: ProfileDirectoryEntry[];
+  total_count: number;
+  hidden_count: number;
+}
+
+export interface ConsentResponse {
+  event_id: string;
+  user_id: string;
+  allow_profile_display: boolean;
+  allow_recognition: boolean;
+  consented_at: string | null;
+  revoked_at: string | null;
+  updated_at: string;
 }

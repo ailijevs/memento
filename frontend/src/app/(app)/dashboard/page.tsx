@@ -3,25 +3,34 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, isApiErrorWithStatus, type EventResponse } from "@/lib/api";
+import {
+  api,
+  isApiErrorWithStatus,
+  type EventResponse,
+  type ProfileDirectoryResponse,
+} from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
+import { RsvpListSheetContent } from "./rsvp-list-sheet-content";
+import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import {
   CreateEventSheetContent,
   EditEventSheetContent,
   type CreateEventInput,
   type EditEventInput,
 } from "./create-event-sheet-content";
-import { CalendarDays, LogOut, Plus } from "lucide-react";
+import { CalendarDays, Loader2, LogOut, Plus, UserMinus } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
 
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [myEvents, setMyEvents] = useState<EventResponse[]>([]);
   const [organizedEvents, setOrganizedEvents] = useState<EventResponse[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -39,9 +48,19 @@ export default function DashboardPage() {
   const [unarchivingOrganizedEventId, setUnarchivingOrganizedEventId] = useState<string | null>(null);
   const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
   const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
+  const [confirmLeaveEvent, setConfirmLeaveEvent] = useState<EventResponse | null>(null);
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isRsvpListOpen, setIsRsvpListOpen] = useState(false);
+  const [rsvpListLoading, setRsvpListLoading] = useState(false);
+  const [rsvpListEventName, setRsvpListEventName] = useState<string>("");
+  const [rsvpListData, setRsvpListData] = useState<ProfileDirectoryResponse>({
+    entries: [],
+    total_count: 0,
+    hidden_count: 0,
+  });
+  const [showRsvpConsentOffNotice, setShowRsvpConsentOffNotice] = useState(false);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -56,6 +75,7 @@ export default function DashboardPage() {
         return;
       }
 
+      setCurrentUserId(session.user.id);
       api.setToken(session.access_token);
       try {
         const [events, organized] = await Promise.all([
@@ -154,9 +174,13 @@ export default function DashboardPage() {
       })
       .map((event) => {
         const startsAt = Date.parse(event.starts_at ?? "");
+        const { message: registrationClosesMessage, isClosingSoon } =
+          formatRegistrationCloseMessage(startsAt, now);
         return {
           event,
           canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 20 * 60 * 1000,
+          registrationClosesMessage,
+          isClosingSoon,
         };
       });
   }, [discoverEvents, discoverSearchText, myEvents]);
@@ -309,6 +333,54 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleConfirmLeaveEvent() {
+    if (!confirmLeaveEvent) {
+      return;
+    }
+    await handleLeaveEvent(confirmLeaveEvent);
+    setConfirmLeaveEvent(null);
+  }
+
+  async function handleViewRsvpList(event: EventResponse) {
+    setOpenEventMenuId(null);
+    setRsvpListEventName(event.name);
+    setIsRsvpListOpen(true);
+    setRsvpListLoading(true);
+    setRsvpListData({
+      entries: [],
+      total_count: 0,
+      hidden_count: 0,
+    });
+    setShowRsvpConsentOffNotice(false);
+    try {
+      let consent = getCachedEventConsent(event.event_id);
+      if (!consent) {
+        try {
+          consent = await api.getMyEventConsent(event.event_id);
+          setCachedEventConsent(event.event_id, consent);
+        } catch {
+          consent = null;
+        }
+      }
+
+      const isCreator = Boolean(currentUserId && currentUserId === event.created_by);
+      setShowRsvpConsentOffNotice(Boolean(!isCreator && consent && !consent.allow_profile_display));
+
+      const data = await api.getEventDirectory(event.event_id);
+      setRsvpListData(data);
+    } catch (error) {
+      console.error("Failed to load RSVP list:", error);
+      setRsvpListData({
+        entries: [],
+        total_count: 0,
+        hidden_count: 0,
+      });
+      setActionError("Could not load RSVP list right now. Please try again.");
+    } finally {
+      setRsvpListLoading(false);
+    }
+  }
+
   function handleEditConsents(event: EventResponse) {
     setOpenEventMenuId(null);
     // Intentionally left blank for now.
@@ -417,6 +489,7 @@ export default function DashboardPage() {
             archivingEventId={archivingOrganizedEventId}
             unarchivingEventId={unarchivingOrganizedEventId}
             onEditEventRequest={handleEditEventRequest}
+            onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onArchiveEvent={handleArchiveOrganizedEvent}
             onUnarchiveEvent={handleUnarchiveOrganizedEvent}
             onDeleteEvent={handleDeleteOrganizedEvent}
@@ -431,8 +504,12 @@ export default function DashboardPage() {
             onToggleEventMenu={(eventId) =>
               setOpenEventMenuId((current) => (current === eventId ? null : eventId))
             }
+            onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onEditConsents={handleEditConsents}
-            onLeaveEvent={(event) => void handleLeaveEvent(event)}
+            onLeaveEvent={(event) => {
+              setOpenEventMenuId(null);
+              setConfirmLeaveEvent(event);
+            }}
             onStartRecognition={handleStartRecognition}
             formatEventDate={formatEventDate}
           />
@@ -515,6 +592,41 @@ export default function DashboardPage() {
           />
         ) : null}
       </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={isRsvpListOpen}
+        onClose={() => setIsRsvpListOpen(false)}
+        title={rsvpListEventName ? `RSVP List · ${rsvpListEventName}` : "RSVP List"}
+      >
+        <RsvpListSheetContent
+          loading={rsvpListLoading}
+          entries={rsvpListData.entries}
+          totalCount={rsvpListData.total_count}
+          hiddenCount={rsvpListData.hidden_count}
+          showConsentOffNotice={showRsvpConsentOffNotice}
+        />
+      </ModalBottomSheet>
+
+      <ConfirmationDialog
+        open={Boolean(confirmLeaveEvent)}
+        title="Leave Event?"
+        message={
+          confirmLeaveEvent
+            ? `You will leave ${confirmLeaveEvent.name} and lose access to this event.`
+            : "You will leave this event."
+        }
+        confirmLabel="Leave"
+        onConfirm={() => void handleConfirmLeaveEvent()}
+        onCancel={() => setConfirmLeaveEvent(null)}
+        confirmIcon={
+          confirmLeaveEvent && leavingEventId === confirmLeaveEvent.event_id ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <UserMinus className="h-3.5 w-3.5" />
+          )
+        }
+        confirmDisabled={Boolean(confirmLeaveEvent && leavingEventId === confirmLeaveEvent.event_id)}
+      />
     </div>
   );
 }
@@ -530,4 +642,34 @@ function formatEventDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatRegistrationCloseMessage(
+  startsAtMs: number,
+  nowMs: number,
+): { message: string; isClosingSoon: boolean } {
+  if (!Number.isFinite(startsAtMs)) {
+    return { message: "Registration close time unavailable", isClosingSoon: false };
+  }
+
+  const closesAtMs = startsAtMs - 20 * 60 * 1000;
+  const remainingMs = closesAtMs - nowMs;
+
+  if (remainingMs > 0 && remainingMs <= 5 * 60 * 1000) {
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+    return {
+      message: `Registration closes in ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`,
+      isClosingSoon: true,
+    };
+  }
+
+  const closesAt = new Date(closesAtMs);
+  return {
+    message: `Registration closes at ${new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(closesAt)}`,
+    isClosingSoon: false,
+  };
 }

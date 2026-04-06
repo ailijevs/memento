@@ -6,6 +6,8 @@ import { CalendarDays, Loader2, MapPin, Search, UserPlus } from "lucide-react";
 export interface DiscoverEventItem {
   event: EventResponse;
   canStillJoin: boolean;
+  registrationClosesMessage: string;
+  isClosingSoon: boolean;
 }
 
 interface DiscoverEventsSheetContentProps {
@@ -67,7 +69,7 @@ export function DiscoverEventsSheetContent({
           </div>
         ) : (
           <div className="space-y-3">
-            {events.map(({ event, canStillJoin }) => {
+            {events.map(({ event, canStillJoin, registrationClosesMessage, isClosingSoon }) => {
 
               return (
                 <article
@@ -99,6 +101,12 @@ export function DiscoverEventsSheetContent({
                   </div>
 
                   <div className="mt-3">
+                    <p
+                      className="mb-2 text-[12px]"
+                      style={{ color: isClosingSoon ? "oklch(0.72 0.17 20)" : "rgba(255,255,255,0.45)" }}
+                    >
+                      {registrationClosesMessage}
+                    </p>
                     {canStillJoin ? (
                       <button
                         onClick={() => onJoinEvent(event)}
