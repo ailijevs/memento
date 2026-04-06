@@ -32,21 +32,6 @@ class MembershipDAL(BaseDAL):
             return MembershipResponse(**response.data)
         return None
 
-    async def get_event_members(self, event_id: UUID) -> list[MembershipResponse]:
-        """
-        Get all memberships for an event.
-        RLS ensures caller is also a member.
-        """
-        response = (
-            self.client.table(self.TABLE)
-            .select("*")
-            .eq("event_id", str(event_id))
-            .order("created_at", desc=False)
-            .execute()
-        )
-
-        return [MembershipResponse(**m) for m in response.data]
-
     async def get_user_memberships(self, user_id: UUID) -> list[MembershipResponse]:
         """
         Get all memberships for a user.
