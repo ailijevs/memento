@@ -99,7 +99,7 @@ class ProfileDAL(BaseDAL):
             entries.append(
                 ProfileDirectoryEntry(
                     user_id=row["user_id"],
-                    full_name=row["full_name"],
+                    full_name=_title_case_name(row["full_name"]),
                     headline=row.get("headline"),
                     company=row.get("company"),
                     school=_extract_current_school(row.get("education")),
@@ -205,3 +205,8 @@ def _parse_education_date(value: Any, *, end_of_period: bool = False) -> datetim
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+
+def _title_case_name(name: str) -> str:
+    """Title-case profile names for consistent directory display."""
+    return name.strip().title()
