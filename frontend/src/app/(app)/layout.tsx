@@ -21,6 +21,11 @@ export default async function AppLayout({
     redirect("/signup?verify=pending");
   }
 
+  const termsAccepted = user.user_metadata?.terms_accepted === true;
+  if (!termsAccepted) {
+    redirect("/terms");
+  }
+
   return (
     <>
       <div className="pb-20">{children}</div>
