@@ -41,7 +41,7 @@ Memento enables professionals and students to know names and roles before conver
 5. From the dashboard, browse and join active events under the **Attendee** tab
 6. Organizers can create and manage events under the **Organizer** tab
 
-> Face recognition requires MentraOS smart glasses and is not testable via the web app alone. All other features (profiles, events, compatibility scores, consent management) are fully accessible via the web.
+> Face recognition can be performed using either MentraOS smart glasses or your phone/laptop camera directly from the web app. Navigate to the **Recognition** tab on the dashboard and toggle between glasses and camera mode.
 
 ## Team
 
