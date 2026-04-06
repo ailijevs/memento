@@ -26,6 +26,7 @@ class Settings(BaseSettings):
 
     # Application Settings
     app_name: str = "Memento API"
+    app_version: str = "0.0.0-dev"
     debug: bool = False
 
     # External APIs (optional)
