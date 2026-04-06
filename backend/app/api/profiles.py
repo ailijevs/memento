@@ -383,6 +383,12 @@ async def get_event_directory(
     viewer_consent = await consent_dal.get(event_id=event_id, user_id=current_user.id)
     if is_creator or (viewer_consent and viewer_consent.allow_profile_display):
         entries = await profile_dal.get_event_directory(event_id)
+    else:
+        entries = [
+            entry
+            for entry in await profile_dal.get_event_directory(event_id)
+            if entry.user_id == current_user.id
+        ]
     hidden_count = max(total_count - len(entries), 0)
 
     return ProfileDirectoryResponse(
