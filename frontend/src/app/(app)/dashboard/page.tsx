@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
@@ -22,7 +23,7 @@ import {
   type CreateEventInput,
   type EditEventInput,
 } from "./create-event-sheet-content";
-import { CalendarDays, LogOut, Plus } from "lucide-react";
+import { CalendarDays, Loader2, LogOut, Plus, UserMinus } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
 
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [unarchivingOrganizedEventId, setUnarchivingOrganizedEventId] = useState<string | null>(null);
   const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
   const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
+  const [confirmLeaveEvent, setConfirmLeaveEvent] = useState<EventResponse | null>(null);
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -327,6 +329,14 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleConfirmLeaveEvent() {
+    if (!confirmLeaveEvent) {
+      return;
+    }
+    await handleLeaveEvent(confirmLeaveEvent);
+    setConfirmLeaveEvent(null);
+  }
+
   async function handleViewRsvpList(event: EventResponse) {
     setOpenEventMenuId(null);
     setRsvpListEventName(event.name);
@@ -492,7 +502,10 @@ export default function DashboardPage() {
             }
             onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onEditConsents={handleEditConsents}
-            onLeaveEvent={(event) => void handleLeaveEvent(event)}
+            onLeaveEvent={(event) => {
+              setOpenEventMenuId(null);
+              setConfirmLeaveEvent(event);
+            }}
             onStartRecognition={handleStartRecognition}
             formatEventDate={formatEventDate}
           />
@@ -589,6 +602,27 @@ export default function DashboardPage() {
           showConsentOffNotice={showRsvpConsentOffNotice}
         />
       </ModalBottomSheet>
+
+      <ConfirmationDialog
+        open={Boolean(confirmLeaveEvent)}
+        title="Leave Event?"
+        message={
+          confirmLeaveEvent
+            ? `You will leave ${confirmLeaveEvent.name} and lose access to this event.`
+            : "You will leave this event."
+        }
+        confirmLabel="Leave"
+        onConfirm={() => void handleConfirmLeaveEvent()}
+        onCancel={() => setConfirmLeaveEvent(null)}
+        confirmIcon={
+          confirmLeaveEvent && leavingEventId === confirmLeaveEvent.event_id ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <UserMinus className="h-3.5 w-3.5" />
+          )
+        }
+        confirmDisabled={Boolean(confirmLeaveEvent && leavingEventId === confirmLeaveEvent.event_id)}
+      />
     </div>
   );
 }
