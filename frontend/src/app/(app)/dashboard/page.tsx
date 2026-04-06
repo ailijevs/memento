@@ -3,12 +3,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, isApiErrorWithStatus, type EventResponse } from "@/lib/api";
+import {
+  api,
+  isApiErrorWithStatus,
+  type EventResponse,
+  type ProfileDirectoryResponse,
+} from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
+import { RsvpListSheetContent } from "./rsvp-list-sheet-content";
+import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import {
   CreateEventSheetContent,
   EditEventSheetContent,
@@ -22,6 +29,7 @@ type DashboardTab = "attendee" | "organizer";
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [myEvents, setMyEvents] = useState<EventResponse[]>([]);
   const [organizedEvents, setOrganizedEvents] = useState<EventResponse[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -42,6 +50,15 @@ export default function DashboardPage() {
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [isRsvpListOpen, setIsRsvpListOpen] = useState(false);
+  const [rsvpListLoading, setRsvpListLoading] = useState(false);
+  const [rsvpListEventName, setRsvpListEventName] = useState<string>("");
+  const [rsvpListData, setRsvpListData] = useState<ProfileDirectoryResponse>({
+    entries: [],
+    total_count: 0,
+    hidden_count: 0,
+  });
+  const [showRsvpConsentOffNotice, setShowRsvpConsentOffNotice] = useState(false);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -56,6 +73,7 @@ export default function DashboardPage() {
         return;
       }
 
+      setCurrentUserId(session.user.id);
       api.setToken(session.access_token);
       try {
         const [events, organized] = await Promise.all([
@@ -309,6 +327,46 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleViewRsvpList(event: EventResponse) {
+    setOpenEventMenuId(null);
+    setRsvpListEventName(event.name);
+    setIsRsvpListOpen(true);
+    setRsvpListLoading(true);
+    setRsvpListData({
+      entries: [],
+      total_count: 0,
+      hidden_count: 0,
+    });
+    setShowRsvpConsentOffNotice(false);
+    try {
+      let consent = getCachedEventConsent(event.event_id);
+      if (!consent) {
+        try {
+          consent = await api.getMyEventConsent(event.event_id);
+          setCachedEventConsent(event.event_id, consent);
+        } catch {
+          consent = null;
+        }
+      }
+
+      const isCreator = Boolean(currentUserId && currentUserId === event.created_by);
+      setShowRsvpConsentOffNotice(Boolean(!isCreator && consent && !consent.allow_profile_display));
+
+      const data = await api.getEventDirectory(event.event_id);
+      setRsvpListData(data);
+    } catch (error) {
+      console.error("Failed to load RSVP list:", error);
+      setRsvpListData({
+        entries: [],
+        total_count: 0,
+        hidden_count: 0,
+      });
+      setActionError("Could not load RSVP list right now. Please try again.");
+    } finally {
+      setRsvpListLoading(false);
+    }
+  }
+
   function handleEditConsents(event: EventResponse) {
     setOpenEventMenuId(null);
     // Intentionally left blank for now.
@@ -417,6 +475,7 @@ export default function DashboardPage() {
             archivingEventId={archivingOrganizedEventId}
             unarchivingEventId={unarchivingOrganizedEventId}
             onEditEventRequest={handleEditEventRequest}
+            onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onArchiveEvent={handleArchiveOrganizedEvent}
             onUnarchiveEvent={handleUnarchiveOrganizedEvent}
             onDeleteEvent={handleDeleteOrganizedEvent}
@@ -431,6 +490,7 @@ export default function DashboardPage() {
             onToggleEventMenu={(eventId) =>
               setOpenEventMenuId((current) => (current === eventId ? null : eventId))
             }
+            onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onEditConsents={handleEditConsents}
             onLeaveEvent={(event) => void handleLeaveEvent(event)}
             onStartRecognition={handleStartRecognition}
@@ -514,6 +574,20 @@ export default function DashboardPage() {
             onSubmit={handleUpdateEvent}
           />
         ) : null}
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={isRsvpListOpen}
+        onClose={() => setIsRsvpListOpen(false)}
+        title={rsvpListEventName ? `RSVP List · ${rsvpListEventName}` : "RSVP List"}
+      >
+        <RsvpListSheetContent
+          loading={rsvpListLoading}
+          entries={rsvpListData.entries}
+          totalCount={rsvpListData.total_count}
+          hiddenCount={rsvpListData.hidden_count}
+          showConsentOffNotice={showRsvpConsentOffNotice}
+        />
       </ModalBottomSheet>
     </div>
   );
