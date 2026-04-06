@@ -174,9 +174,13 @@ export default function DashboardPage() {
       })
       .map((event) => {
         const startsAt = Date.parse(event.starts_at ?? "");
+        const { message: registrationClosesMessage, isClosingSoon } =
+          formatRegistrationCloseMessage(startsAt, now);
         return {
           event,
           canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 20 * 60 * 1000,
+          registrationClosesMessage,
+          isClosingSoon,
         };
       });
   }, [discoverEvents, discoverSearchText, myEvents]);
@@ -638,4 +642,34 @@ function formatEventDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
+}
+
+function formatRegistrationCloseMessage(
+  startsAtMs: number,
+  nowMs: number,
+): { message: string; isClosingSoon: boolean } {
+  if (!Number.isFinite(startsAtMs)) {
+    return { message: "Registration close time unavailable", isClosingSoon: false };
+  }
+
+  const closesAtMs = startsAtMs - 20 * 60 * 1000;
+  const remainingMs = closesAtMs - nowMs;
+
+  if (remainingMs > 0 && remainingMs <= 5 * 60 * 1000) {
+    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
+    return {
+      message: `Registration closes in ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`,
+      isClosingSoon: true,
+    };
+  }
+
+  const closesAt = new Date(closesAtMs);
+  return {
+    message: `Registration closes at ${new Intl.DateTimeFormat("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    }).format(closesAt)}`,
+    isClosingSoon: false,
+  };
 }
