@@ -68,6 +68,16 @@ class ProfileDirectoryEntry(BaseModel):
     full_name: str
     headline: str | None = None
     company: str | None = None
+    school: str | None = None
+    major: str | None = None
     photo_path: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProfileDirectoryResponse(BaseModel):
+    """Directory payload with visibility metadata for an event."""
+
+    entries: list[ProfileDirectoryEntry]
+    total_count: int
+    hidden_count: int

@@ -30,6 +30,7 @@ from .onboarding import (
 from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
+    ProfileDirectoryResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -67,6 +68,7 @@ __all__ = [
     # Profile
     "ProfileCreate",
     "ProfileDirectoryEntry",
+    "ProfileDirectoryResponse",
     "ProfileResponse",
     "ProfileUpdate",
     # Recognition

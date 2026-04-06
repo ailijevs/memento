@@ -46,6 +46,15 @@ class MembershipDAL(BaseDAL):
 
         return [MembershipResponse(**m) for m in response.data]
 
+    async def get_event_member_count(self, event_id: UUID) -> int:
+        """
+        Get total membership count for an event.
+        """
+        response = (
+            self.client.table(self.TABLE).select("user_id").eq("event_id", str(event_id)).execute()
+        )
+        return len(response.data)
+
     async def join_event(self, user_id: UUID, data: MembershipCreate) -> MembershipResponse:
         """
         Join an event (create membership).

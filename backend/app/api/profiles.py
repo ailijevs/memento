@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
-from app.dals import ProfileDAL
+from app.dals import ConsentDAL, EventDAL, MembershipDAL, ProfileDAL
 from app.db import get_supabase_client
 from app.schemas import (
     LinkedInEnrichmentRequest,
@@ -21,7 +21,7 @@ from app.schemas import (
     LinkedInOnboardingResponse,
     ProfileCompletionResponse,
     ProfileCreate,
-    ProfileDirectoryEntry,
+    ProfileDirectoryResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -47,6 +47,26 @@ def get_profile_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     """Dependency to get ProfileDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ProfileDAL(client)
+
+
+def get_event_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> EventDAL:
+    """Dependency to get EventDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return EventDAL(client)
+
+
+def get_membership_dal(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> MembershipDAL:
+    """Dependency to get MembershipDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return MembershipDAL(client)
+
+
+def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> ConsentDAL:
+    """Dependency to get ConsentDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return ConsentDAL(client)
 
 
 @router.get("/me", response_model=ProfileResponse)
@@ -328,17 +348,48 @@ async def get_compatibility(
     )
 
 
-@router.get("/directory/{event_id}", response_model=list[ProfileDirectoryEntry])
+@router.get("/directory/{event_id}", response_model=ProfileDirectoryResponse)
 async def get_event_directory(
     event_id: UUID,
-    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
-) -> list[ProfileDirectoryEntry]:
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
+    membership_dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
+    consent_dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
+) -> ProfileDirectoryResponse:
     """
     Get the directory of profiles for an event.
-    Only returns profiles of users who have consented to display.
+    Returns visible directory entries plus attendee counts.
     Uses the get_event_directory SQL function.
     """
-    return await dal.get_event_directory(event_id)
+    event = await event_dal.get_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    membership = await membership_dal.get(event_id=event_id, user_id=current_user.id)
+    is_creator = current_user.id == event.created_by
+    is_member = membership is not None
+    if not is_creator and not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found or not accessible.",
+        )
+
+    entries = []
+    total_count = await membership_dal.get_event_member_count(event_id)
+    viewer_consent = await consent_dal.get(event_id=event_id, user_id=current_user.id)
+    if is_creator or (viewer_consent and viewer_consent.allow_profile_display):
+        entries = await profile_dal.get_event_directory(event_id)
+    hidden_count = max(total_count - len(entries), 0)
+
+    return ProfileDirectoryResponse(
+        entries=entries,
+        total_count=total_count,
+        hidden_count=hidden_count,
+    )
 
 
 # =============================================================================
