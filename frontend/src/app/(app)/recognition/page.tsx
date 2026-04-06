@@ -63,6 +63,8 @@ export default function RecognitionPage() {
     return process.env.NEXT_PUBLIC_RECOGNITION_EVENT_ID?.trim() ?? null;
   }, [searchParams]);
   const [results, setResults] = useState<RecognitionResult[]>(loadCachedResults);
+  const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState<"recent" | "compatible">("recent");
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
@@ -137,6 +139,38 @@ export default function RecognitionPage() {
   useEffect(() => {
     saveCachedResults(results);
   }, [results]);
+
+  const filteredAndSortedResults = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    const filtered = query
+      ? results.filter((result) => {
+          const profile = result.profile;
+          const haystack = [
+            profile?.full_name ?? "",
+            profile?.headline ?? "",
+            profile?.company ?? "",
+            profile?.major ?? "",
+            profile?.location ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(query);
+        })
+      : [...results];
+
+    filtered.sort((left, right) => {
+      if (sortMode === "compatible") {
+        const leftScore = left.compatibility?.score ?? -1;
+        const rightScore = right.compatibility?.score ?? -1;
+        if (leftScore !== rightScore) {
+          return rightScore - leftScore;
+        }
+      }
+      return Date.parse(right.created_at) - Date.parse(left.created_at);
+    });
+
+    return filtered;
+  }, [results, searchText, sortMode]);
 
   function stopCameraStream() {
     cameraActiveRef.current = false;
@@ -406,7 +440,29 @@ export default function RecognitionPage() {
           <EmptyState />
         ) : (
           <div className="space-y-3">
-            {results.map((result, i) => (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Search recognized profiles..."
+                className="h-9 w-full rounded-full border border-white/10 bg-white/[0.04] px-3 text-[13px] text-white placeholder:text-white/30 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setSortMode((prev) => (prev === "recent" ? "compatible" : "recent"))}
+                className="h-9 shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-white/70 transition-colors hover:text-white"
+                title="Toggle sort mode"
+              >
+                {sortMode === "recent" ? "Recent" : "Compatible"}
+              </button>
+            </div>
+
+            {filteredAndSortedResults.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-[13px] text-white/40">
+                No recognized profiles match your search.
+              </div>
+            ) : filteredAndSortedResults.map((result, i) => (
               <RecognitionCard
                 key={result.id}
                 result={result}
