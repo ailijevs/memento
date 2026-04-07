@@ -136,6 +136,12 @@ async def leave_event(
             detail="You are not a member of this event.",
         )
 
+    if event.ends_at and datetime.now(timezone.utc) >= event.ends_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can no longer leave an event after it has ended.",
+        )
+
     indexing_status = event.indexing_status
 
     if indexing_status == EventProcessingStatus.IN_PROGRESS:
