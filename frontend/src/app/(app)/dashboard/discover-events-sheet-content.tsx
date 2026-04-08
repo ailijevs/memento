@@ -16,6 +16,7 @@ interface DiscoverEventsSheetContentProps {
   onSearchTextChange: (value: string) => void;
   events: DiscoverEventItem[];
   joiningEventId: string | null;
+  onViewEventDetail: (event: EventResponse) => void;
   onJoinEvent: (event: EventResponse) => void;
 }
 
@@ -25,6 +26,7 @@ export function DiscoverEventsSheetContent({
   onSearchTextChange,
   events,
   joiningEventId,
+  onViewEventDetail,
   onJoinEvent,
 }: DiscoverEventsSheetContentProps) {
   const hasQuery = searchText.trim().length > 0;
@@ -81,7 +83,11 @@ export function DiscoverEventsSheetContent({
                   }}
                 >
                   <div className="mb-2 flex items-start justify-between gap-3">
-                    <div>
+                    <button
+                      type="button"
+                      onClick={() => onViewEventDetail(event)}
+                      className="min-w-0 flex-1 text-left"
+                    >
                       <h3 className="text-[17px] font-medium text-white/90">{event.name}</h3>
                       <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/45">
                         {event.starts_at ? (
@@ -97,7 +103,7 @@ export function DiscoverEventsSheetContent({
                           </span>
                         ) : null}
                       </div>
-                    </div>
+                    </button>
                   </div>
 
                   <div className="mt-3">

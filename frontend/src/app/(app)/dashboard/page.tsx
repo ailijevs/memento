@@ -15,6 +15,7 @@ import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
+import { EventDetailSheetContent } from "./event-detail-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
 import { RsvpListSheetContent } from "./rsvp-list-sheet-content";
 import { EventConsentsSheetContent } from "./event-consents-sheet-content";
@@ -54,6 +55,7 @@ export default function DashboardPage() {
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [detailEvent, setDetailEvent] = useState<EventResponse | null>(null);
   const [isRsvpListOpen, setIsRsvpListOpen] = useState(false);
   const [rsvpListLoading, setRsvpListLoading] = useState(false);
   const [rsvpListEventName, setRsvpListEventName] = useState<string>("");
@@ -316,6 +318,10 @@ export default function DashboardPage() {
     }
   }
 
+  function handleViewEventDetail(event: EventResponse) {
+    setDetailEvent(event);
+  }
+
   function handleStartRecognition(event: EventResponse) {
     const params = new URLSearchParams({ event_id: event.event_id });
     router.push(`/recognition?${params.toString()}`);
@@ -534,6 +540,7 @@ export default function DashboardPage() {
             deletingEventId={deletingOrganizedEventId}
             archivingEventId={archivingOrganizedEventId}
             unarchivingEventId={unarchivingOrganizedEventId}
+            onViewEventDetail={handleViewEventDetail}
             onEditEventRequest={handleEditEventRequest}
             onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onArchiveEvent={handleArchiveOrganizedEvent}
@@ -550,6 +557,7 @@ export default function DashboardPage() {
             onToggleEventMenu={(eventId) =>
               setOpenEventMenuId((current) => (current === eventId ? null : eventId))
             }
+            onViewEventDetail={handleViewEventDetail}
             onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onEditConsents={(event) => void handleEditConsents(event)}
             onLeaveEvent={(event) => {
@@ -602,6 +610,7 @@ export default function DashboardPage() {
           onSearchTextChange={setDiscoverSearchText}
           events={discoveredUpcomingEvents}
           joiningEventId={joiningDiscoverEventId}
+          onViewEventDetail={handleViewEventDetail}
           onJoinEvent={handleJoinDiscoverEvent}
         />
       </ModalBottomSheet>
@@ -635,6 +644,19 @@ export default function DashboardPage() {
             isSubmitting={updatingEvent}
             initialValues={editingEvent}
             onSubmit={handleUpdateEvent}
+          />
+        ) : null}
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={Boolean(detailEvent)}
+        onClose={() => setDetailEvent(null)}
+        title="Event Details"
+      >
+        {detailEvent ? (
+          <EventDetailSheetContent
+            event={detailEvent}
+            formatEventDate={formatEventDate}
           />
         ) : null}
       </ModalBottomSheet>
