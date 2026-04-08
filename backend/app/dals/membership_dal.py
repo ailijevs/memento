@@ -51,9 +51,12 @@ class MembershipDAL(BaseDAL):
         Get total membership count for an event.
         """
         response = (
-            self.client.table(self.TABLE).select("user_id").eq("event_id", str(event_id)).execute()
+            self.client.table(self.TABLE)
+            .select("user_id", count="exact", head=True)
+            .eq("event_id", str(event_id))
+            .execute()
         )
-        return len(response.data)
+        return int(response.count or 0)
 
     async def join_event(self, user_id: UUID, data: MembershipCreate) -> MembershipResponse:
         """
