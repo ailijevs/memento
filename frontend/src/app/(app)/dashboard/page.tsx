@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   api,
   isApiErrorWithStatus,
+  type ConsentResponse,
   type EventResponse,
   type ProfileDirectoryResponse,
 } from "@/lib/api";
@@ -16,6 +17,7 @@ import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./att
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
 import { RsvpListSheetContent } from "./rsvp-list-sheet-content";
+import { EventConsentsSheetContent } from "./event-consents-sheet-content";
 import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import {
   CreateEventSheetContent,
@@ -61,6 +63,11 @@ export default function DashboardPage() {
     hidden_count: 0,
   });
   const [showRsvpConsentOffNotice, setShowRsvpConsentOffNotice] = useState(false);
+  const [isEditConsentsOpen, setIsEditConsentsOpen] = useState(false);
+  const [editingConsentsEvent, setEditingConsentsEvent] = useState<EventResponse | null>(null);
+  const [consentsLoading, setConsentsLoading] = useState(false);
+  const [consentsSaving, setConsentsSaving] = useState(false);
+  const [editingConsent, setEditingConsent] = useState<ConsentResponse | null>(null);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -381,10 +388,49 @@ export default function DashboardPage() {
     }
   }
 
-  function handleEditConsents(event: EventResponse) {
+  async function handleEditConsents(event: EventResponse) {
     setOpenEventMenuId(null);
-    // Intentionally left blank for now.
-    void event;
+    setEditingConsentsEvent(event);
+    setIsEditConsentsOpen(true);
+    setConsentsLoading(true);
+    setActionError(null);
+
+    try {
+      const consent = await api.getMyEventConsent(event.event_id);
+      setEditingConsent(consent);
+      setCachedEventConsent(event.event_id, consent);
+    } catch (error) {
+      console.error("Failed to load event consents:", error);
+      setEditingConsent(null);
+      setActionError("Could not load event consent settings right now. Please try again.");
+    } finally {
+      setConsentsLoading(false);
+    }
+  }
+
+  async function handleConsentUpdate(
+    eventId: string,
+    patch: {
+      allow_profile_display?: boolean;
+      allow_recognition?: boolean;
+    },
+  ) {
+    setConsentsSaving(true);
+    setActionError(null);
+    try {
+      const updated = await api.updateMyEventConsent(eventId, patch);
+      setEditingConsent(updated);
+      setCachedEventConsent(eventId, updated);
+    } catch (error) {
+      console.error("Failed to update event consent:", error);
+      if (error instanceof Error) {
+        setActionError(error.message);
+      } else {
+        setActionError("Could not update event consent right now. Please try again.");
+      }
+    } finally {
+      setConsentsSaving(false);
+    }
   }
 
   return (
@@ -505,7 +551,7 @@ export default function DashboardPage() {
               setOpenEventMenuId((current) => (current === eventId ? null : eventId))
             }
             onViewRsvpList={(event) => void handleViewRsvpList(event)}
-            onEditConsents={handleEditConsents}
+            onEditConsents={(event) => void handleEditConsents(event)}
             onLeaveEvent={(event) => {
               setOpenEventMenuId(null);
               setConfirmLeaveEvent(event);
@@ -604,6 +650,50 @@ export default function DashboardPage() {
           totalCount={rsvpListData.total_count}
           hiddenCount={rsvpListData.hidden_count}
           showConsentOffNotice={showRsvpConsentOffNotice}
+        />
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={isEditConsentsOpen}
+        onClose={() => {
+          if (!consentsSaving) {
+            setIsEditConsentsOpen(false);
+            setEditingConsentsEvent(null);
+            setEditingConsent(null);
+          }
+        }}
+        title={editingConsentsEvent ? `Edit Consents · ${editingConsentsEvent.name}` : "Edit Consents"}
+      >
+        <EventConsentsSheetContent
+          loading={consentsLoading}
+          saving={consentsSaving}
+          consent={editingConsent}
+          onToggleProfileDisplay={(next) => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_profile_display: next,
+            });
+          }}
+          onToggleRecognition={(next) => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_recognition: next,
+            });
+          }}
+          onGrantAll={() => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_profile_display: true,
+              allow_recognition: true,
+            });
+          }}
+          onRevokeAll={() => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_profile_display: false,
+              allow_recognition: false,
+            });
+          }}
         />
       </ModalBottomSheet>
 

@@ -114,6 +114,13 @@ class ApiClient {
     return this.request<ConsentResponse>(`/api/v1/events/${eventId}/consents/me`);
   }
 
+  async updateMyEventConsent(eventId: string, data: ConsentUpdateRequest) {
+    return this.request<ConsentResponse>(`/api/v1/events/${eventId}/consents/me`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
   async getEventDirectory(eventId: string) {
     return this.request<ProfileDirectoryResponse>(`/api/v1/profiles/directory/${eventId}`);
   }
@@ -218,6 +225,11 @@ export interface EventUpdateRequest {
   ends_at?: string;
   location?: string;
   is_active?: boolean;
+}
+
+export interface ConsentUpdateRequest {
+  allow_profile_display?: boolean;
+  allow_recognition?: boolean;
 }
 
 // ─── Response types ───────────────────────────────────────────────────────────

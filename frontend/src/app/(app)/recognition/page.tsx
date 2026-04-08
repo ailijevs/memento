@@ -3,7 +3,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, type ProfileResponse, type CompatibilityResponse } from "@/lib/api";
+import {
+  api,
+  type ConsentResponse,
+  type ProfileResponse,
+  type CompatibilityResponse,
+} from "@/lib/api";
+import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import { Aurora } from "@/components/aurora";
 import { Camera, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
@@ -68,6 +74,7 @@ export default function RecognitionPage() {
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
   const [cameraMode, setCameraMode] = useState(false);
+  const [consentWarning, setConsentWarning] = useState<string | null>(null);
   const socketRef = useRef<SocketClient | null>(null);
   const mountIdRef = useRef(`dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -138,6 +145,45 @@ export default function RecognitionPage() {
   useEffect(() => {
     saveCachedResults(results);
   }, [results]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadConsentWarning() {
+      if (!selectedEventId || !accessTokenRef.current) {
+        setConsentWarning(null);
+        return;
+      }
+
+      let consent: ConsentResponse | null = getCachedEventConsent(selectedEventId);
+      if (!consent) {
+        try {
+          consent = await api.getMyEventConsent(selectedEventId);
+          setCachedEventConsent(selectedEventId, consent);
+        } catch (error) {
+          console.error("[Recognition] Failed to load event consent:", error);
+          return;
+        }
+      }
+
+      if (cancelled) return;
+      if (!consent.allow_profile_display || !consent.allow_recognition) {
+        setConsentWarning(
+          "One or more event consents are off. You will not be able to recognize other attendees.",
+        );
+      } else {
+        setConsentWarning(null);
+      }
+    }
+
+    if (!loading) {
+      void loadConsentWarning();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, selectedEventId]);
 
   function stopCameraStream() {
     cameraActiveRef.current = false;
@@ -418,6 +464,17 @@ export default function RecognitionPage() {
 
       {/* Content */}
       <div className="relative z-10 flex-1 overflow-y-auto px-6 pb-4">
+        {consentWarning ? (
+          <div
+            className="mb-3 rounded-2xl px-3 py-2 text-[12px] text-amber-200/90"
+            style={{
+              background: "oklch(0.3 0.09 70 / 22%)",
+              border: "1px solid oklch(0.72 0.14 70 / 38%)",
+            }}
+          >
+            {consentWarning}
+          </div>
+        ) : null}
         {loading ? (
           <div className="flex items-center justify-center py-16">
             <div className="h-6 w-6 animate-spin rounded-full border-2 border-white/10 border-t-white/40" />
