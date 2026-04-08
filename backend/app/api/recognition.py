@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import CurrentUser, get_current_user
-from app.auth.service_auth import verify_service_token
+from app.auth.service_auth import verify_recognition_api_key
 from app.config import get_settings
 from app.dals.event_dal import EventDAL
 from app.db.supabase import get_admin_client
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 @router.post(
     "/detect",
     response_model=FrameDetectionResponse,
-    dependencies=[Depends(verify_service_token)],
+    dependencies=[Depends(verify_recognition_api_key)],
 )
 async def detect_faces_in_frame(
     request: FrameDetectionRequest,
