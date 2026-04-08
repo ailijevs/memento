@@ -9,6 +9,7 @@ import { Camera, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const RECOGNITION_API_KEY = process.env.NEXT_PUBLIC_RECOGNITION_API_KEY?.trim() || null;
 const RESULTS_CACHE_KEY = "recognition_results_cache";
 
 type FrameDetectionResponse = {
@@ -165,9 +166,19 @@ export default function RecognitionPage() {
           const imageBase64 = canvas.toDataURL("image/jpeg", 0.7).split(",")[1];
           if (imageBase64) {
             try {
+              const headers: Record<string, string> = {
+                "Content-Type": "application/json",
+              };
+              if (accessTokenRef.current) {
+                headers["Authorization"] = `Bearer ${accessTokenRef.current}`;
+              }
+              if (RECOGNITION_API_KEY) {
+                headers["X-Recognition-Api-Key"] = RECOGNITION_API_KEY;
+              }
+
               const res = await fetch(`${API_URL}/api/v1/recognition/detect`, {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers,
                 body: JSON.stringify({
                   image_base64: imageBase64,
                   event_id: selectedEventId,
@@ -187,6 +198,15 @@ export default function RecognitionPage() {
                   setResults((prev) => upsertRecognitionResult(prev, result));
                   void attachCompatibility(match.user_id);
                 }
+              } else {
+                const errorBody = await res.json().catch(() => null);
+                console.error("[Camera] Recognition HTTP error:", {
+                  status: res.status,
+                  statusText: res.statusText,
+                  detail: errorBody,
+                  hasAuthorization: Boolean(headers.Authorization),
+                  hasRecognitionApiKey: Boolean(headers["X-Recognition-Api-Key"]),
+                });
               }
             } catch (err) {
               console.error("[Camera] Recognition error:", err);
