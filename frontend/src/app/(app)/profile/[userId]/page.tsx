@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, isApiErrorWithStatus, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { ChevronLeft, MapPin, Briefcase, GraduationCap, ExternalLink, Heart } from "lucide-react";
 
 function resolvePhotoUrl(photoPath: string | null): string | null {
@@ -20,11 +21,14 @@ export default function UserProfilePage() {
   const searchParams = useSearchParams();
   const userId = params.userId as string;
   const eventId = searchParams.get("event_id")?.trim() || null;
+  const source = searchParams.get("source")?.trim() || null;
+  const cameFromFavorites = source === "favorites";
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgFailed, setImgFailed] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likePending, setLikePending] = useState(false);
+  const [confirmUnlikeOpen, setConfirmUnlikeOpen] = useState(false);
 
   useEffect(() => {
     // Show cached data instantly if available
@@ -58,7 +62,7 @@ export default function UserProfilePage() {
     void load();
   }, [userId, router]);
 
-  async function toggleLike() {
+  async function runToggleLike() {
     if (likePending) return;
     if (!liked && !eventId) return;
 
@@ -79,6 +83,14 @@ export default function UserProfilePage() {
     } finally {
       setLikePending(false);
     }
+  }
+
+  async function toggleLike() {
+    if (liked && cameFromFavorites) {
+      setConfirmUnlikeOpen(true);
+      return;
+    }
+    await runToggleLike();
   }
 
   if (loading) {
@@ -271,6 +283,18 @@ export default function UserProfilePage() {
           )}
         </div>
       </div>
+
+      <ConfirmationDialog
+        open={confirmUnlikeOpen}
+        title="Remove Favorite?"
+        message="This profile will be removed from your favorites."
+        confirmLabel="Remove"
+        onConfirm={() => {
+          setConfirmUnlikeOpen(false);
+          void runToggleLike();
+        }}
+        onCancel={() => setConfirmUnlikeOpen(false)}
+      />
     </div>
   );
 }
