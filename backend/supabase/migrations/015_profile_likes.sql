@@ -4,7 +4,7 @@
 create table if not exists public.profile_likes (
   user_id uuid not null references auth.users(id) on delete cascade,
   liked_profile_id uuid not null references public.profiles(user_id) on delete cascade,
-  event_id uuid not null references public.events(event_id) on delete cascade,
+  event_id uuid references public.events(event_id) on delete set null,
   created_at timestamptz not null default now(),
   primary key (user_id, liked_profile_id),
   check (user_id <> liked_profile_id)
