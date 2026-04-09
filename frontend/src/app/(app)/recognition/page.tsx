@@ -5,13 +5,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   api,
+  isApiErrorWithStatus,
   type ConsentResponse,
   type ProfileResponse,
   type CompatibilityResponse,
 } from "@/lib/api";
 import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import { Aurora } from "@/components/aurora";
-import { Camera, LogOut, ScanFace, Square } from "lucide-react";
+import { Camera, Heart, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -75,6 +76,8 @@ export default function RecognitionPage() {
   const [captureLoading, setCaptureLoading] = useState(false);
   const [cameraMode, setCameraMode] = useState(false);
   const [consentWarning, setConsentWarning] = useState<string | null>(null);
+  const [likedUserIds, setLikedUserIds] = useState<Set<string>>(new Set());
+  const [likePendingUserIds, setLikePendingUserIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<SocketClient | null>(null);
   const mountIdRef = useRef(`dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -125,6 +128,12 @@ export default function RecognitionPage() {
 
       accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
+      try {
+        const likes = await api.getMyProfileLikes();
+        setLikedUserIds(new Set(likes.map((like) => like.liked_profile_id)));
+      } catch (error) {
+        console.error("[Recognition] Failed to load likes:", error);
+      }
       socket.connect(session.access_token);
       setLoading(false);
     }
@@ -362,6 +371,49 @@ export default function RecognitionPage() {
     router.refresh();
   }
 
+  async function toggleLike(userId: string) {
+    if (likePendingUserIds.has(userId)) return;
+    const currentlyLiked = likedUserIds.has(userId);
+    if (!currentlyLiked && !selectedEventId) return;
+
+    setLikePendingUserIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
+
+    setLikedUserIds((prev) => {
+      const next = new Set(prev);
+      if (currentlyLiked) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+
+    try {
+      if (currentlyLiked) {
+        await api.unlikeProfile(userId);
+      } else {
+        await api.likeProfile(userId, selectedEventId!);
+      }
+    } catch (error) {
+      // 409 means the like already exists; keep liked state.
+      if (!(isApiErrorWithStatus(error, 409) && !currentlyLiked)) {
+        setLikedUserIds((prev) => {
+          const next = new Set(prev);
+          if (currentlyLiked) next.add(userId);
+          else next.delete(userId);
+          return next;
+        });
+      }
+    } finally {
+      setLikePendingUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    }
+  }
+
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Hidden camera elements for phone camera mode */}
@@ -494,7 +546,18 @@ export default function RecognitionPage() {
                   if (r.profile) {
                     sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(r.profile));
                   }
-                  router.push(`/profile/${userId}`);
+                  const profilePath = selectedEventId
+                    ? `/profile/${userId}?event_id=${encodeURIComponent(selectedEventId)}`
+                    : `/profile/${userId}`;
+                  router.push(profilePath);
+                }}
+                liked={Boolean(result.matched_user_id && likedUserIds.has(result.matched_user_id))}
+                likePending={Boolean(
+                  result.matched_user_id && likePendingUserIds.has(result.matched_user_id),
+                )}
+                canLike={Boolean(result.matched_user_id && selectedEventId)}
+                onToggleLike={(targetUserId) => {
+                  void toggleLike(targetUserId);
                 }}
               />
             ))}
@@ -545,10 +608,18 @@ function RecognitionCard({
   result,
   index,
   onSelect,
+  liked,
+  likePending,
+  canLike,
+  onToggleLike,
 }: {
   result: RecognitionResult;
   index: number;
   onSelect: (result: RecognitionResult) => void;
+  liked: boolean;
+  likePending: boolean;
+  canLike: boolean;
+  onToggleLike: (userId: string) => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const profile = result.profile;
@@ -659,7 +730,28 @@ const firstStarter = compat?.conversation_starters?.[0];
                 </p>
               )}
             </div>
-            <p className="shrink-0 text-[11px] text-white/22 pt-0.5">{formatTime(result.created_at)}</p>
+            <div className="shrink-0 flex items-center gap-2 pt-0.5">
+              {result.matched_user_id ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleLike(result.matched_user_id!);
+                  }}
+                  disabled={likePending || (!liked && !canLike)}
+                  className="group rounded-full p-1.5 transition-all active:scale-90 disabled:opacity-40"
+                  title={!liked && !canLike ? "Event context required to like" : "Toggle like"}
+                  aria-label={liked ? "Unlike profile" : "Like profile"}
+                >
+                  <Heart
+                    className={`h-4 w-4 transition-all ${
+                      liked ? "fill-red-500 text-red-500 scale-110" : "text-white/40 group-hover:text-white/60"
+                    }`}
+                  />
+                </button>
+              ) : null}
+              <p className="text-[11px] text-white/22">{formatTime(result.created_at)}</p>
+            </div>
           </div>
         </div>
       </div>
