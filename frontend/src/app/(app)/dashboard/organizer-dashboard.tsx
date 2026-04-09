@@ -44,6 +44,7 @@ interface OrganizerContentProps {
   deletingEventId: string | null;
   archivingEventId: string | null;
   unarchivingEventId: string | null;
+  onViewEventDetail: (event: EventResponse) => void;
   onEditEventRequest: (event: EventResponse) => void;
   onViewRsvpList: (event: EventResponse) => void;
   onArchiveEvent: (event: EventResponse) => Promise<void>;
@@ -57,6 +58,7 @@ export function OrganizerContent({
   deletingEventId,
   archivingEventId,
   unarchivingEventId,
+  onViewEventDetail,
   onEditEventRequest,
   onViewRsvpList,
   onArchiveEvent,
@@ -166,7 +168,11 @@ export function OrganizerContent({
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => onViewEventDetail(event)}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <h3 className="text-[17px] font-medium text-white/90">{event.name}</h3>
                     <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/45">
                       {event.starts_at ? (
@@ -182,7 +188,7 @@ export function OrganizerContent({
                         </span>
                       ) : null}
                     </div>
-                  </div>
+                  </button>
                   <div
                     className="relative"
                     ref={openEventMenuId === event.event_id ? openMenuContainerRef : null}
@@ -266,7 +272,11 @@ export function OrganizerContent({
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => onViewEventDetail(event)}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <h3 className="text-[17px] font-medium text-white/90">{event.name}</h3>
                     <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/45">
                       {event.starts_at ? (
@@ -282,7 +292,7 @@ export function OrganizerContent({
                         </span>
                       ) : null}
                     </div>
-                  </div>
+                  </button>
                   <div
                     className="relative"
                     ref={openEventMenuId === event.event_id ? openMenuContainerRef : null}
