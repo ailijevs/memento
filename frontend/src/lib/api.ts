@@ -216,6 +216,8 @@ export interface EventCreateRequest {
   starts_at?: string;
   ends_at?: string;
   location?: string;
+  description?: string;
+  max_participants?: number;
   is_active?: boolean;
 }
 
@@ -224,6 +226,8 @@ export interface EventUpdateRequest {
   starts_at?: string;
   ends_at?: string;
   location?: string;
+  description?: string;
+  max_participants?: number;
   is_active?: boolean;
 }
 
@@ -296,6 +300,8 @@ export interface EventResponse {
   starts_at: string | null;
   ends_at: string | null;
   location: string | null;
+  description: string | null;
+  max_participants: number | null;
   is_active: boolean;
   indexing_status: "pending" | "in_progress" | "completed" | "failed";
   cleanup_status: "pending" | "in_progress" | "completed" | "failed";
