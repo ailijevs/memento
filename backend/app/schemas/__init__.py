@@ -31,6 +31,8 @@ from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
     ProfileDirectoryResponse,
+    ProfileLikeCreateRequest,
+    ProfileLikeResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -69,6 +71,8 @@ __all__ = [
     "ProfileCreate",
     "ProfileDirectoryEntry",
     "ProfileDirectoryResponse",
+    "ProfileLikeCreateRequest",
+    "ProfileLikeResponse",
     "ProfileResponse",
     "ProfileUpdate",
     # Recognition
