@@ -354,6 +354,7 @@ export interface ProfileLikeResponse {
   user_id: string;
   liked_profile_id: string;
   event_id: string | null;
+  event_name: string | null;
   created_at: string;
 }
 

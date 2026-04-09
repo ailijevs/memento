@@ -97,4 +97,5 @@ class ProfileLikeResponse(BaseModel):
     user_id: UUID
     liked_profile_id: UUID
     event_id: UUID | None
+    event_name: str | None = None
     created_at: datetime
