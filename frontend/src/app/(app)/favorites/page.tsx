@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { api, isApiErrorWithStatus, type ProfileLikeResponse, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
-import { Heart } from "lucide-react";
+import { Heart, Search } from "lucide-react";
 
 type FavoriteItem = {
   like: ProfileLikeResponse;
@@ -27,6 +27,7 @@ export default function FavoritesPage() {
   const [loading, setLoading] = useState(true);
   const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
   const [confirmUnlikeUserId, setConfirmUnlikeUserId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -121,7 +122,20 @@ export default function FavoritesPage() {
     await runLikeToggle(targetUserId);
   }
 
-  const visibleFavorites = favorites.filter((item) => item.liked);
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+  const visibleFavorites = favorites.filter((item) => {
+    if (!item.liked) return false;
+    if (!normalizedQuery) return true;
+
+    const name = item.profile?.full_name?.toLowerCase() ?? "";
+    const headline = item.profile?.headline?.toLowerCase() ?? "";
+    const eventName = item.like.event_name?.toLowerCase() ?? "";
+    return (
+      name.includes(normalizedQuery) ||
+      headline.includes(normalizedQuery) ||
+      eventName.includes(normalizedQuery)
+    );
+  });
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
@@ -147,6 +161,21 @@ export default function FavoritesPage() {
         >
           Favorites
         </h1>
+        <div
+          className="mt-3 flex items-center gap-2 rounded-2xl px-3 py-2.5"
+          style={{
+            background: "rgba(255,255,255,0.06)",
+            border: "1px solid rgba(255,255,255,0.10)",
+          }}
+        >
+          <Search className="h-4 w-4 text-white/35" />
+          <input
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Search favorites"
+            className="w-full bg-transparent text-[14px] text-white placeholder:text-white/30 outline-none"
+          />
+        </div>
       </div>
 
       <div className="relative z-10 flex-1 overflow-y-auto px-6 pb-4">
@@ -156,9 +185,13 @@ export default function FavoritesPage() {
           </div>
         ) : visibleFavorites.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-[15px] text-white/30">No favorites yet</p>
+            <p className="text-[15px] text-white/30">
+              {normalizedQuery ? "No matches found" : "No favorites yet"}
+            </p>
             <p className="mt-2 text-[13px] text-white/15">
-              Like people from recognition to save them here
+              {normalizedQuery
+                ? "Try a different name, headline, or event"
+                : "Like people from recognition to save them here"}
             </p>
           </div>
         ) : (
