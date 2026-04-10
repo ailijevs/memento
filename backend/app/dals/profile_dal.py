@@ -11,6 +11,7 @@ from app.dals.base_dal import BaseDAL
 from app.schemas import (
     ProfileCreate,
     ProfileDirectoryEntry,
+    ProfileLikeResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -21,6 +22,7 @@ class ProfileDAL(BaseDAL):
     """DAL for profile operations."""
 
     TABLE = "profiles"
+    PROFILE_LIKES_TABLE = "profile_likes"
 
     def __init__(self, client: Client):
         super().__init__(client)
@@ -130,6 +132,78 @@ class ProfileDAL(BaseDAL):
         if response.data:
             return ProfileResponse(**response.data[0])
         return None
+
+    async def create_profile_like(
+        self,
+        *,
+        user_id: UUID,
+        liked_profile_id: UUID,
+        event_id: UUID,
+    ) -> ProfileLikeResponse:
+        """Create a profile-like row."""
+        insert_data = {
+            "user_id": str(user_id),
+            "liked_profile_id": str(liked_profile_id),
+            "event_id": str(event_id),
+        }
+        response = self.client.table(self.PROFILE_LIKES_TABLE).insert(insert_data).execute()
+        return ProfileLikeResponse(**response.data[0])
+
+    async def get_user_profile_likes(self, *, user_id: UUID) -> list[ProfileLikeResponse]:
+        """List all profile likes created by a user."""
+        response = (
+            self.client.table(self.PROFILE_LIKES_TABLE)
+            .select("*")
+            .eq("user_id", str(user_id))
+            .order("created_at", desc=True)
+            .execute()
+        )
+        rows: list[dict[str, Any]] = response.data or []
+
+        event_names_by_id: dict[str, str | None] = {}
+
+        likes: list[ProfileLikeResponse] = []
+        for row in rows:
+            event_id = row.get("event_id")
+            event_name: str | None = None
+
+            if event_id is not None:
+                event_id_str = str(event_id)
+                if event_id_str in event_names_by_id:
+                    event_name = event_names_by_id[event_id_str]
+                else:
+                    event_response = (
+                        self.client.table("events")
+                        .select("event_id,name")
+                        .eq("event_id", event_id_str)
+                        .maybe_single()
+                        .execute()
+                    )
+                    event_name = (
+                        event_response.data.get("name")
+                        if event_response and event_response.data
+                        else None
+                    )
+                    event_names_by_id[event_id_str] = event_name
+
+            likes.append(ProfileLikeResponse(**row, event_name=event_name))
+        return likes
+
+    async def delete_profile_like(
+        self,
+        *,
+        user_id: UUID,
+        liked_profile_id: UUID,
+    ) -> bool:
+        """Delete a profile-like row."""
+        response = (
+            self.client.table(self.PROFILE_LIKES_TABLE)
+            .delete()
+            .eq("user_id", str(user_id))
+            .eq("liked_profile_id", str(liked_profile_id))
+            .execute()
+        )
+        return len(response.data) > 0
 
 
 def _extract_current_school(education: Any) -> str | None:

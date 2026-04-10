@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useParams } from "next/navigation";
+import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, type ProfileResponse } from "@/lib/api";
+import { api, isApiErrorWithStatus, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
-import { ChevronLeft, MapPin, Briefcase, GraduationCap, ExternalLink } from "lucide-react";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
+import { ChevronLeft, MapPin, Briefcase, GraduationCap, ExternalLink, Heart } from "lucide-react";
 
 function resolvePhotoUrl(photoPath: string | null): string | null {
   if (!photoPath) return null;
@@ -17,20 +18,25 @@ function resolvePhotoUrl(photoPath: string | null): string | null {
 export default function UserProfilePage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const userId = params.userId as string;
+  const eventId = searchParams.get("event_id")?.trim() || null;
+  const source = searchParams.get("source")?.trim() || null;
+  const cameFromFavorites = source === "favorites";
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgFailed, setImgFailed] = useState(false);
+  const [liked, setLiked] = useState(false);
+  const [likePending, setLikePending] = useState(false);
+  const [confirmUnlikeOpen, setConfirmUnlikeOpen] = useState(false);
 
   useEffect(() => {
     // Show cached data instantly if available
-    let hadCache = false;
     const cached = sessionStorage.getItem(`profile_cache_${userId}`);
     if (cached) {
       try {
         setProfile(JSON.parse(cached));
         setLoading(false);
-        hadCache = true;
       } catch { /* ignore bad cache */ }
     }
 
@@ -40,8 +46,12 @@ export default function UserProfilePage() {
       if (!session) { router.push("/login"); return; }
       api.setToken(session.access_token);
       try {
-        const p = await api.getProfileById(userId);
+        const [p, likes] = await Promise.all([
+          api.getProfileById(userId),
+          api.getMyProfileLikes(),
+        ]);
         setProfile(p);
+        setLiked(likes.some((like) => like.liked_profile_id === userId));
         sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(p));
       } catch {
         // If fetch fails and we already have cached data, keep showing it
@@ -49,8 +59,39 @@ export default function UserProfilePage() {
         setLoading(false);
       }
     }
-    load();
+    void load();
   }, [userId, router]);
+
+  async function runToggleLike() {
+    if (likePending) return;
+    if (!liked && !eventId) return;
+
+    const wasLiked = liked;
+    setLikePending(true);
+    setLiked(!wasLiked);
+
+    try {
+      if (wasLiked) {
+        await api.unlikeProfile(userId);
+      } else {
+        await api.likeProfile(userId, eventId!);
+      }
+    } catch (error) {
+      if (!(isApiErrorWithStatus(error, 409) && !wasLiked)) {
+        setLiked(wasLiked);
+      }
+    } finally {
+      setLikePending(false);
+    }
+  }
+
+  async function toggleLike() {
+    if (liked && cameFromFavorites) {
+      setConfirmUnlikeOpen(true);
+      return;
+    }
+    await runToggleLike();
+  }
 
   if (loading) {
     return (
@@ -93,15 +134,33 @@ export default function UserProfilePage() {
         }}
       />
 
-      {/* Back button */}
+      {/* Header actions */}
       <div className="relative z-10 px-4 pt-14">
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-1 text-white/40 active:text-white/70 transition-colors"
-        >
-          <ChevronLeft className="h-5 w-5" />
-          <span className="text-[14px]">Back</span>
-        </button>
+        <div className="flex items-center justify-between">
+          <button
+            onClick={() => router.back()}
+            className="flex items-center gap-1 text-white/40 active:text-white/70 transition-colors"
+          >
+            <ChevronLeft className="h-5 w-5" />
+            <span className="text-[14px]">Back</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void toggleLike();
+            }}
+            disabled={likePending || (!liked && !eventId)}
+            className="rounded-full p-2 transition-all active:scale-90 disabled:opacity-40"
+            title={!liked && !eventId ? "Event context required to like" : "Toggle like"}
+            aria-label={liked ? "Unlike profile" : "Like profile"}
+          >
+            <Heart
+              className={`h-5 w-5 transition-all ${
+                liked ? "fill-red-500 text-red-500 scale-110" : "text-white/45"
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Scrollable content */}
@@ -224,6 +283,18 @@ export default function UserProfilePage() {
           )}
         </div>
       </div>
+
+      <ConfirmationDialog
+        open={confirmUnlikeOpen}
+        title="Remove Favorite?"
+        message="This profile will be removed from your favorites."
+        confirmLabel="Remove"
+        onConfirm={() => {
+          setConfirmUnlikeOpen(false);
+          void runToggleLike();
+        }}
+        onCancel={() => setConfirmUnlikeOpen(false)}
+      />
     </div>
   );
 }

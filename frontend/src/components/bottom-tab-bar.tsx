@@ -1,10 +1,11 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarDays, User } from "lucide-react";
+import { CalendarDays, Heart, User } from "lucide-react";
 
 const TABS = [
   { label: "Dashboard", href: "/dashboard", Icon: CalendarDays },
+  { label: "Favorites", href: "/favorites", Icon: Heart },
   { label: "Profile", href: "/profile", Icon: User },
 ];
 
