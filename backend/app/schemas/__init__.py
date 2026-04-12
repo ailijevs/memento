@@ -34,6 +34,7 @@ from .profile import (
     ProfilePhotoUploadConfirmRequest,
     ProfilePhotoUploadUrlRequest,
     ProfilePhotoUploadUrlResponse,
+    ProfilePhotoUrlResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -73,6 +74,7 @@ __all__ = [
     "ProfileDirectoryEntry",
     "ProfileDirectoryResponse",
     "ProfilePhotoUploadConfirmRequest",
+    "ProfilePhotoUrlResponse",
     "ProfilePhotoUploadUrlRequest",
     "ProfilePhotoUploadUrlResponse",
     "ProfileResponse",

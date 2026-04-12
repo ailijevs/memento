@@ -413,3 +413,97 @@ def test_confirm_profile_photo_upload_500_when_bucket_missing(client: TestClient
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Profile image storage is not configured."
+
+
+def test_get_my_profile_photo_url_returns_none_when_photo_missing(client: TestClient, monkeypatch):
+    """Returns null fields when the profile has no photo_path."""
+    user = _mock_user()
+    profile = _profile_response(user_id=user.id, photo_path=None)
+    profile_dal = SimpleNamespace(get_by_user_id=AsyncMock(return_value=profile))
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_profile_dal] = lambda: profile_dal
+
+    response = client.get("/api/v1/profiles/me/photo-url")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "photo_url": None,
+        "expires_at": None,
+    }
+
+
+def test_get_my_profile_photo_url_treats_url_like_path_as_s3_key(client: TestClient, monkeypatch):
+    """Treats stored photo_path as S3 key even when it looks like an absolute URL."""
+    user = _mock_user()
+    url_like_path = "https://cdn.example.com/profiles/u1.jpg"
+    profile = _profile_response(user_id=user.id, photo_path=url_like_path)
+    profile_dal = SimpleNamespace(get_by_user_id=AsyncMock(return_value=profile))
+
+    class FakeS3Service:
+        def get_profile_picture_presigned_url(self, *, s3_key, bucket_name, expires_in_seconds):
+            assert s3_key == url_like_path
+            assert bucket_name == "profile-bucket"
+            assert expires_in_seconds == 600
+            return "https://example.com/presigned-get"
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_profile_dal] = lambda: profile_dal
+    monkeypatch.setattr(
+        profiles_api,
+        "get_settings",
+        lambda: SimpleNamespace(s3_bucket_name="profile-bucket"),
+    )
+    monkeypatch.setattr(profiles_api, "S3Service", FakeS3Service)
+
+    response = client.get("/api/v1/profiles/me/photo-url")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["photo_url"] == "https://example.com/presigned-get"
+    assert "s3_key" not in body
+    assert isinstance(body["expires_at"], str) and body["expires_at"]
+
+
+def test_get_my_profile_photo_url_presigns_s3_key(client: TestClient, monkeypatch):
+    """Returns a presigned URL when photo_path stores an S3 key."""
+    user = _mock_user()
+    s3_key = "profiles/u1-onboarding"
+    profile = _profile_response(user_id=user.id, photo_path=s3_key)
+    profile_dal = SimpleNamespace(get_by_user_id=AsyncMock(return_value=profile))
+
+    class FakeS3Service:
+        def get_profile_picture_presigned_url(self, *, s3_key, bucket_name, expires_in_seconds):
+            assert s3_key == "profiles/u1-onboarding"
+            assert bucket_name == "profile-bucket"
+            assert expires_in_seconds == 600
+            return "https://example.com/presigned-get"
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_profile_dal] = lambda: profile_dal
+    monkeypatch.setattr(
+        profiles_api,
+        "get_settings",
+        lambda: SimpleNamespace(s3_bucket_name="profile-bucket"),
+    )
+    monkeypatch.setattr(profiles_api, "S3Service", FakeS3Service)
+
+    response = client.get("/api/v1/profiles/me/photo-url")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["photo_url"] == "https://example.com/presigned-get"
+    assert "s3_key" not in body
+    assert isinstance(body["expires_at"], str) and body["expires_at"]
+
+
+def test_get_my_profile_photo_url_404_when_profile_missing(client: TestClient, monkeypatch):
+    """Returns 404 when current user's profile does not exist."""
+    profile_dal = SimpleNamespace(get_by_user_id=AsyncMock(return_value=None))
+    app.dependency_overrides[get_current_user] = _mock_user
+    app.dependency_overrides[get_profile_dal] = lambda: profile_dal
+
+    response = client.get("/api/v1/profiles/me/photo-url")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Profile not found. Please create one first."

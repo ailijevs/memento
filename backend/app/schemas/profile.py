@@ -103,3 +103,10 @@ class ProfilePhotoUploadConfirmRequest(BaseModel):
     """Payload for confirming a direct profile photo upload to S3."""
 
     s3_key: str = Field(..., min_length=1, max_length=1024)
+
+
+class ProfilePhotoUrlResponse(BaseModel):
+    """Response payload for resolving a renderable profile photo URL."""
+
+    photo_url: str | None = None
+    expires_at: datetime | None = None

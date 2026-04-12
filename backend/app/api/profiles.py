@@ -3,6 +3,7 @@
 import asyncio
 import ipaddress
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 from urllib.parse import urlparse
 from uuid import UUID
@@ -25,6 +26,7 @@ from app.schemas import (
     ProfilePhotoUploadConfirmRequest,
     ProfilePhotoUploadUrlRequest,
     ProfilePhotoUploadUrlResponse,
+    ProfilePhotoUrlResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -135,6 +137,59 @@ async def update_my_profile(
             detail="Profile not found. Please create one first.",
         )
     return await _refresh_generated_profile_summary(dal, profile)
+
+
+@router.get("/me/photo-url", response_model=ProfilePhotoUrlResponse)
+async def get_my_profile_photo_url(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> ProfilePhotoUrlResponse:
+    """Return a renderable URL for the current user's profile photo."""
+    presign_ttl_seconds = 600
+    profile = await dal.get_by_user_id(current_user.id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found. Please create one first.",
+        )
+
+    photo_path = (profile.photo_path or "").strip()
+    if not photo_path:
+        return ProfilePhotoUrlResponse(
+            photo_url=None,
+            expires_at=None,
+        )
+
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Profile image storage is not configured.",
+        )
+
+    s3_service = S3Service()
+    try:
+        photo_url = s3_service.get_profile_picture_presigned_url(
+            s3_key=photo_path,
+            bucket_name=settings.s3_bucket_name,
+            expires_in_seconds=presign_ttl_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=presign_ttl_seconds)
+    return ProfilePhotoUrlResponse(
+        photo_url=photo_url,
+        expires_at=expires_at,
+    )
 
 
 @router.post("/me/photo-upload-url", response_model=ProfilePhotoUploadUrlResponse)
