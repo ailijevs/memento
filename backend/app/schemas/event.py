@@ -23,6 +23,8 @@ class EventBase(BaseModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     location: str | None = Field(None, max_length=500)
+    description: str | None = Field(None, max_length=2000)
+    max_participants: int | None = Field(None, gt=0)
     is_active: bool = True
 
     @field_validator("ends_at")
@@ -49,6 +51,8 @@ class EventUpdate(BaseModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     location: str | None = Field(default=None, max_length=500)
+    description: str | None = Field(default=None, max_length=2000)
+    max_participants: int | None = Field(default=None, gt=0)
     is_active: bool | None = None
     indexing_status: EventProcessingStatus | None = None
     cleanup_status: EventProcessingStatus | None = None
