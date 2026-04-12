@@ -22,6 +22,8 @@ from app.schemas import (
     ProfileCompletionResponse,
     ProfileCreate,
     ProfileDirectoryResponse,
+    ProfilePhotoUploadUrlRequest,
+    ProfilePhotoUploadUrlResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -132,6 +134,60 @@ async def update_my_profile(
             detail="Profile not found. Please create one first.",
         )
     return await _refresh_generated_profile_summary(dal, profile)
+
+
+@router.post("/me/photo-upload-url", response_model=ProfilePhotoUploadUrlResponse)
+async def create_profile_photo_upload_url(
+    data: ProfilePhotoUploadUrlRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> ProfilePhotoUploadUrlResponse:
+    """Generate a pre-signed URL for direct profile photo upload to S3."""
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Profile image storage is not configured.",
+        )
+
+    s3_service = S3Service()
+    existing_profile = await dal.get_by_user_id(current_user.id)
+    existing_s3_key = (existing_profile.photo_path or "").strip() if existing_profile else ""
+
+    try:
+        if existing_s3_key:
+            try:
+                s3_service.delete_profile_picture(
+                    s3_key=existing_s3_key,
+                    bucket_name=settings.s3_bucket_name,
+                )
+            except Exception as exc:
+                if _is_no_such_object_error(exc):
+                    logger.info(
+                        "Profile photo key not found during delete, continuing: key=%s",
+                        existing_s3_key,
+                    )
+                else:
+                    raise
+        upload_data = s3_service.generate_upload_url(
+            user_id=current_user.id,
+            bucket_name=settings.s3_bucket_name,
+            source=data.source,
+            expires_in_seconds=300,
+            content_type=data.content_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+
+    return ProfilePhotoUploadUrlResponse(**upload_data)
 
 
 @router.post("/enrich-linkedin", response_model=LinkedInEnrichmentResponse)
@@ -611,6 +667,19 @@ def _parse_graduation_year(end_date: str | None) -> int | None:
         if 1900 <= year <= 2100:
             return year
     return None
+
+
+def _is_no_such_object_error(exc: Exception) -> bool:
+    """Best-effort check for missing S3 object deletion errors."""
+    message = str(exc)
+    if "NoSuchKey" in message or "NoSuchObject" in message:
+        return True
+    response = getattr(exc, "response", None)
+    if isinstance(response, dict):
+        error = response.get("Error", {})
+        code = str(error.get("Code", ""))
+        return code in {"NoSuchKey", "NoSuchObject", "404", "NotFound"}
+    return False
 
 
 async def _refresh_generated_profile_summary(

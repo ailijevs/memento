@@ -1,6 +1,7 @@
 """Pydantic schemas for user profiles."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -81,3 +82,18 @@ class ProfileDirectoryResponse(BaseModel):
     entries: list[ProfileDirectoryEntry]
     total_count: int
     hidden_count: int
+
+
+class ProfilePhotoUploadUrlRequest(BaseModel):
+    """Payload for requesting a direct profile photo upload URL."""
+
+    content_type: str = Field(default="image/jpeg", max_length=255)
+    source: Literal["onboarding", "linkedin"] = "onboarding"
+
+
+class ProfilePhotoUploadUrlResponse(BaseModel):
+    """Response containing upload metadata for direct-to-S3 profile photo uploads."""
+
+    upload_url: str
+    s3_key: str
+    content_type: str
