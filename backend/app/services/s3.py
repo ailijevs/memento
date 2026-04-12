@@ -158,6 +158,30 @@ class S3Service:
                 f"Failed to generate pre-signed URL for profile key '{cleaned_s3_key}'."
             ) from exc
 
+    def profile_picture_exists(
+        self,
+        *,
+        s3_key: str,
+        bucket_name: str,
+    ) -> bool:
+        """Return True if a profile picture object exists in S3."""
+        cleaned_bucket_name = self._clean_bucket_name(bucket_name)
+        cleaned_s3_key = self._clean_s3_key(s3_key)
+
+        try:
+            self.client.head_object(Bucket=cleaned_bucket_name, Key=cleaned_s3_key)
+            return True
+        except Exception as exc:
+            if self._is_not_found_error(exc):
+                return False
+            raise RuntimeError(
+                f"Failed to verify existence for profile key '{cleaned_s3_key}'."
+            ) from exc
+
+    def is_not_found_error(self, exc: Exception) -> bool:
+        """Return True when an S3 exception indicates object/key not found."""
+        return self._is_not_found_error(exc)
+
     def _create_client(self) -> Any:
         """Create a boto3 S3 client when one is not injected."""
         try:
@@ -205,6 +229,18 @@ class S3Service:
         if include_extension:
             key += _DEFAULT_EXTENSION
         return key
+
+    def _is_not_found_error(self, exc: Exception) -> bool:
+        """Return True when an S3 exception indicates the object does not exist."""
+        message = str(exc)
+        if "NoSuchKey" in message or "NoSuchObject" in message:
+            return True
+        response = getattr(exc, "response", None)
+        if isinstance(response, dict):
+            error = response.get("Error", {})
+            code = str(error.get("Code", ""))
+            return code in {"NoSuchKey", "NoSuchObject", "404", "NotFound"}
+        return False
 
     def _to_rgb(self, image: Any) -> Any:
         """Convert a Pillow image to RGB, flattening alpha onto white if needed."""

@@ -26,7 +26,9 @@ class DummyS3Client:
         self.calls: list[dict] = []
         self.delete_calls: list[dict] = []
         self.presign_calls: list[dict] = []
+        self.head_calls: list[dict] = []
         self.presign_url = "https://example.com/presigned"
+        self.head_exception: Exception | None = None
 
     def upload_fileobj(self, fileobj, bucket, key, ExtraArgs):  # noqa: N803
         """Record upload details from boto3-compatible upload call."""
@@ -49,6 +51,13 @@ class DummyS3Client:
             {"client_method": ClientMethod, "params": Params, "expires_in": ExpiresIn}
         )
         return self.presign_url
+
+    def head_object(self, Bucket, Key):  # noqa: N803
+        """Record head_object checks or raise a configured exception."""
+        self.head_calls.append({"bucket": Bucket, "key": Key})
+        if self.head_exception is not None:
+            raise self.head_exception
+        return {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
 
 def _png_bytes(mode: str = "RGB") -> bytes:
@@ -425,4 +434,64 @@ def test_generate_upload_url_raises_on_presign_error():
             user_id="u1",
             bucket_name="bucket",
             source="linkedin",
+        )
+
+
+def test_profile_picture_exists_validates_inputs():
+    """profile_picture_exists validates required inputs."""
+    service = S3Service(s3_client=DummyS3Client())
+
+    with pytest.raises(ValueError, match="bucket_name must not be empty"):
+        service.profile_picture_exists(
+            s3_key="profiles/u1-onboarding",
+            bucket_name="   ",
+        )
+
+    with pytest.raises(ValueError, match="s3_key must not be empty"):
+        service.profile_picture_exists(
+            s3_key="  ",
+            bucket_name="bucket",
+        )
+
+
+def test_profile_picture_exists_returns_true_when_head_object_succeeds():
+    """profile_picture_exists returns True when head_object succeeds."""
+    client = DummyS3Client()
+    service = S3Service(s3_client=client)
+
+    result = service.profile_picture_exists(
+        s3_key=" profiles/u1-onboarding ",
+        bucket_name=" my-bucket ",
+    )
+
+    assert result is True
+    assert client.head_calls == [
+        {"bucket": "my-bucket", "key": "profiles/u1-onboarding"},
+    ]
+
+
+def test_profile_picture_exists_returns_false_on_not_found():
+    """profile_picture_exists returns False for NoSuchKey errors."""
+    client = DummyS3Client()
+    client.head_exception = Exception("NoSuchKey")
+    service = S3Service(s3_client=client)
+
+    result = service.profile_picture_exists(
+        s3_key="profiles/u1-onboarding",
+        bucket_name="bucket",
+    )
+
+    assert result is False
+
+
+def test_profile_picture_exists_raises_on_unexpected_error():
+    """profile_picture_exists wraps unexpected errors in RuntimeError."""
+    client = DummyS3Client()
+    client.head_exception = Exception("boom")
+    service = S3Service(s3_client=client)
+
+    with pytest.raises(RuntimeError, match="Failed to verify existence"):
+        service.profile_picture_exists(
+            s3_key="profiles/u1-onboarding",
+            bucket_name="bucket",
         )

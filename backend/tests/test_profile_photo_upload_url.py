@@ -1,6 +1,7 @@
 """Tests for POST /api/v1/profiles/me/photo-upload-url."""
 
 import os
+from datetime import UTC, datetime
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 from uuid import uuid4
@@ -14,6 +15,7 @@ from app.api import profiles as profiles_api  # noqa: E402
 from app.api.profiles import get_profile_dal  # noqa: E402
 from app.auth import CurrentUser, get_current_user  # noqa: E402
 from app.main import app  # noqa: E402
+from app.schemas.profile import ProfileResponse  # noqa: E402
 
 
 @pytest.fixture
@@ -30,6 +32,29 @@ def _mock_user() -> CurrentUser:
         id=uuid4(),
         email="test@example.com",
         access_token="test-token",
+    )
+
+
+def _profile_response(*, user_id, photo_path: str | None) -> ProfileResponse:
+    return ProfileResponse(
+        user_id=user_id,
+        full_name="Test User",
+        headline=None,
+        bio=None,
+        location=None,
+        company=None,
+        major=None,
+        graduation_year=None,
+        linkedin_url=None,
+        photo_path=photo_path,
+        experiences=[],
+        education=[],
+        profile_one_liner=None,
+        profile_summary=None,
+        summary_provider=None,
+        summary_updated_at=None,
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
     )
 
 
@@ -296,3 +321,95 @@ def test_create_profile_photo_upload_url_continues_when_delete_missing_key(
         "delete:profile-bucket:profiles/existing-onboarding",
         "generate:profile-bucket:onboarding:300:image/jpeg",
     ]
+
+
+def test_confirm_profile_photo_upload_success(client: TestClient, monkeypatch):
+    """Confirms S3 object exists and stores s3_key in profile.photo_path."""
+    user = _mock_user()
+    updated_profile = _profile_response(
+        user_id=user.id,
+        photo_path="profiles/new-onboarding",
+    )
+
+    class FakeS3Service:
+        def profile_picture_exists(self, *, s3_key, bucket_name):
+            assert bucket_name == "profile-bucket"
+            assert s3_key == "profiles/new-onboarding"
+            return True
+
+    profile_dal = SimpleNamespace(
+        get_by_user_id=AsyncMock(return_value=updated_profile),
+        update=AsyncMock(return_value=updated_profile),
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_profile_dal] = lambda: profile_dal
+    monkeypatch.setattr(
+        profiles_api,
+        "get_settings",
+        lambda: SimpleNamespace(s3_bucket_name="profile-bucket"),
+    )
+    monkeypatch.setattr(profiles_api, "S3Service", FakeS3Service)
+
+    response = client.post(
+        "/api/v1/profiles/me/photo-upload-confirm",
+        json={"s3_key": "profiles/new-onboarding"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["photo_path"] == "profiles/new-onboarding"
+    profile_dal.update.assert_awaited_once()
+    update_args = profile_dal.update.await_args.args
+    assert update_args[0] == user.id
+    assert update_args[1].photo_path == "profiles/new-onboarding"
+
+
+def test_confirm_profile_photo_upload_404_when_s3_object_missing(client: TestClient, monkeypatch):
+    """Returns 404 when the uploaded object is not found in S3."""
+
+    class FakeS3Service:
+        def profile_picture_exists(self, *, s3_key, bucket_name):
+            return False
+
+    profile_dal = SimpleNamespace(
+        update=AsyncMock(),
+    )
+
+    app.dependency_overrides[get_current_user] = _mock_user
+    app.dependency_overrides[get_profile_dal] = lambda: profile_dal
+    monkeypatch.setattr(
+        profiles_api,
+        "get_settings",
+        lambda: SimpleNamespace(s3_bucket_name="profile-bucket"),
+    )
+    monkeypatch.setattr(profiles_api, "S3Service", FakeS3Service)
+
+    response = client.post(
+        "/api/v1/profiles/me/photo-upload-confirm",
+        json={"s3_key": "profiles/new-onboarding"},
+    )
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Uploaded profile photo was not found in storage."
+    profile_dal.update.assert_not_awaited()
+
+
+def test_confirm_profile_photo_upload_500_when_bucket_missing(client: TestClient, monkeypatch):
+    """Returns 500 when S3 bucket config is missing."""
+    app.dependency_overrides[get_current_user] = _mock_user
+    app.dependency_overrides[get_profile_dal] = lambda: SimpleNamespace(
+        update=AsyncMock(),
+    )
+    monkeypatch.setattr(
+        profiles_api,
+        "get_settings",
+        lambda: SimpleNamespace(s3_bucket_name=None),
+    )
+
+    response = client.post(
+        "/api/v1/profiles/me/photo-upload-confirm",
+        json={"s3_key": "profiles/new-onboarding"},
+    )
+
+    assert response.status_code == 500
+    assert response.json()["detail"] == "Profile image storage is not configured."

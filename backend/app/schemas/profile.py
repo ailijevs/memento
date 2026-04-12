@@ -97,3 +97,9 @@ class ProfilePhotoUploadUrlResponse(BaseModel):
     upload_url: str
     s3_key: str
     content_type: str
+
+
+class ProfilePhotoUploadConfirmRequest(BaseModel):
+    """Payload for confirming a direct profile photo upload to S3."""
+
+    s3_key: str = Field(..., min_length=1, max_length=1024)
