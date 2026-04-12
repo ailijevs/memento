@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, type ProfileResponse, type ProfileUpdateRequest } from "@/lib/api";
+import { uploadProfilePhoto } from "@/lib/profile-photo-upload";
 import { Aurora } from "@/components/aurora";
 import {
   Camera,
@@ -25,6 +26,8 @@ export default function ProfilePage() {
   const [draftValue, setDraftValue] = useState("");
   const [saving, setSaving] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
+  const [photoStatus, setPhotoStatus] = useState<string | null>(null);
+  const [photoStatusError, setPhotoStatusError] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,7 +44,11 @@ export default function ProfilePage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        setPhotoStatus("Upload failed. Please try again later.");
+        setPhotoStatusError(true);
+        return;
+      }
       api.setToken(session.access_token);
       try {
         const p = await api.getProfile();
@@ -82,6 +89,8 @@ export default function ProfilePage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setPhotoLoading(true);
+    setPhotoStatus("Uploading photo...");
+    setPhotoStatusError(false);
     try {
       const supabase = createClient();
       const {
@@ -89,19 +98,16 @@ export default function ProfilePage() {
       } = await supabase.auth.getSession();
       if (!session) return;
 
-      const filePath = `${session.user.id}/avatar.jpg`;
-      await supabase.storage
-        .from("profile-photos")
-        .upload(filePath, file, { upsert: true, contentType: file.type });
-
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("profile-photos").getPublicUrl(filePath);
-
       api.setToken(session.access_token);
-      const updated = await api.updateProfile({ photo_path: publicUrl });
+      const updated = await uploadProfilePhoto(file, "onboarding");
       setProfile(updated);
+      setPhotoStatus("Upload complete.");
+      setPhotoStatusError(false);
+    } catch {
+      setPhotoStatus("Upload failed. Please try again later.");
+      setPhotoStatusError(true);
     } finally {
+      e.target.value = "";
       setPhotoLoading(false);
     }
   }
@@ -187,6 +193,15 @@ export default function ProfilePage() {
             className="hidden"
             onChange={handlePhotoChange}
           />
+          {photoStatus ? (
+            <p
+              className={`mt-1 text-[12px] ${
+                photoStatusError ? "text-red-400/80" : "text-emerald-300/80"
+              }`}
+            >
+              {photoStatus}
+            </p>
+          ) : null}
 
           {/* Name */}
           <FieldEditor
