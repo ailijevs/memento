@@ -343,3 +343,86 @@ def test_get_profile_picture_presigned_url_raises_on_presign_error():
             s3_key="profiles/u1-linkedin.jpg",
             bucket_name="bucket",
         )
+
+
+def test_generate_upload_url_validates_inputs():
+    """generate_upload_url validates required inputs."""
+    service = S3Service(s3_client=DummyS3Client())
+
+    with pytest.raises(ValueError, match="bucket_name must not be empty"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="   ",
+            source="onboarding",
+        )
+
+    with pytest.raises(ValueError, match="user_id must not be empty"):
+        service.generate_upload_url(
+            user_id=" ",
+            bucket_name="bucket",
+            source="onboarding",
+        )
+
+    with pytest.raises(ValueError, match="content_type must not be empty"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="bucket",
+            source="onboarding",
+            content_type="   ",
+        )
+
+    with pytest.raises(ValueError, match="expires_in_seconds must be greater than 0"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="bucket",
+            source="onboarding",
+            expires_in_seconds=0,
+        )
+
+
+def test_generate_upload_url_returns_put_presigned_url_and_key():
+    """generate_upload_url returns upload URL metadata for direct PUT uploads."""
+    client = DummyS3Client()
+    service = S3Service(s3_client=client)
+
+    result = service.generate_upload_url(
+        user_id=" u123 ",
+        bucket_name=" my-bucket ",
+        source="onboarding",
+        expires_in_seconds=900,
+        content_type=" image/png ",
+    )
+
+    assert result == {
+        "upload_url": "https://example.com/presigned",
+        "s3_key": "profiles/u123-onboarding",
+        "content_type": "image/png",
+    }
+    assert client.presign_calls == [
+        {
+            "client_method": "put_object",
+            "params": {
+                "Bucket": "my-bucket",
+                "Key": "profiles/u123-onboarding",
+                "ContentType": "image/png",
+            },
+            "expires_in": 900,
+        }
+    ]
+
+
+def test_generate_upload_url_raises_on_presign_error():
+    """generate_upload_url wraps presign failures with RuntimeError."""
+
+    class FailingPresignClient(DummyS3Client):
+        def generate_presigned_url(self, ClientMethod, Params, ExpiresIn):  # noqa: N803
+            raise Exception("boom")
+
+    service = S3Service(s3_client=FailingPresignClient())
+
+    with pytest.raises(RuntimeError, match="Failed to generate upload URL"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="bucket",
+            source="linkedin",
+        )
