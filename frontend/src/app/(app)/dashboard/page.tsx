@@ -68,6 +68,7 @@ export default function DashboardPage() {
   const [consentsLoading, setConsentsLoading] = useState(false);
   const [consentsSaving, setConsentsSaving] = useState(false);
   const [editingConsent, setEditingConsent] = useState<ConsentResponse | null>(null);
+  const [joinedEventPrompt, setJoinedEventPrompt] = useState<EventResponse | null>(null);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -179,17 +180,7 @@ export default function DashboardPage() {
         const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
         return haystack.includes(query);
       })
-      .map((event) => {
-        const startsAt = Date.parse(event.starts_at ?? "");
-        const { message: registrationClosesMessage, isClosingSoon } =
-          formatRegistrationCloseMessage(startsAt, now);
-        return {
-          event,
-          canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 20 * 60 * 1000,
-          registrationClosesMessage,
-          isClosingSoon,
-        };
-      });
+      .map((event) => ({ event }));
   }, [discoverEvents, discoverSearchText, myEvents]);
 
   async function handleSignOut() {
@@ -309,6 +300,7 @@ export default function DashboardPage() {
         }
         return [...previous, event];
       });
+      setJoinedEventPrompt(event);
     } catch (error) {
       console.error("Failed to join event:", error);
     } finally {
@@ -698,6 +690,25 @@ export default function DashboardPage() {
       </ModalBottomSheet>
 
       <ConfirmationDialog
+        open={Boolean(joinedEventPrompt)}
+        title="Joined Event"
+        message={
+          joinedEventPrompt
+            ? `You successfully joined ${joinedEventPrompt.name}. Update your event consents so you can recognize others and be recognized.`
+            : "You successfully joined this event. Update your event consents so you can recognize others and be recognized."
+        }
+        confirmLabel="Update Consents"
+        cancelLabel="Not Now"
+        onConfirm={() => {
+          if (!joinedEventPrompt) return;
+          const joinedEvent = joinedEventPrompt;
+          setJoinedEventPrompt(null);
+          void handleEditConsents(joinedEvent);
+        }}
+        onCancel={() => setJoinedEventPrompt(null)}
+      />
+
+      <ConfirmationDialog
         open={Boolean(confirmLeaveEvent)}
         title="Leave Event?"
         message={
@@ -732,34 +743,4 @@ function formatEventDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
-}
-
-function formatRegistrationCloseMessage(
-  startsAtMs: number,
-  nowMs: number,
-): { message: string; isClosingSoon: boolean } {
-  if (!Number.isFinite(startsAtMs)) {
-    return { message: "Registration close time unavailable", isClosingSoon: false };
-  }
-
-  const closesAtMs = startsAtMs - 20 * 60 * 1000;
-  const remainingMs = closesAtMs - nowMs;
-
-  if (remainingMs > 0 && remainingMs <= 5 * 60 * 1000) {
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-    return {
-      message: `Registration closes in ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`,
-      isClosingSoon: true,
-    };
-  }
-
-  const closesAt = new Date(closesAtMs);
-  return {
-    message: `Registration closes at ${new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(closesAt)}`,
-    isClosingSoon: false,
-  };
 }

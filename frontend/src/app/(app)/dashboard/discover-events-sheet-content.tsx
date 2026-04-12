@@ -5,9 +5,6 @@ import { CalendarDays, Loader2, MapPin, Search, UserPlus } from "lucide-react";
 
 export interface DiscoverEventItem {
   event: EventResponse;
-  canStillJoin: boolean;
-  registrationClosesMessage: string;
-  isClosingSoon: boolean;
 }
 
 interface DiscoverEventsSheetContentProps {
@@ -69,7 +66,7 @@ export function DiscoverEventsSheetContent({
           </div>
         ) : (
           <div className="space-y-3">
-            {events.map(({ event, canStillJoin, registrationClosesMessage, isClosingSoon }) => {
+            {events.map(({ event }) => {
 
               return (
                 <article
@@ -101,41 +98,22 @@ export function DiscoverEventsSheetContent({
                   </div>
 
                   <div className="mt-3">
-                    <p
-                      className="mb-2 text-[12px]"
-                      style={{ color: isClosingSoon ? "oklch(0.72 0.17 20)" : "rgba(255,255,255,0.45)" }}
+                    <button
+                      onClick={() => onJoinEvent(event)}
+                      disabled={joiningEventId === event.event_id}
+                      className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/80 transition-transform active:scale-95 disabled:opacity-55"
+                      style={{
+                        background: "oklch(1 0 0 / 5%)",
+                        border: "1px solid oklch(1 0 0 / 11%)",
+                      }}
                     >
-                      {registrationClosesMessage}
-                    </p>
-                    {canStillJoin ? (
-                      <button
-                        onClick={() => onJoinEvent(event)}
-                        disabled={joiningEventId === event.event_id}
-                        className="inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.1em] text-white/80 transition-transform active:scale-95 disabled:opacity-55"
-                        style={{
-                          background: "oklch(1 0 0 / 5%)",
-                          border: "1px solid oklch(1 0 0 / 11%)",
-                        }}
-                      >
-                        {joiningEventId === event.event_id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <UserPlus className="h-3.5 w-3.5" />
-                        )}
-                        {joiningEventId === event.event_id ? "Joining" : "Join Event"}
-                      </button>
-                    ) : (
-                      <span
-                        className="inline-flex items-center rounded-full px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.08em]"
-                        style={{
-                          background: "oklch(0.25 0.07 20 / 45%)",
-                          border: "1px solid oklch(0.58 0.12 20 / 35%)",
-                          color: "oklch(0.86 0.05 25)",
-                        }}
-                      >
-                        You can no longer RSVP for this event
-                      </span>
-                    )}
+                      {joiningEventId === event.event_id ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <UserPlus className="h-3.5 w-3.5" />
+                      )}
+                      {joiningEventId === event.event_id ? "Joining" : "Join Event"}
+                    </button>
                   </div>
                 </article>
               );
