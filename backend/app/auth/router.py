@@ -10,14 +10,19 @@ from typing import Annotated
 from urllib.parse import urlencode
 from uuid import UUID
 
+import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from gotrue.types import Options
 
 from app.auth.dependencies import CurrentUser, get_current_user, verify_jwt
 from app.auth.schemas import (
     AuthResponse,
+    MessageResponse,
     OAuthCallbackRequest,
     OAuthUrlResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
     SignInRequest,
     SignUpRequest,
     TokenVerifyRequest,
@@ -25,6 +30,7 @@ from app.auth.schemas import (
     UserInfo,
 )
 from app.config import get_settings
+from supabase import create_client
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer(auto_error=False)
@@ -87,8 +93,6 @@ async def signup(data: SignUpRequest) -> AuthResponse:
     Create a new user account with email and password.
     Returns access and refresh tokens on success.
     """
-    from supabase import create_client
-
     settings = get_settings()
     supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
 
@@ -142,8 +146,6 @@ async def signin(data: SignInRequest) -> AuthResponse:
     Sign in with email and password.
     Returns access and refresh tokens on success.
     """
-    from supabase import create_client
-
     settings = get_settings()
     supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
 
@@ -269,8 +271,6 @@ async def oauth_callback(data: OAuthCallbackRequest) -> AuthResponse:
 
     Automatically creates a user profile on first sign-in using OAuth metadata.
     """
-    import httpx
-
     settings = get_settings()
 
     try:
@@ -322,6 +322,101 @@ async def oauth_callback(data: OAuthCallbackRequest) -> AuthResponse:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"OAuth callback failed: {str(e)}",
+        )
+
+
+# =============================================================================
+# Sign-Out
+# =============================================================================
+
+
+@router.post("/signout", response_model=MessageResponse)
+async def signout(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> MessageResponse:
+    """
+    Sign out the current user by revoking the Supabase session server-side.
+    The client should also clear all local auth state after calling this.
+    """
+    settings = get_settings()
+    admin_client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+
+    try:
+        admin_client.auth.admin.sign_out(current_user.access_token)
+    except Exception:
+        pass
+
+    return MessageResponse(message="Signed out successfully")
+
+
+# =============================================================================
+# Password Reset
+# =============================================================================
+
+
+@router.post("/reset-password", response_model=MessageResponse)
+async def request_password_reset(data: PasswordResetRequest) -> MessageResponse:
+    """
+    Send a password reset email to the user.
+    Always returns success to prevent email enumeration.
+    """
+    settings = get_settings()
+    supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
+
+    try:
+        opts: Options | None = None
+        if data.redirect_to:
+            opts = Options(redirect_to=data.redirect_to)
+
+        supabase.auth.reset_password_email(data.email, options=opts)
+    except Exception:
+        pass
+
+    return MessageResponse(
+        message="If an account with that email exists, a reset link has been sent."
+    )
+
+
+@router.post("/reset-password/confirm", response_model=MessageResponse)
+async def confirm_password_reset(
+    data: PasswordResetConfirmRequest,
+) -> MessageResponse:
+    """
+    Set a new password using the access token from the password reset email link.
+    The frontend extracts the access_token from the URL fragment after the user
+    clicks the reset link, then sends it here along with the new password.
+    """
+    settings = get_settings()
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                f"{settings.supabase_url}/auth/v1/user",
+                json={"password": data.new_password},
+                headers={
+                    "apikey": settings.supabase_anon_key,
+                    "Authorization": f"Bearer {data.access_token}",
+                    "Content-Type": "application/json",
+                },
+            )
+
+        if response.status_code != 200:
+            error_detail = response.json().get(
+                "message", response.json().get("msg", "Password update failed")
+            )
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_detail,
+            )
+
+        return MessageResponse(message="Password updated successfully")
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Password reset failed: {str(e)}",
         )
 
 

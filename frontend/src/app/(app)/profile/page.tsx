@@ -16,6 +16,7 @@ import {
   Pencil,
   LogOut,
 } from "lucide-react";
+import { signOutUser } from "@/lib/signout";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -29,8 +30,7 @@ export default function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutUser();
     router.push("/");
     router.refresh();
   }
