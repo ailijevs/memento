@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api, type ProfileResponse, type ProfileUpdateRequest } from "@/lib/api";
 import { uploadProfilePhoto } from "@/lib/profile-photo-upload";
+import { useProfilePhotoUrl } from "@/lib/use-profile-photo-url";
 import { Aurora } from "@/components/aurora";
 import {
   Camera,
@@ -30,6 +31,7 @@ export default function ProfilePage() {
   const [photoStatusError, setPhotoStatusError] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { photoUrl, handleImageError } = useProfilePhotoUrl(profile?.photo_path ?? null);
 
   async function handleSignOut() {
     const supabase = createClient();
@@ -45,8 +47,7 @@ export default function ProfilePage() {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        setPhotoStatus("Upload failed. Please try again later.");
-        setPhotoStatusError(true);
+        setLoading(false);
         return;
       }
       api.setToken(session.access_token);
@@ -154,12 +155,13 @@ export default function ProfilePage() {
             onClick={() => fileInputRef.current?.click()}
             className="relative mb-4 transition-transform active:scale-95"
           >
-            {profile.photo_path ? (
+            {photoUrl ? (
               <img
-                src={profile.photo_path}
+                src={photoUrl}
                 alt={profile.full_name}
                 className="h-20 w-20 rounded-full object-cover"
                 style={{ border: "1.5px solid rgba(255,255,255,0.15)" }}
+                onError={handleImageError}
               />
             ) : (
               <div
