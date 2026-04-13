@@ -278,6 +278,9 @@ def test_create_profile_photo_upload_url_continues_when_delete_missing_key(
         pass
 
     class FakeS3Service:
+        def is_not_found_error(self, exc: Exception) -> bool:
+            return "NoSuchKey" in str(exc)
+
         def delete_profile_picture(self, *, s3_key, bucket_name):
             calls.append(f"delete:{bucket_name}:{s3_key}")
             raise NoSuchKeyError("NoSuchKey")
