@@ -13,7 +13,7 @@ from uuid import UUID
 import httpx
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from gotrue.types import Options
+from supabase_auth.types import Options
 
 from app.auth.dependencies import CurrentUser, get_current_user, verify_jwt
 from app.auth.schemas import (
