@@ -15,6 +15,7 @@ import {
   GraduationCap,
   Pencil,
   LogOut,
+  KeyRound,
 } from "lucide-react";
 import { signOutUser } from "@/lib/signout";
 
@@ -27,6 +28,9 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false);
   const [photoLoading, setPhotoLoading] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [isEmailUser, setIsEmailUser] = useState(false);
+  const [passwordResetSent, setPasswordResetSent] = useState(false);
+  const [passwordResetLoading, setPasswordResetLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function handleSignOut() {
@@ -43,6 +47,12 @@ export default function ProfilePage() {
       } = await supabase.auth.getSession();
       if (!session) return;
       api.setToken(session.access_token);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (user?.app_metadata?.provider === "email") {
+        setIsEmailUser(true);
+      }
       try {
         const p = await api.getProfile();
         setProfile(p);
@@ -371,6 +381,60 @@ export default function ProfilePage() {
             )}
           </SectionCard>
         </div>
+
+        {isEmailUser && (
+          <div className="mt-6">
+            {passwordResetSent ? (
+              <p className="text-center text-[13px] text-white/40">
+                Password reset link sent to your email.
+              </p>
+            ) : (
+              <button
+                onClick={async () => {
+                  setPasswordResetLoading(true);
+                  try {
+                    const supabase = createClient();
+                    const {
+                      data: { user },
+                    } = await supabase.auth.getUser();
+                    if (!user?.email) return;
+                    const {
+                      data: { session },
+                    } = await supabase.auth.getSession();
+                    await fetch(
+                      `${process.env.NEXT_PUBLIC_API_URL ?? ""}/api/v1/auth/reset-password`,
+                      {
+                        method: "POST",
+                        headers: {
+                          "Content-Type": "application/json",
+                          ...(session?.access_token
+                            ? { Authorization: `Bearer ${session.access_token}` }
+                            : {}),
+                        },
+                        body: JSON.stringify({
+                          email: user.email,
+                          redirect_to: `${window.location.origin}/auth/callback?next=/reset-password`,
+                        }),
+                      },
+                    );
+                    setPasswordResetSent(true);
+                  } finally {
+                    setPasswordResetLoading(false);
+                  }
+                }}
+                disabled={passwordResetLoading}
+                className="flex w-full items-center justify-center gap-2 py-2 text-[13px] text-white/25 active:text-white/50"
+              >
+                {passwordResetLoading ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <KeyRound className="h-3.5 w-3.5" />
+                )}
+                Change Password
+              </button>
+            )}
+          </div>
+        )}
 
         {confirmingSignOut ? (
           <div className="mt-6 flex items-center justify-center gap-3">

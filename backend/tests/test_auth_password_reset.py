@@ -40,10 +40,10 @@ class TestSignOut:
         response = client.post("/api/v1/auth/signout")
         assert response.status_code == 401
 
-    @patch("app.auth.router.create_client")
-    def test_signout_success(self, mock_create_client, authed_client):
+    @patch("app.auth.router.get_admin_client")
+    def test_signout_success(self, mock_get_admin, authed_client):
         mock_supabase = MagicMock()
-        mock_create_client.return_value = mock_supabase
+        mock_get_admin.return_value = mock_supabase
 
         response = authed_client.post("/api/v1/auth/signout")
 
@@ -52,12 +52,12 @@ class TestSignOut:
         assert data["message"] == "Signed out successfully"
         mock_supabase.auth.admin.sign_out.assert_called_once_with("fake-token")
 
-    @patch("app.auth.router.create_client")
-    def test_signout_succeeds_even_if_supabase_fails(self, mock_create_client, authed_client):
+    @patch("app.auth.router.get_admin_client")
+    def test_signout_succeeds_even_if_supabase_fails(self, mock_get_admin, authed_client):
         """Sign-out should not fail even if Supabase throws an error."""
         mock_supabase = MagicMock()
         mock_supabase.auth.admin.sign_out.side_effect = Exception("Supabase down")
-        mock_create_client.return_value = mock_supabase
+        mock_get_admin.return_value = mock_supabase
 
         response = authed_client.post("/api/v1/auth/signout")
 
@@ -71,10 +71,10 @@ class TestSignOut:
 class TestPasswordResetRequest:
     """Tests for POST /api/v1/auth/reset-password."""
 
-    @patch("app.auth.router.create_client")
-    def test_reset_password_sends_email(self, mock_create_client, client):
+    @patch("app.auth.router.get_supabase_client")
+    def test_reset_password_sends_email(self, mock_get_client, client):
         mock_supabase = MagicMock()
-        mock_create_client.return_value = mock_supabase
+        mock_get_client.return_value = mock_supabase
 
         response = client.post(
             "/api/v1/auth/reset-password",
@@ -86,10 +86,10 @@ class TestPasswordResetRequest:
         assert "reset link" in data["message"].lower()
         mock_supabase.auth.reset_password_email.assert_called_once()
 
-    @patch("app.auth.router.create_client")
-    def test_reset_password_with_redirect(self, mock_create_client, client):
+    @patch("app.auth.router.get_supabase_client")
+    def test_reset_password_with_redirect(self, mock_get_client, client):
         mock_supabase = MagicMock()
-        mock_create_client.return_value = mock_supabase
+        mock_get_client.return_value = mock_supabase
 
         response = client.post(
             "/api/v1/auth/reset-password",
@@ -103,12 +103,12 @@ class TestPasswordResetRequest:
         call_args = mock_supabase.auth.reset_password_email.call_args
         assert call_args[1]["options"]["redirect_to"] == "https://example.com/reset"
 
-    @patch("app.auth.router.create_client")
-    def test_reset_password_always_succeeds_for_unknown_email(self, mock_create_client, client):
+    @patch("app.auth.router.get_supabase_client")
+    def test_reset_password_always_succeeds_for_unknown_email(self, mock_get_client, client):
         """Prevents email enumeration — always returns success."""
         mock_supabase = MagicMock()
         mock_supabase.auth.reset_password_email.side_effect = Exception("User not found")
-        mock_create_client.return_value = mock_supabase
+        mock_get_client.return_value = mock_supabase
 
         response = client.post(
             "/api/v1/auth/reset-password",

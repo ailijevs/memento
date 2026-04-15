@@ -30,6 +30,7 @@ from app.auth.schemas import (
     UserInfo,
 )
 from app.config import get_settings
+from app.db.supabase import get_admin_client, get_supabase_client
 from supabase import create_client
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -335,11 +336,14 @@ async def signout(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> MessageResponse:
     """
-    Sign out the current user by revoking the Supabase session server-side.
-    The client should also clear all local auth state after calling this.
+    Revoke the user's session server-side via Supabase Admin API.
+
+    This complements the client-side supabase.auth.signOut() which only clears
+    local state. Server-side revocation invalidates the JWT at Supabase so it
+    cannot be reused if intercepted (e.g. stolen token, shared device).
+    The client should still clear local auth state after calling this.
     """
-    settings = get_settings()
-    admin_client = create_client(settings.supabase_url, settings.supabase_service_role_key)
+    admin_client = get_admin_client()
 
     try:
         admin_client.auth.admin.sign_out(current_user.access_token)
@@ -360,8 +364,7 @@ async def request_password_reset(data: PasswordResetRequest) -> MessageResponse:
     Send a password reset email to the user.
     Always returns success to prevent email enumeration.
     """
-    settings = get_settings()
-    supabase = create_client(settings.supabase_url, settings.supabase_anon_key)
+    supabase = get_supabase_client()
 
     try:
         opts: Options | None = None
