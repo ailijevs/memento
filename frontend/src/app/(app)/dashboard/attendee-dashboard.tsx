@@ -1,8 +1,10 @@
 "use client";
 
 import type { RefObject } from "react";
+import { useRouter } from "next/navigation";
 import { type EventResponse } from "@/lib/api";
 import {
+  BarChart3,
   CalendarDays,
   Loader2,
   MapPin,
@@ -91,6 +93,8 @@ export function AttendeeContent({
   onStartRecognition,
   formatEventDate,
 }: AttendeeContentProps) {
+  const router = useRouter();
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-16">
@@ -186,6 +190,16 @@ export function AttendeeContent({
                     >
                       <ShieldCheck className="h-3.5 w-3.5" />
                       Edit Consents
+                    </button>
+                    <button
+                      onClick={() => {
+                        onToggleEventMenu(event.event_id);
+                        router.push(`/analytics/${event.event_id}`);
+                      }}
+                      className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                    >
+                      <BarChart3 className="h-3.5 w-3.5" />
+                      Analytics
                     </button>
                     <button
                       onClick={() => onLeaveEvent(event)}

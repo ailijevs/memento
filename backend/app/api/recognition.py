@@ -4,12 +4,14 @@ import logging
 import math
 import time
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.service_auth import verify_recognition_api_key
 from app.config import get_settings
+from app.dals.analytics_dal import AnalyticsDAL
 from app.dals.event_dal import EventDAL
 from app.db.supabase import get_admin_client
 from app.schemas import (
@@ -113,6 +115,25 @@ async def detect_faces_in_frame(
         )
 
         processing_time = (time.perf_counter() - start_time) * 1000
+
+        # Log analytics asynchronously (best-effort)
+        try:
+            analytics_dal = AnalyticsDAL(admin_client)
+            await analytics_dal.log_recognition_attempt(
+                event_id=request.event_id,
+                observer_user_id=current_user.id,
+                faces_detected=len(matches_raw),
+                faces_matched=len(profile_cards),
+            )
+            for card in profile_cards:
+                await analytics_dal.log_recognition_match(
+                    event_id=request.event_id,
+                    recognized_user_id=UUID(card.user_id),
+                    observer_user_id=current_user.id,
+                    confidence=card.face_similarity,
+                )
+        except Exception as analytics_err:
+            logger.warning("Failed to log analytics: %s", analytics_err)
 
         return FrameDetectionResponse(
             matches=profile_cards,
