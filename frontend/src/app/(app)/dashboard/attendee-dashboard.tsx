@@ -69,6 +69,7 @@ interface AttendeeContentProps {
   openMenuContainerRef: RefObject<HTMLDivElement | null>;
   leavingEventId: string | null;
   onToggleEventMenu: (eventId: string) => void;
+  onViewEventDetail: (event: EventResponse) => void;
   onViewRsvpList: (event: EventResponse) => void;
   onEditConsents: (event: EventResponse) => void;
   onLeaveEvent: (event: EventResponse) => void;
@@ -83,6 +84,7 @@ export function AttendeeContent({
   openMenuContainerRef,
   leavingEventId,
   onToggleEventMenu,
+  onViewEventDetail,
   onViewRsvpList,
   onEditConsents,
   onLeaveEvent,
@@ -125,7 +127,11 @@ export function AttendeeContent({
             }}
           >
             <div className="mb-2 flex items-start justify-between gap-3">
-              <div>
+              <button
+                type="button"
+                onClick={() => onViewEventDetail(event)}
+                className="min-w-0 flex-1 text-left"
+              >
                 <h2 className="text-[17px] font-medium text-white/90">{event.name}</h2>
                 <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/45">
                   {event.starts_at ? (
@@ -141,7 +147,7 @@ export function AttendeeContent({
                     </span>
                   ) : null}
                 </div>
-              </div>
+              </button>
 
               <div
                 className="relative"

@@ -58,6 +58,27 @@ class ApiClient {
     });
   }
 
+  async requestProfilePhotoUploadUrl(data: ProfilePhotoUploadUrlRequest) {
+    return this.request<ProfilePhotoUploadUrlResponse>(
+      "/api/v1/profiles/me/photo-upload-url",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async confirmProfilePhotoUpload(data: ProfilePhotoUploadConfirmRequest) {
+    return this.request<ProfileResponse>("/api/v1/profiles/me/photo-upload-confirm", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getMyProfilePhotoUrl() {
+    return this.request<ProfilePhotoUrlResponse>("/api/v1/profiles/me/photo-url");
+  }
+
   async getProfileById(userId: string) {
     return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
   }
@@ -233,6 +254,8 @@ export interface EventCreateRequest {
   starts_at?: string;
   ends_at?: string;
   location?: string;
+  description?: string;
+  max_participants?: number;
   is_active?: boolean;
 }
 
@@ -241,12 +264,25 @@ export interface EventUpdateRequest {
   starts_at?: string;
   ends_at?: string;
   location?: string;
+  description?: string;
+  max_participants?: number;
   is_active?: boolean;
 }
 
 export interface ConsentUpdateRequest {
   allow_profile_display?: boolean;
   allow_recognition?: boolean;
+}
+
+export type ProfilePhotoUploadSource = "onboarding" | "linkedin";
+
+export interface ProfilePhotoUploadUrlRequest {
+  content_type: string;
+  source?: ProfilePhotoUploadSource;
+}
+
+export interface ProfilePhotoUploadConfirmRequest {
+  s3_key: string;
 }
 
 // ─── Response types ───────────────────────────────────────────────────────────
@@ -268,6 +304,17 @@ export interface ProfileResponse {
   profile_summary: string | null;
   // created_at: string;
   // updated_at: string;
+}
+
+export interface ProfilePhotoUploadUrlResponse {
+  upload_url: string;
+  s3_key: string;
+  content_type: string;
+}
+
+export interface ProfilePhotoUrlResponse {
+  photo_url: string | null;
+  expires_at: string | null;
 }
 
 export interface Experience {
@@ -313,6 +360,8 @@ export interface EventResponse {
   starts_at: string | null;
   ends_at: string | null;
   location: string | null;
+  description: string | null;
+  max_participants: number | null;
   is_active: boolean;
   indexing_status: "pending" | "in_progress" | "completed" | "failed";
   cleanup_status: "pending" | "in_progress" | "completed" | "failed";

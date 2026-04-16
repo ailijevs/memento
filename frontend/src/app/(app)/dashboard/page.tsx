@@ -15,6 +15,7 @@ import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
+import { EventDetailSheetContent } from "./event-detail-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
 import { RsvpListSheetContent } from "./rsvp-list-sheet-content";
 import { EventConsentsSheetContent } from "./event-consents-sheet-content";
@@ -54,6 +55,7 @@ export default function DashboardPage() {
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [detailEvent, setDetailEvent] = useState<EventResponse | null>(null);
   const [isRsvpListOpen, setIsRsvpListOpen] = useState(false);
   const [rsvpListLoading, setRsvpListLoading] = useState(false);
   const [rsvpListEventName, setRsvpListEventName] = useState<string>("");
@@ -68,6 +70,7 @@ export default function DashboardPage() {
   const [consentsLoading, setConsentsLoading] = useState(false);
   const [consentsSaving, setConsentsSaving] = useState(false);
   const [editingConsent, setEditingConsent] = useState<ConsentResponse | null>(null);
+  const [joinedEventPrompt, setJoinedEventPrompt] = useState<EventResponse | null>(null);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -179,17 +182,7 @@ export default function DashboardPage() {
         const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
         return haystack.includes(query);
       })
-      .map((event) => {
-        const startsAt = Date.parse(event.starts_at ?? "");
-        const { message: registrationClosesMessage, isClosingSoon } =
-          formatRegistrationCloseMessage(startsAt, now);
-        return {
-          event,
-          canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 20 * 60 * 1000,
-          registrationClosesMessage,
-          isClosingSoon,
-        };
-      });
+      .map((event) => ({ event }));
   }, [discoverEvents, discoverSearchText, myEvents]);
 
   async function handleSignOut() {
@@ -309,11 +302,16 @@ export default function DashboardPage() {
         }
         return [...previous, event];
       });
+      setJoinedEventPrompt(event);
     } catch (error) {
       console.error("Failed to join event:", error);
     } finally {
       setJoiningDiscoverEventId(null);
     }
+  }
+
+  function handleViewEventDetail(event: EventResponse) {
+    setDetailEvent(event);
   }
 
   function handleStartRecognition(event: EventResponse) {
@@ -534,6 +532,7 @@ export default function DashboardPage() {
             deletingEventId={deletingOrganizedEventId}
             archivingEventId={archivingOrganizedEventId}
             unarchivingEventId={unarchivingOrganizedEventId}
+            onViewEventDetail={handleViewEventDetail}
             onEditEventRequest={handleEditEventRequest}
             onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onArchiveEvent={handleArchiveOrganizedEvent}
@@ -550,6 +549,7 @@ export default function DashboardPage() {
             onToggleEventMenu={(eventId) =>
               setOpenEventMenuId((current) => (current === eventId ? null : eventId))
             }
+            onViewEventDetail={handleViewEventDetail}
             onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onEditConsents={(event) => void handleEditConsents(event)}
             onLeaveEvent={(event) => {
@@ -602,6 +602,7 @@ export default function DashboardPage() {
           onSearchTextChange={setDiscoverSearchText}
           events={discoveredUpcomingEvents}
           joiningEventId={joiningDiscoverEventId}
+          onViewEventDetail={handleViewEventDetail}
           onJoinEvent={handleJoinDiscoverEvent}
         />
       </ModalBottomSheet>
@@ -635,6 +636,19 @@ export default function DashboardPage() {
             isSubmitting={updatingEvent}
             initialValues={editingEvent}
             onSubmit={handleUpdateEvent}
+          />
+        ) : null}
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={Boolean(detailEvent)}
+        onClose={() => setDetailEvent(null)}
+        title="Event Details"
+      >
+        {detailEvent ? (
+          <EventDetailSheetContent
+            event={detailEvent}
+            formatEventDate={formatEventDate}
           />
         ) : null}
       </ModalBottomSheet>
@@ -698,6 +712,25 @@ export default function DashboardPage() {
       </ModalBottomSheet>
 
       <ConfirmationDialog
+        open={Boolean(joinedEventPrompt)}
+        title="Joined Event"
+        message={
+          joinedEventPrompt
+            ? `You successfully joined ${joinedEventPrompt.name}. Update your event consents so you can recognize others and be recognized.`
+            : "You successfully joined this event. Update your event consents so you can recognize others and be recognized."
+        }
+        confirmLabel="Update Consents"
+        cancelLabel="Not Now"
+        onConfirm={() => {
+          if (!joinedEventPrompt) return;
+          const joinedEvent = joinedEventPrompt;
+          setJoinedEventPrompt(null);
+          void handleEditConsents(joinedEvent);
+        }}
+        onCancel={() => setJoinedEventPrompt(null)}
+      />
+
+      <ConfirmationDialog
         open={Boolean(confirmLeaveEvent)}
         title="Leave Event?"
         message={
@@ -732,34 +765,4 @@ function formatEventDate(value: string): string {
     hour: "numeric",
     minute: "2-digit",
   }).format(date);
-}
-
-function formatRegistrationCloseMessage(
-  startsAtMs: number,
-  nowMs: number,
-): { message: string; isClosingSoon: boolean } {
-  if (!Number.isFinite(startsAtMs)) {
-    return { message: "Registration close time unavailable", isClosingSoon: false };
-  }
-
-  const closesAtMs = startsAtMs - 20 * 60 * 1000;
-  const remainingMs = closesAtMs - nowMs;
-
-  if (remainingMs > 0 && remainingMs <= 5 * 60 * 1000) {
-    const remainingMinutes = Math.max(1, Math.ceil(remainingMs / 60000));
-    return {
-      message: `Registration closes in ${remainingMinutes} minute${remainingMinutes === 1 ? "" : "s"}`,
-      isClosingSoon: true,
-    };
-  }
-
-  const closesAt = new Date(closesAtMs);
-  return {
-    message: `Registration closes at ${new Intl.DateTimeFormat("en-US", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    }).format(closesAt)}`,
-    isClosingSoon: false,
-  };
 }

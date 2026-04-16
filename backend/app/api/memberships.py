@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -73,19 +73,11 @@ async def join_event(
             detail="Event not found.",
         )
 
-    event_start = event.starts_at
-    if event_start is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Event start time is unexpectedly missing.",
-        )
-
-    join_cutoff = event_start - timedelta(minutes=20)
     now = datetime.now(timezone.utc)
-    if now > join_cutoff:
+    if event.ends_at and now >= event.ends_at:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only join an event at least 20 minutes before it starts.",
+            detail="You can no longer join an event after it has ended.",
         )
 
     # Create membership

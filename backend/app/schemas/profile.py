@@ -1,6 +1,7 @@
 """Pydantic schemas for user profiles."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -99,3 +100,31 @@ class ProfileLikeResponse(BaseModel):
     event_id: UUID | None
     event_name: str | None = None
     created_at: datetime
+
+
+class ProfilePhotoUploadUrlRequest(BaseModel):
+    """Payload for requesting a direct profile photo upload URL."""
+
+    content_type: str = Field(default="image/jpeg", max_length=255)
+    source: Literal["onboarding", "linkedin"] = "onboarding"
+
+
+class ProfilePhotoUploadUrlResponse(BaseModel):
+    """Response containing upload metadata for direct-to-S3 profile photo uploads."""
+
+    upload_url: str
+    s3_key: str
+    content_type: str
+
+
+class ProfilePhotoUploadConfirmRequest(BaseModel):
+    """Payload for confirming a direct profile photo upload to S3."""
+
+    s3_key: str = Field(..., min_length=1, max_length=1024)
+
+
+class ProfilePhotoUrlResponse(BaseModel):
+    """Response payload for resolving a renderable profile photo URL."""
+
+    photo_url: str | None = None
+    expires_at: datetime | None = None
