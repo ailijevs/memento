@@ -14,7 +14,7 @@ from app.api.recognition import (
     _resolve_presigned_url_ttl_seconds,
 )
 from app.auth.dependencies import CurrentUser, get_current_user
-from app.auth.service_auth import verify_service_token
+from app.auth.service_auth import verify_recognition_api_key
 from app.main import app
 from app.schemas import (
     EventProcessingStatus,
@@ -338,7 +338,7 @@ class TestFrameDetectionResponseSchema:
         assert response.processing_time_ms == 100.0
 
 
-# --- verify_service_token (unit) ---------------------------------------------
+# --- verify_recognition_api_key (unit) ---------------------------------------
 
 
 FAKE_USER = CurrentUser(
@@ -348,42 +348,49 @@ FAKE_USER = CurrentUser(
 )
 
 
-class TestVerifyServiceToken:
-    """Unit tests for the X-Service-Token dependency."""
+class TestVerifyRecognitionApiKey:
+    """Unit tests for the X-Recognition-Api-Key dependency."""
 
     @patch("app.auth.service_auth.get_settings")
     def test_skips_check_when_not_configured(self, mock_settings):
-        """When no RECOGNITION_SERVICE_TOKEN is set, all requests pass."""
-        mock_settings.return_value = MagicMock(recognition_service_token=None)
-        verify_service_token(x_service_token=None)
+        """When no API key hash mapping is set, all requests pass."""
+        mock_settings.return_value = MagicMock(hash_to_client={})
+        verify_recognition_api_key(x_recognition_api_key=None)
 
     @patch("app.auth.service_auth.get_settings")
-    def test_passes_when_token_matches(self, mock_settings):
-        """Correct X-Service-Token passes validation."""
+    def test_passes_when_api_key_hash_matches(self, mock_settings):
+        """Correct recognition API key passes validation."""
+        import hashlib
+
+        raw_key = "secret-123"
+        key_hash = hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
         mock_settings.return_value = MagicMock(
-            recognition_service_token="secret-123",
+            hash_to_client={key_hash: "mentra"},
         )
-        verify_service_token(x_service_token="secret-123")
+        assert verify_recognition_api_key(x_recognition_api_key=raw_key) == "mentra"
 
     @patch("app.auth.service_auth.get_settings")
     def test_rejects_missing_header(self, mock_settings):
         """Missing header returns 401 when token is configured."""
         mock_settings.return_value = MagicMock(
-            recognition_service_token="secret-123",
+            hash_to_client={"abc": "mentra"},
         )
         with pytest.raises(HTTPException) as exc_info:
-            verify_service_token(x_service_token=None)
+            verify_recognition_api_key(x_recognition_api_key=None)
         assert exc_info.value.status_code == 401
         assert "Missing" in exc_info.value.detail
 
     @patch("app.auth.service_auth.get_settings")
-    def test_rejects_wrong_token(self, mock_settings):
-        """Incorrect X-Service-Token returns 401."""
+    def test_rejects_wrong_api_key(self, mock_settings):
+        """Incorrect X-Recognition-Api-Key returns 401."""
+        import hashlib
+
+        key_hash = hashlib.sha256("secret-123".encode("utf-8")).hexdigest()
         mock_settings.return_value = MagicMock(
-            recognition_service_token="secret-123",
+            hash_to_client={key_hash: "mentra"},
         )
         with pytest.raises(HTTPException) as exc_info:
-            verify_service_token(x_service_token="wrong-token")
+            verify_recognition_api_key(x_recognition_api_key="wrong-token")
         assert exc_info.value.status_code == 401
         assert "Invalid" in exc_info.value.detail
 
@@ -399,16 +406,16 @@ class TestDetectEndpoint:
     ``raw_client`` with targeted patches.
     """
 
-    SERVICE_TOKEN = "test-service-token"
+    RECOGNITION_API_KEY = "test-recognition-api-key"
 
     @pytest.fixture
     def client(self):
         """TestClient with both auth dependencies bypassed."""
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
-        app.dependency_overrides[verify_service_token] = lambda: None
+        app.dependency_overrides[verify_recognition_api_key] = lambda: "test-client"
         yield TestClient(app)
         app.dependency_overrides.pop(get_current_user, None)
-        app.dependency_overrides.pop(verify_service_token, None)
+        app.dependency_overrides.pop(verify_recognition_api_key, None)
 
     @pytest.fixture
     def raw_client(self):
@@ -592,14 +599,14 @@ class TestDetectEndpoint:
         assert response.status_code == 401
 
     @patch("app.auth.service_auth.get_settings")
-    def test_detect_missing_service_token_returns_401(
+    def test_detect_missing_recognition_api_key_returns_401(
         self,
         mock_settings,
         raw_client,
     ):
-        """Missing X-Service-Token returns 401 when token is configured."""
+        """Missing X-Recognition-Api-Key returns 401 when hash mapping is configured."""
         mock_settings.return_value = MagicMock(
-            recognition_service_token=self.SERVICE_TOKEN,
+            hash_to_client={"abc": "mentra"},
         )
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
         try:
@@ -615,14 +622,17 @@ class TestDetectEndpoint:
             app.dependency_overrides.pop(get_current_user, None)
 
     @patch("app.auth.service_auth.get_settings")
-    def test_detect_invalid_service_token_returns_401(
+    def test_detect_invalid_recognition_api_key_returns_401(
         self,
         mock_settings,
         raw_client,
     ):
-        """Wrong X-Service-Token returns 401."""
+        """Wrong X-Recognition-Api-Key returns 401."""
+        import hashlib
+
+        key_hash = hashlib.sha256(self.RECOGNITION_API_KEY.encode("utf-8")).hexdigest()
         mock_settings.return_value = MagicMock(
-            recognition_service_token=self.SERVICE_TOKEN,
+            hash_to_client={key_hash: "mentra"},
         )
         app.dependency_overrides[get_current_user] = lambda: FAKE_USER
         try:
@@ -632,7 +642,7 @@ class TestDetectEndpoint:
                     "image_base64": SAMPLE_IMAGE_BASE64,
                     "event_id": None,
                 },
-                headers={"X-Service-Token": "wrong-token"},
+                headers={"X-Recognition-Api-Key": "wrong-token"},
             )
             assert response.status_code == 401
         finally:

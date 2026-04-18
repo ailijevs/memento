@@ -60,16 +60,14 @@ class S3Service:
         source: ProfilePhotoSource,
     ) -> str:
         """Upload a user's profile picture to S3 as JPEG and return object key."""
-        cleaned_bucket_name = bucket_name.strip()
-        if not cleaned_bucket_name:
-            raise ValueError("bucket_name must not be empty.")
+        cleaned_bucket_name = self._clean_bucket_name(bucket_name)
 
         image_bytes = self._read_image_bytes(image)
         if not image_bytes:
             raise ValueError("image must not be empty.")
 
         normalized_image = self.normalize_image_stream_to_jpeg(image_bytes)
-        object_key = f"profiles/{user_id}-{source}{_DEFAULT_EXTENSION}"
+        object_key = self._build_profile_picture_key(user_id=user_id, source=source)
 
         self.client.upload_fileobj(
             BytesIO(normalized_image),
@@ -79,6 +77,49 @@ class S3Service:
         )
         return object_key
 
+    def generate_upload_url(
+        self,
+        *,
+        user_id: UUID | str,
+        bucket_name: str,
+        source: ProfilePhotoSource,
+        expires_in_seconds: int = 600,
+        content_type: str = _DEFAULT_CONTENT_TYPE,
+    ) -> dict[str, str]:
+        """Create a pre-signed PUT URL for uploading a profile picture directly to S3."""
+        cleaned_bucket_name = self._clean_bucket_name(bucket_name)
+        cleaned_content_type = content_type.strip()
+        if not cleaned_content_type:
+            raise ValueError("content_type must not be empty.")
+        if expires_in_seconds <= 0:
+            raise ValueError("expires_in_seconds must be greater than 0.")
+
+        object_key = self._build_profile_picture_key(
+            user_id=user_id,
+            source=source,
+            include_extension=False,
+        )
+        try:
+            upload_url = self.client.generate_presigned_url(
+                "put_object",
+                Params={
+                    "Bucket": cleaned_bucket_name,
+                    "Key": object_key,
+                    "ContentType": cleaned_content_type,
+                },
+                ExpiresIn=expires_in_seconds,
+            )
+        except Exception as exc:
+            raise RuntimeError(
+                f"Failed to generate upload URL for profile key '{object_key}'."
+            ) from exc
+
+        return {
+            "upload_url": upload_url,
+            "s3_key": object_key,
+            "content_type": cleaned_content_type,
+        }
+
     def delete_profile_picture(
         self,
         *,
@@ -86,13 +127,8 @@ class S3Service:
         bucket_name: str,
     ) -> None:
         """Delete a profile picture object from S3."""
-        cleaned_bucket_name = bucket_name.strip()
-        if not cleaned_bucket_name:
-            raise ValueError("bucket_name must not be empty.")
-
-        cleaned_s3_key = s3_key.strip()
-        if not cleaned_s3_key:
-            raise ValueError("s3_key must not be empty.")
+        cleaned_bucket_name = self._clean_bucket_name(bucket_name)
+        cleaned_s3_key = self._clean_s3_key(s3_key)
 
         self.client.delete_object(Bucket=cleaned_bucket_name, Key=cleaned_s3_key)
 
@@ -104,16 +140,12 @@ class S3Service:
         expires_in_seconds: int = 3600,
     ) -> Any:
         """Return a pre-signed URL for a profile picture object."""
-        cleaned_bucket_name = bucket_name.strip()
-        if not cleaned_bucket_name:
-            raise ValueError("bucket_name must not be empty.")
+        cleaned_bucket_name = self._clean_bucket_name(bucket_name)
 
         if expires_in_seconds <= 0:
             raise ValueError("expires_in_seconds must be greater than 0.")
 
-        cleaned_s3_key = s3_key.strip()
-        if not cleaned_s3_key:
-            raise ValueError("s3_key must not be empty.")
+        cleaned_s3_key = self._clean_s3_key(s3_key)
 
         try:
             return self.client.generate_presigned_url(
@@ -125,6 +157,30 @@ class S3Service:
             raise RuntimeError(
                 f"Failed to generate pre-signed URL for profile key '{cleaned_s3_key}'."
             ) from exc
+
+    def profile_picture_exists(
+        self,
+        *,
+        s3_key: str,
+        bucket_name: str,
+    ) -> bool:
+        """Return True if a profile picture object exists in S3."""
+        cleaned_bucket_name = self._clean_bucket_name(bucket_name)
+        cleaned_s3_key = self._clean_s3_key(s3_key)
+
+        try:
+            self.client.head_object(Bucket=cleaned_bucket_name, Key=cleaned_s3_key)
+            return True
+        except Exception as exc:
+            if self._is_not_found_error(exc):
+                return False
+            raise RuntimeError(
+                f"Failed to verify existence for profile key '{cleaned_s3_key}'."
+            ) from exc
+
+    def is_not_found_error(self, exc: Exception) -> bool:
+        """Return True when an S3 exception indicates object/key not found."""
+        return self._is_not_found_error(exc)
 
     def _create_client(self) -> Any:
         """Create a boto3 S3 client when one is not injected."""
@@ -143,6 +199,48 @@ class S3Service:
         if isinstance(image, bytes):
             return image
         return image.read()
+
+    def _clean_bucket_name(self, bucket_name: str) -> str:
+        """Return normalized bucket name or raise if empty."""
+        cleaned_bucket_name = bucket_name.strip()
+        if not cleaned_bucket_name:
+            raise ValueError("bucket_name must not be empty.")
+        return cleaned_bucket_name
+
+    def _clean_s3_key(self, s3_key: str) -> str:
+        """Return normalized S3 object key or raise if empty."""
+        cleaned_s3_key = s3_key.strip()
+        if not cleaned_s3_key:
+            raise ValueError("s3_key must not be empty.")
+        return cleaned_s3_key
+
+    def _build_profile_picture_key(
+        self,
+        *,
+        user_id: UUID | str,
+        source: ProfilePhotoSource,
+        include_extension: bool = True,
+    ) -> str:
+        """Build canonical profile picture object key."""
+        cleaned_user_id = str(user_id).strip()
+        if not cleaned_user_id:
+            raise ValueError("user_id must not be empty.")
+        key = f"profiles/{cleaned_user_id}-{source}"
+        if include_extension:
+            key += _DEFAULT_EXTENSION
+        return key
+
+    def _is_not_found_error(self, exc: Exception) -> bool:
+        """Return True when an S3 exception indicates the object does not exist."""
+        message = str(exc)
+        if "NoSuchKey" in message or "NoSuchObject" in message:
+            return True
+        response = getattr(exc, "response", None)
+        if isinstance(response, dict):
+            error = response.get("Error", {})
+            code = str(error.get("Code", ""))
+            return code in {"NoSuchKey", "NoSuchObject", "404", "NotFound"}
+        return False
 
     def _to_rgb(self, image: Any) -> Any:
         """Convert a Pillow image to RGB, flattening alpha onto white if needed."""

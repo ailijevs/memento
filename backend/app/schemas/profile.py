@@ -1,6 +1,7 @@
 """Pydantic schemas for user profiles."""
 
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -68,6 +69,44 @@ class ProfileDirectoryEntry(BaseModel):
     full_name: str
     headline: str | None = None
     company: str | None = None
+    school: str | None = None
+    major: str | None = None
     photo_path: str | None = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class ProfileDirectoryResponse(BaseModel):
+    """Directory payload with visibility metadata for an event."""
+
+    entries: list[ProfileDirectoryEntry]
+    total_count: int
+    hidden_count: int
+
+
+class ProfilePhotoUploadUrlRequest(BaseModel):
+    """Payload for requesting a direct profile photo upload URL."""
+
+    content_type: str = Field(default="image/jpeg", max_length=255)
+    source: Literal["onboarding", "linkedin"] = "onboarding"
+
+
+class ProfilePhotoUploadUrlResponse(BaseModel):
+    """Response containing upload metadata for direct-to-S3 profile photo uploads."""
+
+    upload_url: str
+    s3_key: str
+    content_type: str
+
+
+class ProfilePhotoUploadConfirmRequest(BaseModel):
+    """Payload for confirming a direct profile photo upload to S3."""
+
+    s3_key: str = Field(..., min_length=1, max_length=1024)
+
+
+class ProfilePhotoUrlResponse(BaseModel):
+    """Response payload for resolving a renderable profile photo URL."""
+
+    photo_url: str | None = None
+    expires_at: datetime | None = None
