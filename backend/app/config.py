@@ -47,6 +47,18 @@ class Settings(BaseSettings):
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
 
+    # Email Configuration (FastAPI Mail / SMTP)
+    mail_enabled: bool = False
+    mail_from: str | None = None
+    mail_from_name: str = "Memento"
+    mail_username: str | None = None
+    mail_password: str | None = None
+    mail_server: str = "smtp.gmail.com"
+    mail_port: int = 587
+    mail_starttls: bool = True
+    mail_ssl_tls: bool = False
+    mail_validate_certs: bool = True
+
     @property
     def hash_to_client(self) -> dict[str, str]:
         """Map known API key hashes to client identifiers."""
