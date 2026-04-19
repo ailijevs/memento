@@ -1,12 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2 } from "lucide-react";
 
 import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
 
 export default function TermsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden">
+          <div className="absolute inset-0" style={{ opacity: 0.5 }}>
+            <Aurora className="h-full w-full" mode="focused" />
+          </div>
+          <Loader2 className="relative z-10 h-6 w-6 animate-spin text-white/40" />
+        </div>
+      }
+    >
+      <TermsContent />
+    </Suspense>
+  );
+}
+
+function TermsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [accepting, setAccepting] = useState(false);
@@ -125,4 +143,3 @@ export default function TermsPage() {
     </div>
   );
 }
-
