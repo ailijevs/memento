@@ -710,6 +710,14 @@ function SignupContent() {
             Sign in
           </Link>
         </p>
+        <p className="animate-fade-in delay-600 mt-2 text-center text-[11px] text-white/20">
+          <Link
+            href="/terms?view=1&back=/signup"
+            className="underline-offset-4 transition-colors hover:text-white/45 hover:underline"
+          >
+            View Terms of Service
+          </Link>
+        </p>
       </div>
     </div>
   );
