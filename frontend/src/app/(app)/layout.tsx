@@ -1,6 +1,8 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
 import { BottomTabBar } from "@/components/bottom-tab-bar";
+import { safeNextPath } from "@/lib/internal-nav";
+import { createClient } from "@/lib/supabase/server";
 
 export default async function AppLayout({
   children,
@@ -23,7 +25,10 @@ export default async function AppLayout({
 
   const termsAccepted = user.user_metadata?.terms_accepted === true;
   if (!termsAccepted) {
-    redirect("/terms");
+    const pathname = (await headers()).get("x-pathname") ?? "";
+    const continuePath = safeNextPath(pathname, "/onboarding");
+    const nextPath = continuePath === "/terms" ? "/onboarding" : continuePath;
+    redirect(`/terms?next=${encodeURIComponent(nextPath)}`);
   }
 
   return (
