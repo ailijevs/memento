@@ -404,6 +404,7 @@ export interface ProfileLikeResponse {
   liked_profile_id: string;
   event_id: string | null;
   event_name: string | null;
+  liked_profile: ProfileResponse | null;
   created_at: string;
 }
 

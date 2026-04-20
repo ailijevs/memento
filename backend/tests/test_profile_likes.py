@@ -19,7 +19,7 @@ from app.api.profiles import (  # noqa: E402
 )
 from app.auth import CurrentUser, get_current_user  # noqa: E402
 from app.main import app  # noqa: E402
-from app.schemas.profile import ProfileLikeResponse  # noqa: E402
+from app.schemas.profile import ProfileLikeResponse, ProfileResponse  # noqa: E402
 
 
 @pytest.fixture
@@ -41,7 +41,31 @@ def _like(user_id: UUID, liked_profile_id: UUID, event_id: UUID | None) -> Profi
         liked_profile_id=liked_profile_id,
         event_id=event_id,
         event_name="Spring Summit" if event_id else None,
+        liked_profile=_profile(liked_profile_id),
         created_at=datetime.now(timezone.utc),
+    )
+
+
+def _profile(user_id: UUID) -> ProfileResponse:
+    return ProfileResponse(
+        user_id=user_id,
+        full_name="Liked User",
+        headline="Software Engineer",
+        bio=None,
+        location=None,
+        company=None,
+        major=None,
+        graduation_year=None,
+        linkedin_url=None,
+        photo_path=None,
+        experiences=[],
+        education=[],
+        profile_one_liner=None,
+        profile_summary=None,
+        summary_provider=None,
+        summary_updated_at=None,
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -72,9 +96,12 @@ def test_get_my_profile_likes_returns_rows(client: TestClient):
     assert body[0]["liked_profile_id"] == str(liked_a)
     assert body[0]["event_id"] == str(event_id)
     assert body[0]["event_name"] == "Spring Summit"
+    assert body[0]["liked_profile"]["user_id"] == str(liked_a)
+    assert body[0]["liked_profile"]["full_name"] == "Liked User"
     assert body[1]["liked_profile_id"] == str(liked_b)
     assert body[1]["event_id"] is None
     assert body[1]["event_name"] is None
+    assert body[1]["liked_profile"]["user_id"] == str(liked_b)
     profile_dal.get_user_profile_likes.assert_awaited_once_with(user_id=user_id)
 
 

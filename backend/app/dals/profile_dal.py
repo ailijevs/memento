@@ -154,7 +154,10 @@ class ProfileDAL(BaseDAL):
         response = (
             self.client.table(self.PROFILE_LIKES_TABLE)
             .select(
-                "user_id,liked_profile_id,event_id,created_at,event:events(name)",
+                (
+                    "user_id,liked_profile_id,event_id,created_at,"
+                    "event:events(name),liked_profile:profiles(*)"
+                ),
             )
             .eq("user_id", str(user_id))
             .order("created_at", desc=True)
@@ -165,13 +168,20 @@ class ProfileDAL(BaseDAL):
         likes: list[ProfileLikeResponse] = []
         for row in rows:
             event_data = row.pop("event", None)
+            liked_profile = row.pop("liked_profile", None)
             event_name: str | None = None
             if isinstance(event_data, dict):
                 event_name_raw = event_data.get("name")
                 if isinstance(event_name_raw, str):
                     event_name = event_name_raw
 
-            likes.append(ProfileLikeResponse(**row, event_name=event_name))
+            likes.append(
+                ProfileLikeResponse(
+                    **row,
+                    event_name=event_name,
+                    liked_profile=liked_profile if isinstance(liked_profile, dict) else None,
+                )
+            )
         return likes
 
     async def delete_profile_like(

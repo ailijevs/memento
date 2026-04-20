@@ -43,20 +43,10 @@ export default function FavoritesPage() {
       api.setToken(session.access_token);
       try {
         const likes = await api.getMyProfileLikes();
-        const profiles = await Promise.all(
-          likes.map(async (like) => {
-            try {
-              return await api.getProfileById(like.liked_profile_id);
-            } catch {
-              return null;
-            }
-          }),
-        );
-
         setFavorites(
-          likes.map((like, index) => ({
+          likes.map((like) => ({
             like,
-            profile: profiles[index],
+            profile: like.liked_profile,
             liked: true,
             pending: false,
           })),
