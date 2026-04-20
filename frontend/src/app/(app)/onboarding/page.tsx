@@ -177,6 +177,15 @@ export default function OnboardingPage() {
 
   async function handleSubmit() {
     setError(null);
+
+    if (!isResume) {
+      const username = linkedinUrl.trim().replace(/^.*linkedin\.com\/in\//i, "").replace(/\/+$/, "");
+      if (!/^[a-zA-Z0-9-]{3,100}$/.test(username)) {
+        setError("Please enter a valid LinkedIn username (letters, numbers, and hyphens only).");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       const supabase = createClient();
