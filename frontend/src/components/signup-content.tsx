@@ -168,14 +168,21 @@ export function SignupContent({ onBack, onGoLogin, showYouDot = true }: { onBack
     setError(null);
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: values[1],
       password: values[2],
-      options: { data: { full_name: values[0] } },
+      options: {
+        data: { full_name: values[0] },
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
+      },
     });
     if (error) { setError(error.message); setLoading(false); return; }
-    router.replace("/onboarding");
-    router.refresh();
+    if (data?.session === null) {
+      router.replace("/signup?verify=pending");
+    } else {
+      router.replace("/onboarding");
+      router.refresh();
+    }
   }
 
   async function handleGoogle() {
