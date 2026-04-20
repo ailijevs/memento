@@ -28,7 +28,10 @@ def delete_current_account(*, admin: Client, user_id: UUID) -> None:
     uid_str = str(user_id)
 
     events_resp = (
-        admin.table("events").select("event_id", "indexing_status").eq("created_by", uid_str).execute()
+        admin.table("events")
+        .select("event_id", "indexing_status")
+        .eq("created_by", uid_str)
+        .execute()
     )
 
     rekognition = RekognitionService()
