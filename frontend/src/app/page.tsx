@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
+import Link from "next/link";
 import { Aurora } from "@/components/aurora";
 import { SignupContent } from "@/components/signup-content";
 import { LoginContent } from "@/components/login-content";
@@ -198,6 +199,15 @@ function WelcomeScreen({ onNavigate }: { onNavigate: (dest: Screen) => void }) {
           >
             I already have an account
           </button>
+
+          <p className="animate-fade-in delay-600 mt-8 text-center">
+            <Link
+              href="/terms"
+              className="text-[13px] text-white/35 underline-offset-4 transition-colors hover:text-white/55 hover:underline"
+            >
+              Terms of Service
+            </Link>
+          </p>
         </div>
       </div>
     </>
