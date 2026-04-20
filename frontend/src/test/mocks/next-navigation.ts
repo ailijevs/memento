@@ -5,6 +5,7 @@ export const mockReplace = vi.fn();
 export const mockBack = vi.fn();
 export const mockRefresh = vi.fn();
 export const mockPathname = vi.fn().mockReturnValue("/dashboard");
+export const mockParams = vi.fn().mockReturnValue({});
 export const mockSearchParams = new URLSearchParams();
 
 vi.mock("next/navigation", () => ({
@@ -16,7 +17,7 @@ vi.mock("next/navigation", () => ({
     prefetch: vi.fn(),
   }),
   usePathname: () => mockPathname(),
-  useParams: () => ({}),
+  useParams: () => mockParams(),
   useSearchParams: () => mockSearchParams,
 }));
 
@@ -26,4 +27,5 @@ export function resetNavigationMocks() {
   mockBack.mockClear();
   mockRefresh.mockClear();
   mockPathname.mockReturnValue("/dashboard");
+  mockParams.mockReturnValue({});
 }
