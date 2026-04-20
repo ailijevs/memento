@@ -24,10 +24,18 @@ export default async function AppLayout({
   }
 
   const termsAccepted = user.user_metadata?.terms_accepted === true;
+  console.log("[app-layout] terms check", {
+    userId: user.id,
+    provider: user.app_metadata?.provider,
+    termsAccepted,
+    rawFlag: user.user_metadata?.terms_accepted,
+    metadataKeys: Object.keys(user.user_metadata ?? {}),
+  });
   if (!termsAccepted) {
     const pathname = (await headers()).get("x-pathname") ?? "";
     const continuePath = safeNextPath(pathname, "/onboarding");
     const nextPath = continuePath === "/terms" ? "/onboarding" : continuePath;
+    console.log("[app-layout] redirecting to /terms", { nextPath });
     redirect(`/terms?next=${encodeURIComponent(nextPath)}`);
   }
 
