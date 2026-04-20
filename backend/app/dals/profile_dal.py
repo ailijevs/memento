@@ -153,38 +153,23 @@ class ProfileDAL(BaseDAL):
         """List all profile likes created by a user."""
         response = (
             self.client.table(self.PROFILE_LIKES_TABLE)
-            .select("*")
+            .select(
+                "user_id,liked_profile_id,event_id,created_at,event:events(name)",
+            )
             .eq("user_id", str(user_id))
             .order("created_at", desc=True)
             .execute()
         )
         rows: list[dict[str, Any]] = response.data or []
 
-        event_names_by_id: dict[str, str | None] = {}
-
         likes: list[ProfileLikeResponse] = []
         for row in rows:
-            event_id = row.get("event_id")
+            event_data = row.pop("event", None)
             event_name: str | None = None
-
-            if event_id is not None:
-                event_id_str = str(event_id)
-                if event_id_str in event_names_by_id:
-                    event_name = event_names_by_id[event_id_str]
-                else:
-                    event_response = (
-                        self.client.table("events")
-                        .select("event_id,name")
-                        .eq("event_id", event_id_str)
-                        .maybe_single()
-                        .execute()
-                    )
-                    event_name = (
-                        event_response.data.get("name")
-                        if event_response and event_response.data
-                        else None
-                    )
-                    event_names_by_id[event_id_str] = event_name
+            if isinstance(event_data, dict):
+                event_name_raw = event_data.get("name")
+                if isinstance(event_name_raw, str):
+                    event_name = event_name_raw
 
             likes.append(ProfileLikeResponse(**row, event_name=event_name))
         return likes
