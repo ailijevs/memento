@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
@@ -441,6 +442,14 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
           <button onClick={onGoSignup} className="font-semibold text-white/35 active:text-white/60">
             Create an account
           </button>
+        </p>
+        <p className="mt-2 text-center text-[11px] text-white/20">
+          <Link
+            href="/terms?view=1&back=/login"
+            className="underline-offset-4 transition-colors hover:text-white/45 hover:underline"
+          >
+            View Terms of Service
+          </Link>
         </p>
       </div>
     </>
