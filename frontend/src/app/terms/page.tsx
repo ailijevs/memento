@@ -6,6 +6,7 @@ import { Loader2 } from "lucide-react";
 
 import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
+import { safeNextPath } from "@/lib/internal-nav";
 
 export default function TermsPage() {
   return (
@@ -30,7 +31,7 @@ function TermsContent() {
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const nextPath = searchParams.get("next") ?? "/dashboard";
+  const nextPath = safeNextPath(searchParams.get("next"), "/onboarding");
 
   async function handleAccept() {
     setError(null);
