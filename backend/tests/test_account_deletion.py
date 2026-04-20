@@ -184,15 +184,15 @@ def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
         events_rows=[{"event_id": eid, "indexing_status": "pending"}],
     )
 
-    rek_calls: list[str] = []
+    class _StubRekognitionService:
+        """Avoid real boto3 in CI; ``delete_current_account`` constructs this."""
 
-    def fake_delete_collection(self, *, collection_id: str) -> dict:
-        rek_calls.append(collection_id)
-        return {"StatusCode": 200}
+        def delete_collection(self, *, collection_id: str) -> dict:
+            raise AssertionError("Rekognition should not run when indexing_status is pending")
 
     monkeypatch.setattr(
-        "app.services.account_deletion.RekognitionService.delete_collection",
-        fake_delete_collection,
+        "app.services.account_deletion.RekognitionService",
+        _StubRekognitionService,
     )
 
     delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
@@ -200,7 +200,6 @@ def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
     assert admin.deleted_event_ids == [eid]
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
     assert admin.deleted_auth_user_id == str(user_id)
-    assert rek_calls == []  # Rekognition only when indexing_status == completed
 
 
 def test_delete_current_account_calls_rekognition_when_indexing_completed(
@@ -214,13 +213,16 @@ def test_delete_current_account_calls_rekognition_when_indexing_completed(
 
     rek_calls: list[str] = []
 
-    def fake_delete_collection(self, *, collection_id: str) -> dict:
-        rek_calls.append(collection_id)
-        return {"StatusCode": 200}
+    class _RecordingRekognitionService:
+        """Avoid real boto3 in CI while recording ``delete_collection`` calls."""
+
+        def delete_collection(self, *, collection_id: str) -> dict:
+            rek_calls.append(collection_id)
+            return {"StatusCode": 200}
 
     monkeypatch.setattr(
-        "app.services.account_deletion.RekognitionService.delete_collection",
-        fake_delete_collection,
+        "app.services.account_deletion.RekognitionService",
+        _RecordingRekognitionService,
     )
 
     delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
