@@ -32,7 +32,7 @@ export default function ForgotPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
-          redirect_to: `${siteUrl}/auth/callback?next=/reset-password`,
+          redirect_to: `${siteUrl}/reset-password`,
         }),
       });
 
