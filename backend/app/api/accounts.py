@@ -4,11 +4,11 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from supabase import Client
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_admin_client
 from app.services.account_deletion import delete_current_account
+from supabase import Client
 
 logger = logging.getLogger(__name__)
 

@@ -5,11 +5,10 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from supabase import Client
-
 from app.schemas.event import EventProcessingStatus
 from app.services.rekognition import RekognitionError, RekognitionService
 from app.utils.rekognition_helpers import build_event_collection_id
+from supabase import Client
 
 logger = logging.getLogger(__name__)
 
