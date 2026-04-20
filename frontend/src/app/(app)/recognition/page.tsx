@@ -364,6 +364,41 @@ export default function RecognitionPage() {
     router.refresh();
   }
 
+  const filteredAndSortedResults = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    const filtered = query
+      ? results.filter((result) => {
+          const profile = result.profile;
+          const haystack = [
+            profile?.full_name ?? "",
+            profile?.headline ?? "",
+            profile?.company ?? "",
+            profile?.major ?? "",
+            profile?.location ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(query);
+        })
+      : [...results];
+
+    if (sortMode === "compatible") {
+      filtered.sort((a, b) => {
+        const aScore = a.compatibility?.score ?? -1;
+        const bScore = b.compatibility?.score ?? -1;
+        if (aScore !== bScore) return bScore - aScore;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      return filtered;
+    }
+
+    filtered.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    return filtered;
+  }, [results, searchText, sortMode]);
+
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Hidden camera elements for phone camera mode */}
