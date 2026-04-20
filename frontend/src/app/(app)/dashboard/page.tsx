@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  ApiError,
   api,
   isApiErrorWithStatus,
   type ConsentResponse,
@@ -29,6 +30,10 @@ import {
 import { CalendarDays, Loader2, LogOut, Plus, UserMinus } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
+type ConsentUpdateDialogState = {
+  title: string;
+  message: string;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -70,6 +75,7 @@ export default function DashboardPage() {
   const [consentsLoading, setConsentsLoading] = useState(false);
   const [consentsSaving, setConsentsSaving] = useState(false);
   const [editingConsent, setEditingConsent] = useState<ConsentResponse | null>(null);
+  const [consentUpdateDialog, setConsentUpdateDialog] = useState<ConsentUpdateDialogState | null>(null);
   const [joinedEventPrompt, setJoinedEventPrompt] = useState<EventResponse | null>(null);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
@@ -419,12 +425,50 @@ export default function DashboardPage() {
       const updated = await api.updateMyEventConsent(eventId, patch);
       setEditingConsent(updated);
       setCachedEventConsent(eventId, updated);
+      setConsentUpdateDialog({
+        title: "Consents Updated",
+        message: "Your event consent settings were updated successfully.",
+      });
     } catch (error) {
       console.error("Failed to update event consent:", error);
-      if (error instanceof Error) {
-        setActionError(error.message);
+      if (isApiErrorWithStatus(error, 400) && error.message.toLowerCase().includes("profile photo")) {
+        setConsentUpdateDialog({
+          title: "Profile Photo Required",
+          message: "You must upload a profile photo before allowing recognition.",
+        });
+      } else if (isApiErrorWithStatus(error, 404)) {
+        const detail = error.message.toLowerCase();
+        if (detail.includes("event not found")) {
+          setConsentUpdateDialog({
+            title: "Event Not Found",
+            message: "This event does not exist.",
+          });
+        } else if (detail.includes("consent not found")) {
+          setConsentUpdateDialog({
+            title: "Consent Not Found",
+            message: "Consent settings were not found for this event.",
+          });
+        } else {
+          setConsentUpdateDialog({
+            title: "Not Found",
+            message: "The requested event or consent settings could not be found.",
+          });
+        }
+      } else if (isApiErrorWithStatus(error, 409) || (error instanceof ApiError && error.status >= 500)) {
+        setConsentUpdateDialog({
+          title: "Try Again Later",
+          message: "We could not update your consent right now. Please try again later.",
+        });
+      } else if (error instanceof Error) {
+        setConsentUpdateDialog({
+          title: "Unable to Update Consent",
+          message: error.message,
+        });
       } else {
-        setActionError("Could not update event consent right now. Please try again.");
+        setConsentUpdateDialog({
+          title: "Unable to Update Consent",
+          message: "Could not update event consent right now. Please try again.",
+        });
       }
     } finally {
       setConsentsSaving(false);
@@ -710,6 +754,16 @@ export default function DashboardPage() {
           }}
         />
       </ModalBottomSheet>
+
+      <ConfirmationDialog
+        open={Boolean(consentUpdateDialog)}
+        title={consentUpdateDialog?.title ?? "Consent Update"}
+        message={consentUpdateDialog?.message ?? ""}
+        confirmLabel="OK"
+        hideCancel
+        onConfirm={() => setConsentUpdateDialog(null)}
+        onCancel={() => setConsentUpdateDialog(null)}
+      />
 
       <ConfirmationDialog
         open={Boolean(joinedEventPrompt)}
