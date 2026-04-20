@@ -202,7 +202,7 @@ function WelcomeScreen({ onNavigate }: { onNavigate: (dest: Screen) => void }) {
 
           <p className="animate-fade-in delay-600 mt-8 text-center">
             <Link
-              href="/terms"
+              href="/terms?view=1&back=/"
               className="text-[13px] text-white/35 underline-offset-4 transition-colors hover:text-white/55 hover:underline"
             >
               Terms of Service
