@@ -4,6 +4,7 @@ import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from supabase import Client
 
 from app.auth import CurrentUser, get_current_user
 from app.db import get_admin_client
@@ -17,6 +18,7 @@ router = APIRouter(prefix="/accounts", tags=["accounts"])
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_my_account(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    admin: Annotated[Client, Depends(get_admin_client)],
 ) -> None:
     """
     Permanently delete the current user's account.
@@ -24,7 +26,6 @@ async def delete_my_account(
     Removes events they created (and related data), profile photo in Storage,
     then deletes the Supabase Auth user (cascading profile, memberships, consents).
     """
-    admin = get_admin_client()
     try:
         delete_current_account(admin=admin, user_id=current_user.id)
     except Exception as exc:
