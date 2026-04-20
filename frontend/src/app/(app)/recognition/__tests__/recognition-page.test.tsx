@@ -15,12 +15,14 @@ import {
 
 const mockGetMyEventConsent = vi.fn();
 const mockGetCompatibility = vi.fn();
+const mockGetMyProfileLikes = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   api: {
     setToken: vi.fn(),
     getMyEventConsent: (...args: unknown[]) => mockGetMyEventConsent(...args),
     getCompatibility: (...args: unknown[]) => mockGetCompatibility(...args),
+    getMyProfileLikes: (...args: unknown[]) => mockGetMyProfileLikes(...args),
   },
 }));
 
@@ -84,6 +86,7 @@ describe("RecognitionPage", () => {
     resetSupabaseMocks();
     mockGetMyEventConsent.mockClear();
     mockGetCompatibility.mockClear();
+    mockGetMyProfileLikes.mockClear().mockResolvedValue([]);
     mockSocketConnect.mockClear();
     mockSocketDisconnect.mockClear();
     mockSocketSend.mockClear();
