@@ -177,7 +177,7 @@ export function SignupContent({ onBack, onGoLogin, showYouDot = true }: { onBack
       },
     });
     if (error) { setError(error.message); setLoading(false); return; }
-    if (data.session) {
+    if (data?.session) {
       router.replace("/onboarding");
       router.refresh();
     } else {
