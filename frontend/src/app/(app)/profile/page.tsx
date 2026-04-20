@@ -3,11 +3,13 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, type ProfileResponse, type ProfileUpdateRequest } from "@/lib/api";
+import { ApiError, api, type ProfileResponse, type ProfileUpdateRequest } from "@/lib/api";
 import { uploadProfilePhoto } from "@/lib/profile-photo-upload";
 import { useProfilePhotoUrl } from "@/lib/use-profile-photo-url";
 import { Aurora } from "@/components/aurora";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import {
+  AlertTriangle,
   Camera,
   Check,
   X,
@@ -18,6 +20,7 @@ import {
   Pencil,
   LogOut,
   Link2,
+  Trash2,
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -31,6 +34,9 @@ export default function ProfilePage() {
   const [photoStatus, setPhotoStatus] = useState<string | null>(null);
   const [photoStatusError, setPhotoStatusError] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
+  const [deletePhase, setDeletePhase] = useState<"closed" | "first" | "second">("closed");
+  const [deleteSubmitting, setDeleteSubmitting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { photoUrl, handleImageError } = useProfilePhotoUrl(profile?.photo_path ?? null);
 
@@ -39,6 +45,27 @@ export default function ProfilePage() {
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
+  }
+
+  const finalDeleteMessage =
+    "If you continue, your event consents will be revoked automatically. You will no longer be able to access liked profiles or connections you have made. All of your data will be lost forever. This cannot be undone.";
+
+  async function confirmDeleteAccount() {
+    if (deleteSubmitting) return;
+    setDeleteSubmitting(true);
+    setDeleteError(null);
+    try {
+      await api.deleteMyAccount();
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push("/");
+      router.refresh();
+    } catch (e) {
+      setDeleteSubmitting(false);
+      setDeleteError(
+        e instanceof ApiError ? e.message : "Something went wrong. Please try again.",
+      );
+    }
   }
 
   useEffect(() => {
@@ -415,6 +442,82 @@ export default function ProfilePage() {
             )}
           </SectionCard>
         </div>
+
+        <div
+          className="mt-10 rounded-2xl p-4"
+          style={{
+            background: "rgba(255, 60, 60, 0.08)",
+            border: "2px solid rgba(255, 100, 100, 0.45)",
+            boxShadow: "0 0 24px rgba(255, 60, 60, 0.12)",
+          }}
+        >
+          <div className="mb-3 flex items-center gap-2">
+            <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" aria-hidden />
+            <span className="text-[13px] font-semibold uppercase tracking-[0.12em] text-red-200/90">
+              Danger zone
+            </span>
+          </div>
+          <p className="mb-4 text-[13px] leading-relaxed text-red-100/75">
+            Permanently delete your Memento account and all associated data. This action cannot be
+            undone.
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setDeleteError(null);
+              setDeleteSubmitting(false);
+              setDeletePhase("first");
+            }}
+            className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
+            style={{
+              background: "linear-gradient(180deg, oklch(0.52 0.22 25) 0%, oklch(0.4 0.2 22) 100%)",
+              border: "1px solid oklch(0.65 0.2 25 / 55%)",
+              boxShadow: "0 4px 20px rgba(220, 38, 38, 0.35)",
+            }}
+          >
+            <Trash2 className="h-5 w-5" aria-hidden />
+            Delete my account
+          </button>
+        </div>
+
+        <ConfirmationDialog
+          open={deletePhase === "first"}
+          title="Delete your account?"
+          message="Do you want to delete your account? Tap Yes to continue, or Cancel to go back."
+          cancelLabel="Cancel"
+          confirmLabel="Yes"
+          onCancel={() => setDeletePhase("closed")}
+          onConfirm={() => {
+            setDeleteError(null);
+            setDeleteSubmitting(false);
+            setDeletePhase("second");
+          }}
+        />
+
+        <ConfirmationDialog
+          open={deletePhase === "second"}
+          title="Are you sure?"
+          message={
+            deleteError
+              ? `${finalDeleteMessage}\n\n${deleteError}`
+              : finalDeleteMessage
+          }
+          cancelLabel="Cancel"
+          confirmLabel={deleteSubmitting ? "Deleting…" : "Yes, delete my account"}
+          confirmDisabled={deleteSubmitting}
+          onCancel={() => {
+            if (!deleteSubmitting) {
+              setDeletePhase("closed");
+              setDeleteError(null);
+            }
+          }}
+          onConfirm={() => void confirmDeleteAccount()}
+          confirmIcon={
+            deleteSubmitting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : undefined
+          }
+        />
 
         {confirmingSignOut ? (
           <div className="mt-6 flex items-center justify-center gap-3">
