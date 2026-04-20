@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Any
 from uuid import UUID
 
 from app.schemas.event import EventProcessingStatus
@@ -34,9 +35,20 @@ def delete_current_account(*, admin: Client, user_id: UUID) -> None:
     )
 
     rekognition = RekognitionService()
-    for row in events_resp.data or []:
-        eid = row["event_id"]
-        idx = (row.get("indexing_status") or "").lower()
+    raw_rows = events_resp.data
+    if not isinstance(raw_rows, list):
+        raw_rows = []
+
+    for raw in raw_rows:
+        if not isinstance(raw, dict):
+            continue
+        row: dict[str, Any] = raw
+        eid_val = row.get("event_id")
+        if eid_val is None:
+            continue
+        eid = str(eid_val)
+        status_raw = row.get("indexing_status")
+        idx = (str(status_raw) if status_raw is not None else "").lower()
         if idx == EventProcessingStatus.COMPLETED.value:
             collection_id = build_event_collection_id(eid)
             try:

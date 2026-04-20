@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
@@ -26,7 +27,7 @@ def _mock_user(user_id: UUID | None = None) -> CurrentUser:
 
 
 @pytest.fixture
-def client() -> TestClient:
+def client() -> Generator[TestClient, None, None]:
     app.dependency_overrides.clear()
     with TestClient(app) as test_client:
         yield test_client
@@ -64,7 +65,8 @@ def test_delete_me_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) 
 
 
 def test_delete_me_returns_502_when_orchestration_fails(
-    monkeypatch: pytest.MonkeyPatch, client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
 ) -> None:
     """Any exception from delete_current_account is mapped to 502."""
 
@@ -111,8 +113,10 @@ class _TableQuery:
         if self._table == "events" and self._kind == "select" and self._eq_col == "created_by":
             return SimpleNamespace(data=self._root.events_rows)
         if self._table == "events" and self._kind == "delete" and self._eq_col == "event_id":
-            self._root.deleted_event_ids.append(self._eq_val)
-            return SimpleNamespace(data=[{"event_id": self._eq_val}])
+            event_id = self._eq_val
+            assert event_id is not None
+            self._root.deleted_event_ids.append(event_id)
+            return SimpleNamespace(data=[{"event_id": event_id}])
         raise AssertionError(f"Unexpected table chain: {self._table} {self._kind} {self._eq_col}")
 
 
