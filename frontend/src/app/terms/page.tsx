@@ -44,7 +44,7 @@ function TermsContent() {
       } = await supabase.auth.getUser();
 
       if (userError || !user) {
-        setError(userError?.message ?? "You need to be signed in to accept the terms.");
+        setError(userError?.message ?? "You must be signed in to accept the terms.");
         setAccepting(false);
         return;
       }
@@ -92,40 +92,64 @@ function TermsContent() {
         </h1>
 
         <p className="mb-4 text-sm text-white/60">
-          Please review and accept the terms of service before continuing to use Memento.
+          Please review and accept these terms before continuing to use Memento.
         </p>
 
         <div className="mb-4 flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/70">
-          <p className="mb-2 font-semibold">1. Usage at events</p>
+          <p className="mb-2 font-semibold">1. Approved Event Use</p>
           <p className="mb-4">
-            Memento helps you recognize and remember people at supported events. Recognition is only
-            available for events where you have joined and provided the necessary consents.
+            Memento is intended for use only at approved events where participants have
+            registered and provided consent. Facial recognition features are limited to
+            event-specific attendee groups and cannot be used outside those approved
+            settings.
           </p>
 
-          <p className="mb-2 font-semibold">2. Facial recognition and consent</p>
+          <p className="mb-2 font-semibold">2. Facial Recognition and Consent</p>
           <p className="mb-4">
-            When enabled, Memento uses facial recognition to match faces captured by compatible devices
-            to attendee profiles. You can withdraw consent for recognition in the app&apos;s event
-            settings at any time, which will disable recognition for that event.
+            Memento uses facial recognition to match images captured by compatible devices
+            with attendee profiles. Recognition is only available for users who have
+            explicitly opted in. You may withdraw consent at any time through the app’s
+            event settings. If consent is withdrawn, your profile and face data will no
+            longer be available for recognition within that event.
           </p>
 
-          <p className="mb-2 font-semibold">3. Data storage and sharing</p>
+          <p className="mb-2 font-semibold">3. Data Collection and Storage</p>
           <p className="mb-4">
-            Profile data (such as your name, headline, and shared interests) is stored in our backend
-            and may be displayed to other attendees at the same event where you have granted
-            permission. We do not sell your personal data.
+            Memento may store information you choose to provide, including your name,
+            headline, academic or professional affiliation, interests, uploaded headshot,
+            and event participation history. This information is stored securely and is only
+            shared with other attendees in events where you have chosen to participate.
           </p>
 
-          <p className="mb-2 font-semibold">4. Your responsibilities</p>
+          <p className="mb-2 font-semibold">4. Data Retention</p>
           <p className="mb-4">
-            You agree to use Memento in accordance with applicable laws and event codes of conduct. Do
-            not attempt to misuse recognition features or circumvent consent mechanisms.
+            Event-specific facial recognition records and uploaded images may be deleted
+            after the event period ends, unless you provide separate permission for longer
+            retention. Memento does not sell personal data to advertisers or third parties.
           </p>
 
-          <p className="mb-2 font-semibold">5. Changes to these terms</p>
+          <p className="mb-2 font-semibold">5. User Responsibilities</p>
+          <p className="mb-4">
+            You agree to use Memento in compliance with applicable laws, university
+            policies, and event codes of conduct. You may not misuse facial recognition
+            features, attempt to identify non-participants, share another person’s data
+            without permission, or interfere with the system’s privacy protections.
+          </p>
+
+          <p className="mb-2 font-semibold">6. Accuracy and Availability</p>
+          <p className="mb-4">
+            Memento is designed to assist with networking and event interactions, but it
+            may occasionally return incorrect, incomplete, or unavailable results.
+            Recognition accuracy may vary depending on lighting, camera quality,
+            connectivity, and the information provided by participants.
+          </p>
+
+          <p className="mb-2 font-semibold">7. Updates to These Terms</p>
           <p>
-            We may update these terms from time to time. When we do, we will notify you in the app and
-            may ask you to accept updated terms before continuing to use recognition features.
+            We may update these terms from time to time to reflect product changes,
+            privacy requirements, or legal obligations. If material changes are made, you
+            will be notified in the app and may be required to accept the updated terms
+            before continuing to use Memento.
           </p>
         </div>
 
