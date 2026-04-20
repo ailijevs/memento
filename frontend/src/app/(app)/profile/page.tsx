@@ -17,6 +17,7 @@ import {
   GraduationCap,
   Pencil,
   LogOut,
+  Link2,
 } from "lucide-react";
 
 export default function ProfilePage() {
@@ -299,6 +300,32 @@ export default function ProfilePage() {
               onSave={saveEdit}
               onDraftChange={setDraftValue}
               placeholder="Add a location"
+              displayClassName="text-[14px] text-white/60"
+              inputClassName="w-full bg-transparent text-[14px] text-white/80 outline-none"
+            />
+          </SectionCard>
+
+          {/* LinkedIn */}
+          <SectionCard
+            label="LinkedIn"
+            icon={<Link2 className="h-3.5 w-3.5" />}
+            onEdit={
+              editField !== "linkedin_url"
+                ? () => startEdit("linkedin_url", profile.linkedin_url ?? "")
+                : undefined
+            }
+          >
+            <FieldEditor
+              field="linkedin_url"
+              value={profile.linkedin_url ?? ""}
+              editField={editField}
+              draftValue={draftValue}
+              saving={saving}
+              onStart={startEdit}
+              onCancel={cancelEdit}
+              onSave={saveEdit}
+              onDraftChange={setDraftValue}
+              placeholder="Add a LinkedIn URL"
               displayClassName="text-[14px] text-white/60"
               inputClassName="w-full bg-transparent text-[14px] text-white/80 outline-none"
             />
