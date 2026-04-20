@@ -2,7 +2,7 @@
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Loader2 } from "lucide-react";
+import { ChevronLeft, Loader2 } from "lucide-react";
 
 import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
@@ -31,6 +31,8 @@ function TermsContent() {
   const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isReadOnlyView = searchParams.get("view") === "1";
+  const backPath = safeNextPath(searchParams.get("back"), "/");
   const nextPath = safeNextPath(searchParams.get("next"), "/onboarding");
 
   async function handleAccept() {
@@ -80,6 +82,18 @@ function TermsContent() {
       </div>
 
       <div className="relative z-10 mx-auto flex w-full max-w-xl flex-1 flex-col px-6 py-10">
+        {isReadOnlyView && (
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => router.push(backPath)}
+              className="inline-flex h-[44px] items-center text-white/30 transition-colors active:text-white/60"
+              aria-label="Go back"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+          </div>
+        )}
         <h1
           className="mb-4 text-white"
           style={{
@@ -93,7 +107,9 @@ function TermsContent() {
         </h1>
 
         <p className="mb-4 text-sm text-white/60">
-          Please review and accept these terms before continuing to use Memento.
+          {isReadOnlyView
+            ? "Please review these terms."
+            : "Please review and accept these terms before continuing to use Memento."}
         </p>
 
         <div className="mb-4 flex-1 overflow-y-auto rounded-2xl border border-white/10 bg-black/40 p-4 text-sm text-white/70">
@@ -154,16 +170,20 @@ function TermsContent() {
           </p>
         </div>
 
-        {error && <p className="mb-3 text-xs text-red-300">{error}</p>}
+        {!isReadOnlyView && (
+          <>
+            {error && <p className="mb-3 text-xs text-red-300">{error}</p>}
 
-        <button
-          type="button"
-          onClick={handleAccept}
-          disabled={accepting}
-          className="mt-2 inline-flex items-center justify-center rounded-full bg-white px-6 py-2 text-[13px] font-medium text-black transition active:scale-95 disabled:opacity-60"
-        >
-          {accepting ? "Saving..." : "I have read and accept the terms"}
-        </button>
+            <button
+              type="button"
+              onClick={handleAccept}
+              disabled={accepting}
+              className="mt-2 inline-flex items-center justify-center rounded-full bg-white px-6 py-2 text-[13px] font-medium text-black transition active:scale-95 disabled:opacity-60"
+            >
+              {accepting ? "Saving..." : "I have read and accept the terms"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
