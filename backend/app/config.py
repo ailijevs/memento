@@ -26,11 +26,14 @@ class Settings(BaseSettings):
 
     # Application Settings
     app_name: str = "Memento API"
+    app_version: str = "0.0.0-dev"
     debug: bool = False
 
     # External APIs (optional)
     exa_api_key: str | None = None
     mentra_api_key: str | None = None
+    mentra_api_key_hash: str | None = None
+    web_api_key_hash: str | None = None
     pdl_api_key: str | None = None
     openai_api_key: str | None = None
     profile_summary_provider: str = "auto"  # auto | dspy | template
@@ -43,6 +46,16 @@ class Settings(BaseSettings):
     s3_bucket_name: str | None = None
     aws_access_key_id: str | None = None
     aws_secret_access_key: str | None = None
+
+    @property
+    def hash_to_client(self) -> dict[str, str]:
+        """Map known API key hashes to client identifiers."""
+        mapping: dict[str, str] = {}
+        if self.mentra_api_key_hash:
+            mapping[self.mentra_api_key_hash] = "mentra"
+        if self.web_api_key_hash:
+            mapping[self.web_api_key_hash] = "web_frontend"
+        return mapping
 
 
 @lru_cache

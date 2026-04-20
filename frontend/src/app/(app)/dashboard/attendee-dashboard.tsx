@@ -2,7 +2,17 @@
 
 import type { RefObject } from "react";
 import { type EventResponse } from "@/lib/api";
-import { CalendarDays, Loader2, MapPin, MoreHorizontal, ScanFace, Search, ShieldCheck, UserMinus } from "lucide-react";
+import {
+  CalendarDays,
+  Loader2,
+  MapPin,
+  MoreHorizontal,
+  ScanFace,
+  Search,
+  ShieldCheck,
+  UserMinus,
+  Users,
+} from "lucide-react";
 
 export interface AttendeeEventItem {
   event: EventResponse;
@@ -59,6 +69,8 @@ interface AttendeeContentProps {
   openMenuContainerRef: RefObject<HTMLDivElement | null>;
   leavingEventId: string | null;
   onToggleEventMenu: (eventId: string) => void;
+  onViewEventDetail: (event: EventResponse) => void;
+  onViewRsvpList: (event: EventResponse) => void;
   onEditConsents: (event: EventResponse) => void;
   onLeaveEvent: (event: EventResponse) => void;
   onStartRecognition: (event: EventResponse) => void;
@@ -72,6 +84,8 @@ export function AttendeeContent({
   openMenuContainerRef,
   leavingEventId,
   onToggleEventMenu,
+  onViewEventDetail,
+  onViewRsvpList,
   onEditConsents,
   onLeaveEvent,
   onStartRecognition,
@@ -113,7 +127,11 @@ export function AttendeeContent({
             }}
           >
             <div className="mb-2 flex items-start justify-between gap-3">
-              <div>
+              <button
+                type="button"
+                onClick={() => onViewEventDetail(event)}
+                className="min-w-0 flex-1 text-left"
+              >
                 <h2 className="text-[17px] font-medium text-white/90">{event.name}</h2>
                 <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/45">
                   {event.starts_at ? (
@@ -129,7 +147,7 @@ export function AttendeeContent({
                     </span>
                   ) : null}
                 </div>
-              </div>
+              </button>
 
               <div
                 className="relative"
@@ -155,6 +173,13 @@ export function AttendeeContent({
                       border: "1px solid oklch(1 0 0 / 12%)",
                     }}
                   >
+                    <button
+                      onClick={() => onViewRsvpList(event)}
+                      className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                    >
+                      <Users className="h-3.5 w-3.5" />
+                      RSVP List
+                    </button>
                     <button
                       onClick={() => onEditConsents(event)}
                       className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"

@@ -45,9 +45,9 @@ export class BackendClient {
     payload: FrameDetectionRequest,
     userAccessToken?: string,
   ): Promise<FrameDetectionResponse> {
-    const serviceToken = process.env.RECOGNITION_SERVICE_TOKEN;
+    const recognitionApiKey = process.env.RECOGNITION_API_KEY;
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (serviceToken) headers['X-Service-Token'] = serviceToken;
+    if (recognitionApiKey) headers['X-Recognition-Api-Key'] = recognitionApiKey;
     if (userAccessToken) headers['Authorization'] = `Bearer ${userAccessToken}`;
 
     const response = await fetch(this.recognitionUrl, {

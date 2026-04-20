@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -139,6 +140,12 @@ async def delete_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found or you don't have permission to delete.",
+        )
+
+    if event.starts_at and datetime.now(timezone.utc) >= event.starts_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Events cannot be deleted after they have started.",
         )
 
     indexing_status = event.indexing_status

@@ -2,7 +2,7 @@
 
 import asyncio
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
@@ -11,7 +11,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.auth import CurrentUser, get_current_user
 from app.dals import ConsentDAL, EventDAL, MembershipDAL
 from app.db import get_supabase_client
-from app.schemas import ConsentCreate, EventProcessingStatus, MembershipCreate, MembershipResponse
+from app.schemas import (
+    ConsentCreate,
+    EventProcessingStatus,
+    MembershipCreate,
+    MembershipResponse,
+)
 from app.services.rekognition import RekognitionError, RekognitionService
 from app.utils.rekognition_helpers import build_event_collection_id
 
@@ -68,19 +73,11 @@ async def join_event(
             detail="Event not found.",
         )
 
-    event_start = event.starts_at
-    if event_start is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Event start time is unexpectedly missing.",
-        )
-
-    join_cutoff = event_start - timedelta(minutes=20)
     now = datetime.now(timezone.utc)
-    if now > join_cutoff:
+    if event.ends_at and now >= event.ends_at:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only join an event at least 20 minutes before it starts.",
+            detail="You can no longer join an event after it has ended.",
         )
 
     # Create membership
@@ -99,18 +96,6 @@ async def join_event(
     )
 
     return membership
-
-
-@router.get("/{event_id}/members", response_model=list[MembershipResponse])
-async def list_event_members(
-    event_id: UUID,
-    dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
-) -> list[MembershipResponse]:
-    """
-    Get all members of an event.
-    RLS enforces: only visible if caller is also a member.
-    """
-    return await dal.get_event_members(event_id)
 
 
 @router.delete("/{event_id}/leave", status_code=status.HTTP_204_NO_CONTENT)
@@ -141,6 +126,12 @@ async def leave_event(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="You are not a member of this event.",
+        )
+
+    if event.ends_at and datetime.now(timezone.utc) >= event.ends_at:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can no longer leave an event after it has ended.",
         )
 
     indexing_status = event.indexing_status

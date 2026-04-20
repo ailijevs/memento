@@ -12,6 +12,7 @@ interface ConfirmationDialogProps {
   onCancel: () => void;
   confirmIcon?: ReactNode;
   confirmDisabled?: boolean;
+  hideCancel?: boolean;
 }
 
 export function ConfirmationDialog({
@@ -24,6 +25,7 @@ export function ConfirmationDialog({
   onCancel,
   confirmIcon,
   confirmDisabled = false,
+  hideCancel = false,
 }: ConfirmationDialogProps) {
   if (!open) {
     return null;
@@ -49,16 +51,18 @@ export function ConfirmationDialog({
         <p className="mt-2 text-[13px] text-white/60">{message}</p>
 
         <div className="mt-4 flex gap-2">
-          <button
-            onClick={onCancel}
-            className="flex-1 rounded-full px-3 py-2 text-[11px] font-medium uppercase tracking-[0.1em] text-white/75 transition-transform active:scale-95"
-            style={{
-              background: "oklch(1 0 0 / 4%)",
-              border: "1px solid oklch(1 0 0 / 10%)",
-            }}
-          >
-            {cancelLabel}
-          </button>
+          {!hideCancel ? (
+            <button
+              onClick={onCancel}
+              className="flex-1 rounded-full px-3 py-2 text-[11px] font-medium uppercase tracking-[0.1em] text-white/75 transition-transform active:scale-95"
+              style={{
+                background: "oklch(1 0 0 / 4%)",
+                border: "1px solid oklch(1 0 0 / 10%)",
+              }}
+            >
+              {cancelLabel}
+            </button>
+          ) : null}
           <button
             onClick={onConfirm}
             disabled={confirmDisabled}

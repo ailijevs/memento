@@ -3,6 +3,7 @@
 import asyncio
 import ipaddress
 import logging
+from datetime import datetime, timedelta, timezone
 from typing import Annotated, Any
 from urllib.parse import urlparse
 from uuid import UUID
@@ -12,7 +13,7 @@ from pydantic import BaseModel
 
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
-from app.dals import ProfileDAL
+from app.dals import ConsentDAL, EventDAL, MembershipDAL, ProfileDAL
 from app.db import get_supabase_client
 from app.schemas import (
     LinkedInEnrichmentRequest,
@@ -21,7 +22,11 @@ from app.schemas import (
     LinkedInOnboardingResponse,
     ProfileCompletionResponse,
     ProfileCreate,
-    ProfileDirectoryEntry,
+    ProfileDirectoryResponse,
+    ProfilePhotoUploadConfirmRequest,
+    ProfilePhotoUploadUrlRequest,
+    ProfilePhotoUploadUrlResponse,
+    ProfilePhotoUrlResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -47,6 +52,26 @@ def get_profile_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     """Dependency to get ProfileDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ProfileDAL(client)
+
+
+def get_event_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> EventDAL:
+    """Dependency to get EventDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return EventDAL(client)
+
+
+def get_membership_dal(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> MembershipDAL:
+    """Dependency to get MembershipDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return MembershipDAL(client)
+
+
+def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> ConsentDAL:
+    """Dependency to get ConsentDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return ConsentDAL(client)
 
 
 @router.get("/me", response_model=ProfileResponse)
@@ -112,6 +137,163 @@ async def update_my_profile(
             detail="Profile not found. Please create one first.",
         )
     return await _refresh_generated_profile_summary(dal, profile)
+
+
+@router.get("/me/photo-url", response_model=ProfilePhotoUrlResponse)
+async def get_my_profile_photo_url(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> ProfilePhotoUrlResponse:
+    """Return a renderable URL for the current user's profile photo."""
+    presign_ttl_seconds = 600
+    profile = await dal.get_by_user_id(current_user.id)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found. Please create one first.",
+        )
+
+    photo_path = (profile.photo_path or "").strip()
+    if not photo_path:
+        return ProfilePhotoUrlResponse(
+            photo_url=None,
+            expires_at=None,
+        )
+
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Profile image storage is not configured.",
+        )
+
+    s3_service = S3Service()
+    try:
+        photo_url = s3_service.get_profile_picture_presigned_url(
+            s3_key=photo_path,
+            bucket_name=settings.s3_bucket_name,
+            expires_in_seconds=presign_ttl_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=presign_ttl_seconds)
+    return ProfilePhotoUrlResponse(
+        photo_url=photo_url,
+        expires_at=expires_at,
+    )
+
+
+@router.post("/me/photo-upload-url", response_model=ProfilePhotoUploadUrlResponse)
+async def create_profile_photo_upload_url(
+    data: ProfilePhotoUploadUrlRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> ProfilePhotoUploadUrlResponse:
+    """Generate a pre-signed URL for direct profile photo upload to S3."""
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Profile image storage is not configured.",
+        )
+
+    s3_service = S3Service()
+    existing_profile = await dal.get_by_user_id(current_user.id)
+    existing_s3_key = (existing_profile.photo_path or "").strip() if existing_profile else ""
+
+    try:
+        if existing_s3_key:
+            try:
+                s3_service.delete_profile_picture(
+                    s3_key=existing_s3_key,
+                    bucket_name=settings.s3_bucket_name,
+                )
+            except Exception as exc:
+                if s3_service.is_not_found_error(exc):
+                    logger.info(
+                        "Profile photo key not found during delete, continuing: key=%s",
+                        existing_s3_key,
+                    )
+                else:
+                    raise
+        upload_data = s3_service.generate_upload_url(
+            user_id=current_user.id,
+            bucket_name=settings.s3_bucket_name,
+            source=data.source,
+            expires_in_seconds=300,
+            content_type=data.content_type,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+
+    return ProfilePhotoUploadUrlResponse(**upload_data)
+
+
+@router.post("/me/photo-upload-confirm", response_model=ProfileResponse)
+async def confirm_profile_photo_upload(
+    data: ProfilePhotoUploadConfirmRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> ProfileResponse:
+    """Confirm uploaded photo object exists in S3 and persist key on profile."""
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Profile image storage is not configured.",
+        )
+
+    s3_service = S3Service()
+    try:
+        exists = s3_service.profile_picture_exists(
+            s3_key=data.s3_key,
+            bucket_name=settings.s3_bucket_name,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
+    except RuntimeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=str(exc),
+        )
+
+    if not exists:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Uploaded profile photo was not found in storage.",
+        )
+
+    profile = await dal.update(
+        current_user.id,
+        ProfileUpdate.model_validate({"photo_path": data.s3_key}),
+    )
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found. Please create one first.",
+        )
+
+    return profile
 
 
 @router.post("/enrich-linkedin", response_model=LinkedInEnrichmentResponse)
@@ -328,17 +510,54 @@ async def get_compatibility(
     )
 
 
-@router.get("/directory/{event_id}", response_model=list[ProfileDirectoryEntry])
+@router.get("/directory/{event_id}", response_model=ProfileDirectoryResponse)
 async def get_event_directory(
     event_id: UUID,
-    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
-) -> list[ProfileDirectoryEntry]:
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
+    membership_dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
+    consent_dal: Annotated[ConsentDAL, Depends(get_consent_dal)],
+) -> ProfileDirectoryResponse:
     """
     Get the directory of profiles for an event.
-    Only returns profiles of users who have consented to display.
+    Returns visible directory entries plus attendee counts.
     Uses the get_event_directory SQL function.
     """
-    return await dal.get_event_directory(event_id)
+    event = await event_dal.get_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    membership = await membership_dal.get(event_id=event_id, user_id=current_user.id)
+    is_creator = current_user.id == event.created_by
+    is_member = membership is not None
+    if not is_creator and not is_member:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found or not accessible.",
+        )
+
+    entries = []
+    total_count = await membership_dal.get_event_member_count(event_id)
+    viewer_consent = await consent_dal.get(event_id=event_id, user_id=current_user.id)
+    if is_creator or (viewer_consent and viewer_consent.allow_profile_display):
+        entries = await profile_dal.get_event_directory(event_id)
+    else:
+        entries = [
+            entry
+            for entry in await profile_dal.get_event_directory(event_id)
+            if entry.user_id == current_user.id
+        ]
+    hidden_count = max(total_count - len(entries), 0)
+
+    return ProfileDirectoryResponse(
+        entries=entries,
+        total_count=total_count,
+        hidden_count=hidden_count,
+    )
 
 
 # =============================================================================
