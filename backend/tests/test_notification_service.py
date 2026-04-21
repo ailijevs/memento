@@ -62,8 +62,8 @@ def test_should_not_send_for_non_notifiable_changes():
     assert reasons == []
 
 
-def test_should_send_for_time_change():
-    """Time changes should trigger update emails."""
+def test_should_send_for_start_time_change():
+    """Start-time changes should trigger update emails."""
     old_event = _event()
     new_event = old_event.model_copy(update={"starts_at": old_event.starts_at + timedelta(hours=1)})
 
@@ -73,7 +73,23 @@ def test_should_send_for_time_change():
     )
 
     assert should_send is True
-    assert "time" in reasons
+    assert "start_time" in reasons
+    assert "end_time" not in reasons
+
+
+def test_should_send_for_end_time_change():
+    """End-time changes should trigger update emails."""
+    old_event = _event()
+    new_event = old_event.model_copy(update={"ends_at": old_event.ends_at + timedelta(hours=1)})
+
+    should_send, reasons = _service().should_send_event_update(
+        old_event=old_event,
+        new_event=new_event,
+    )
+
+    assert should_send is True
+    assert "end_time" in reasons
+    assert "start_time" not in reasons
 
 
 def test_should_send_for_location_change():

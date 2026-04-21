@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <title>Event Deleted</title>
+  </head>
+  <body
+    style="
+      margin: 0;
+      padding: 0;
+      background-color: #f3f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      color: #0f172a;
+    "
+  >
+    <div style="display: none; max-height: 0; overflow: hidden; opacity: 0;">
+      {{ event_name }} was deleted. See your dashboard in {{ app_name }} for current events.
+    </div>
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="padding: 24px 12px;">
+      <tr>
+        <td align="center">
+          <table
+            role="presentation"
+            width="100%"
+            cellspacing="0"
+            cellpadding="0"
+            style="max-width: 620px; background: #ffffff; border-radius: 16px; overflow: hidden;"
+          >
+            <tr>
+              <td
+                style="
+                  background: linear-gradient(135deg, #991b1b 0%, #dc2626 100%);
+                  color: #ffffff;
+                  padding: 22px 28px;
+                "
+              >
+                <p style="margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;">
+                  {{ app_name }}
+                </p>
+                <h1 style="margin: 8px 0 0; font-size: 24px; line-height: 1.25;">Event Deleted</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 26px 28px 12px;">
+                <p style="margin: 0 0 12px; font-size: 16px; line-height: 1.6;">
+                  Hi there,
+                </p>
+                <p style="margin: 0 0 18px; font-size: 16px; line-height: 1.6;">
+                  The event <strong>{{ event_name }}</strong> has been deleted.
+                </p>
+                <table
+                  role="presentation"
+                  width="100%"
+                  cellspacing="0"
+                  cellpadding="0"
+                  style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;"
+                >
+                  <tr>
+                    <td style="padding: 14px 16px; border-bottom: 1px solid #e2e8f0;">
+                      <p style="margin: 0 0 6px; font-size: 13px; color: #475569; text-transform: uppercase;">
+                        Scheduled Time
+                      </p>
+                      <p style="margin: 0; font-size: 15px; color: #0f172a;">
+                        {{ scheduled_time }}
+                      </p>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding: 14px 16px;">
+                      <p style="margin: 0 0 6px; font-size: 13px; color: #475569; text-transform: uppercase;">
+                        Location
+                      </p>
+                      <p style="margin: 0; font-size: 15px; color: #0f172a;">
+                        {{ location }}
+                      </p>
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 8px 28px 28px;">
+                <table role="presentation" cellspacing="0" cellpadding="0">
+                  <tr>
+                    <td
+                      style="background: #7c3aed; border-radius: 10px; text-align: center;"
+                    >
+                      <a
+                        href="{{ cta_url }}"
+                        style="
+                          display: inline-block;
+                          padding: 12px 18px;
+                          color: #ffffff;
+                          text-decoration: none;
+                          font-weight: 600;
+                          font-size: 14px;
+                        "
+                      >
+                        Go to Dashboard
+                      </a>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin: 16px 0 0; font-size: 13px; color: #64748b; line-height: 1.6;">
+                  You’re receiving this because you were part of this event in {{ app_name }}.
+                </p>
+                <p style="margin: 14px 0 0; font-size: 14px; color: #334155;">
+                  Thanks,<br />
+                  The {{ app_name }} Team
+                </p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

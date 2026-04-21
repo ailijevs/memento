@@ -5,8 +5,13 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import urlencode
 from uuid import UUID
+from zoneinfo import ZoneInfo
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from app.config import Settings, get_settings
 from app.dals import NotificationDAL
@@ -17,8 +22,13 @@ from supabase import Client
 
 logger = logging.getLogger(__name__)
 
-
-JsonDict = Mapping[str, object]
+_EMAIL_TEMPLATE_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
+_EMAIL_TEMPLATE_ENV = Environment(
+    loader=FileSystemLoader(str(_EMAIL_TEMPLATE_DIR)),
+    autoescape=select_autoescape(["html", "xml"]),
+)
+_APP_BRAND_NAME = "Memento"
+_EASTERN_TZ = ZoneInfo("America/New_York")
 
 
 @dataclass(frozen=True)
@@ -115,18 +125,15 @@ class NotificationService:
         Return whether update notifications should be sent and why.
 
         Rules:
-        - send on time changes (`starts_at` or `ends_at`)
+        - send on start/end time changes
         - send on location change
         - send when event becomes archived (`is_active: true -> false`)
         """
         reasons: list[str] = []
-        if not self._datetime_equal(
-            old_event.starts_at, new_event.starts_at
-        ) or not self._datetime_equal(
-            old_event.ends_at,
-            new_event.ends_at,
-        ):
-            reasons.append("time")
+        if not self._datetime_equal(old_event.starts_at, new_event.starts_at):
+            reasons.append("start_time")
+        if not self._datetime_equal(old_event.ends_at, new_event.ends_at):
+            reasons.append("end_time")
         if old_event.location != new_event.location:
             reasons.append("location")
         if old_event.is_active and not new_event.is_active:
@@ -291,38 +298,74 @@ class NotificationService:
         new_event: EventResponse,
         reasons: list[str],
     ) -> str:
-        lines: list[str] = [f"<p><strong>{new_event.name}</strong> has been updated.</p>", "<ul>"]
-        if "time" in reasons:
-            old_time = self._format_time(old_event.starts_at, old_event.ends_at)
-            new_time = self._format_time(new_event.starts_at, new_event.ends_at)
-            lines.append(f"<li><strong>Time:</strong> {old_time} -> {new_time}</li>")
-        if "location" in reasons:
-            lines.append(
-                (
-                    f"<li><strong>Location:</strong> {old_event.location or 'TBD'}"
-                    f" -> {new_event.location or 'TBD'}</li>"
-                )
-            )
-        if "archived" in reasons:
-            lines.append("<li><strong>Status:</strong> This event has been archived.</li>")
-        lines.append("</ul>")
-        return "".join(lines)
+        context: dict[str, str | bool] = {
+            "event_name": new_event.name,
+            "show_start_time": "start_time" in reasons,
+            "show_end_time": "end_time" in reasons,
+            "from_start_time": self._format_datetime_or_tbd(old_event.starts_at),
+            "to_start_time": self._format_datetime_or_tbd(new_event.starts_at),
+            "from_end_time": self._format_datetime_or_tbd(old_event.ends_at),
+            "to_end_time": self._format_datetime_or_tbd(new_event.ends_at),
+            "show_location": "location" in reasons,
+            "from_location": old_event.location or "TBD",
+            "to_location": new_event.location or "TBD",
+            "archived": "archived" in reasons,
+            "cta_url": self._build_dashboard_url(event_id=new_event.event_id),
+            "app_name": _APP_BRAND_NAME,
+        }
+        return self._render_email_template("event_update.html", context)
 
     def _build_deleted_email_body(self, event: EventResponse) -> str:
-        return (
-            f"<p>The event <strong>{event.name}</strong> has been deleted.</p>"
-            f"<p>Scheduled time: {self._format_time(event.starts_at, event.ends_at)}</p>"
-            f"<p>Location: {event.location or 'TBD'}</p>"
-        )
+        context: dict[str, str] = {
+            "event_name": event.name,
+            "scheduled_time": self._format_time(event.starts_at, event.ends_at),
+            "location": event.location or "TBD",
+            "cta_url": self._build_dashboard_url(event_id=None),
+            "app_name": _APP_BRAND_NAME,
+        }
+        return self._render_email_template("event_deleted.html", context)
 
     @staticmethod
     def _format_time(starts_at: datetime | None, ends_at: datetime | None) -> str:
         if starts_at is None and ends_at is None:
             return "TBD"
         if starts_at and ends_at:
-            return f"{starts_at.isoformat()} to {ends_at.isoformat()}"
+            return (
+                f"{NotificationService._format_datetime(starts_at)} to "
+                f"{NotificationService._format_datetime(ends_at)}"
+            )
         if starts_at:
-            return f"Starts {starts_at.isoformat()}"
+            return f"Starts {NotificationService._format_datetime(starts_at)}"
         if ends_at:
-            return f"Ends {ends_at.isoformat()}"
+            return f"Ends {NotificationService._format_datetime(ends_at)}"
         return "TBD"
+
+    @staticmethod
+    def _format_datetime_or_tbd(value: datetime | None) -> str:
+        if value is None:
+            return "TBD"
+        return NotificationService._format_datetime(value)
+
+    @staticmethod
+    def _format_datetime(value: datetime) -> str:
+        """Format a datetime for end-user email readability."""
+        dt = value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        dt_eastern = dt.astimezone(_EASTERN_TZ)
+        hour = dt_eastern.strftime("%I").lstrip("0") or "12"
+        return (
+            f"{dt_eastern.strftime('%a')}, {dt_eastern.strftime('%b')} {dt_eastern.day}, "
+            f"{dt_eastern.year} at {hour}:{dt_eastern.strftime('%M')} "
+            f"{dt_eastern.strftime('%p')} {dt_eastern.strftime('%Z')}"
+        )
+
+    @staticmethod
+    def _render_email_template(template_name: str, context: Mapping[str, object]) -> str:
+        template = _EMAIL_TEMPLATE_ENV.get_template(template_name)
+        return template.render(**context)
+
+    def _build_dashboard_url(self, *, event_id: UUID | None) -> str:
+        base_url = self.settings.frontend_app_url.rstrip("/")
+        if not event_id:
+            return f"{base_url}/dashboard"
+        query = urlencode({"event_id": str(event_id)})
+        return f"{base_url}/dashboard?{query}"

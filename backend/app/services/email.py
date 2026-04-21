@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi_mail import ConnectionConfig, FastMail, MessageSchema, MessageType
+from pydantic import NameEmail, SecretStr
 
 from app.config import Settings, get_settings
 
@@ -38,10 +39,17 @@ class EmailService:
                 f"Email sending is enabled, but required env vars are missing: {joined}"
             )
 
+        # Values are guaranteed non-null after the missing check above.
+        mail_username = self.settings.mail_username
+        mail_password = self.settings.mail_password
+        mail_from = self.settings.mail_from
+        if mail_username is None or mail_password is None or mail_from is None:
+            raise EmailConfigurationError("Email settings are invalid.")
+
         return ConnectionConfig(
-            MAIL_USERNAME=self.settings.mail_username,
-            MAIL_PASSWORD=self.settings.mail_password,
-            MAIL_FROM=self.settings.mail_from,
+            MAIL_USERNAME=mail_username,
+            MAIL_PASSWORD=SecretStr(mail_password),
+            MAIL_FROM=mail_from,
             MAIL_FROM_NAME=self.settings.mail_from_name,
             MAIL_SERVER=self.settings.mail_server,
             MAIL_PORT=self.settings.mail_port,
@@ -64,8 +72,11 @@ class EmailService:
             raise ValueError("At least one recipient email is required.")
 
         config = self._require_config()
+        name_email_recipients = [
+            NameEmail(name=recipient.split("@")[0], email=recipient) for recipient in recipients
+        ]
         message = MessageSchema(
-            recipients=recipients,
+            recipients=name_email_recipients,
             subject=subject,
             body=body,
             subtype=MessageType.html if is_html else MessageType.plain,

@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     app_name: str = "Memento API"
     app_version: str = "0.0.0-dev"
     debug: bool = False
+    frontend_app_url: str = "https://memento-4f4m.vercel.app"
 
     # External APIs (optional)
     exa_api_key: str | None = None
