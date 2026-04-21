@@ -12,6 +12,7 @@ import {
 } from "@/lib/api";
 import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import { Aurora } from "@/components/aurora";
+import { signOutUser } from "@/lib/signout";
 import { Camera, Heart, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
@@ -365,8 +366,7 @@ export default function RecognitionPage() {
   }
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutUser();
     router.push("/");
     router.refresh();
   }

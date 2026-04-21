@@ -1,33 +1,35 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, Suspense } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Loader2, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, CheckCircle, AlertCircle } from "lucide-react";
 import { Aurora } from "@/components/aurora";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const FIELDS = [
   {
-    key: "email",
-    label: "Email",
-    type: "email" as const,
-    placeholder: "you@example.com",
-    autoComplete: "email",
+    key: "password",
+    label: "New Password",
+    type: "password" as const,
+    placeholder: "At least 6 characters",
+    autoComplete: "new-password",
     color: [100, 75, 240] as const,
     glow: "rgba(100,75,240,0.45)",
-    pos: { left: 24, top: 40 },
+    pos: { left: 30, top: 40 },
     float: "float-2 15s ease-in-out infinite",
   },
   {
-    key: "password",
-    label: "Password",
+    key: "confirm_password",
+    label: "Confirm Password",
     type: "password" as const,
-    placeholder: "Your password",
-    autoComplete: "current-password",
+    placeholder: "Repeat password",
+    autoComplete: "new-password",
     color: [70, 110, 230] as const,
     glow: "rgba(70,110,230,0.45)",
-    pos: { left: 68, top: 52 },
+    pos: { left: 65, top: 52 },
     float: "float-3 14s ease-in-out infinite",
   },
 ];
@@ -39,21 +41,29 @@ function displayValue(val: string, type: string) {
   return val;
 }
 
-export default function LoginPage() {
+export default function ResetPasswordPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-dvh items-center justify-center" style={{ background: "oklch(0.07 0.015 270)" }}>
+          <Loader2 className="h-6 w-6 animate-spin text-white/30" />
+        </div>
+      }
+    >
+      <ResetPasswordContent />
+    </Suspense>
+  );
+}
+
+function ResetPasswordContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [values, setValues] = useState(["", ""]);
   const [activeIdx, setActiveIdx] = useState<number>(0);
-
-  // Continue the zoom from wherever the "You" dot was on the welcome page
-  const [enterOrigin] = useState<string>(() => {
-    if (typeof window === "undefined") return "50% 35%";
-    const stored = sessionStorage.getItem("zoomOrigin");
-    if (stored) { sessionStorage.removeItem("zoomOrigin"); return stored; }
-    return "50% 35%";
-  });
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [googleLoading, setGoogleLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [tokenError, setTokenError] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dotRef = useRef<HTMLDivElement>(null);
@@ -68,12 +78,43 @@ export default function LoginPage() {
   const allFilled = values.every((v) => v.length > 0);
   const isLastField = activeIdx === FIELDS.length - 1;
 
-  // Auto-focus on mount and on field change
+  useEffect(() => {
+    async function extractToken() {
+      if (typeof window === "undefined") return;
+
+      const hash = window.location.hash;
+      if (hash && hash.includes("access_token")) {
+        const params = new URLSearchParams(hash.substring(1));
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+
+        if (accessToken && refreshToken) {
+          const supabase = createClient();
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) {
+            setTokenError(true);
+          }
+          return;
+        }
+      }
+
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setTokenError(true);
+      }
+    }
+
+    extractToken();
+  }, [searchParams]);
+
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus());
   }, [activeIdx]);
 
-  // Canvas constellation lines
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -170,34 +211,171 @@ export default function LoginPage() {
   }, []);
 
   async function handleSubmit() {
-    setError(null);
-    setLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
-      email: values[0],
-      password: values[1],
-    });
-    if (error) {
-      setError(error.message);
-      setLoading(false);
+    if (values[0] !== values[1]) {
+      setError("Passwords do not match");
       return;
     }
-    router.push("/onboarding");
-    router.refresh();
+
+    if (values[0].length < 6) {
+      setError("Password must be at least 6 characters");
+      return;
+    }
+
+    setError(null);
+    setLoading(true);
+
+    try {
+      const supabase = createClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session?.access_token) {
+        setTokenError(true);
+        setLoading(false);
+        return;
+      }
+
+      const res = await fetch(`${API_URL}/api/v1/auth/reset-password/confirm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          access_token: session.access_token,
+          new_password: values[0],
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.detail || "Failed to reset password");
+      }
+
+      await supabase.auth.signOut();
+      setSuccess(true);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+    } finally {
+      setLoading(false);
+    }
   }
 
-  async function handleGoogle() {
-    setError(null);
-    setGoogleLoading(true);
-    const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? window.location.origin}/auth/callback` },
-    });
-    if (error) {
-      setError(error.message);
-      setGoogleLoading(false);
-    }
+  if (tokenError) {
+    return (
+      <div
+        className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6"
+        style={{
+          background: [
+            "radial-gradient(ellipse 80% 50% at 50% 20%, oklch(0.22 0.14 275) 0%, transparent 100%)",
+            "oklch(0.07 0.015 270)",
+          ].join(", "),
+        }}
+      >
+        <div className="absolute inset-0" style={{ opacity: 0.35 }}>
+          <Aurora className="h-full w-full" mode="focused" />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <div
+            className="mb-6 flex h-16 w-16 items-center justify-center rounded-full"
+            style={{
+              background: "rgba(255,80,80,0.12)",
+              border: "1.5px solid rgba(255,80,80,0.3)",
+            }}
+          >
+            <AlertCircle className="h-7 w-7 text-red-400/80" />
+          </div>
+
+          <h1
+            className="mb-3 text-white"
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 28,
+              fontWeight: 400,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Link expired
+          </h1>
+
+          <p className="mb-8 max-w-[280px] text-[14px] leading-relaxed text-white/40">
+            This password reset link is invalid or has expired. Please request a new one.
+          </p>
+
+          <Link
+            href="/forgot-password"
+            className="flex items-center gap-2 rounded-full px-5 py-2.5 text-[13px] font-medium text-white/70 transition-all active:scale-95"
+            style={{
+              background: "rgba(100,75,240,0.12)",
+              border: "1px solid rgba(100,75,240,0.25)",
+            }}
+          >
+            Request new link
+          </Link>
+
+          <Link
+            href="/login"
+            className="mt-6 text-[13px] text-white/25 active:text-white/50"
+          >
+            Back to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (success) {
+    return (
+      <div
+        className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-6"
+        style={{
+          background: [
+            "radial-gradient(ellipse 80% 50% at 50% 20%, oklch(0.22 0.14 275) 0%, transparent 100%)",
+            "oklch(0.07 0.015 270)",
+          ].join(", "),
+        }}
+      >
+        <div className="absolute inset-0" style={{ opacity: 0.35 }}>
+          <Aurora className="h-full w-full" mode="focused" />
+        </div>
+
+        <div className="relative z-10 flex flex-col items-center text-center">
+          <div
+            className="mb-6 flex h-16 w-16 items-center justify-center rounded-full"
+            style={{
+              background: "rgba(52,168,83,0.12)",
+              border: "1.5px solid rgba(52,168,83,0.3)",
+            }}
+          >
+            <CheckCircle className="h-7 w-7 text-[rgba(52,168,83,0.8)]" />
+          </div>
+
+          <h1
+            className="mb-3 text-white"
+            style={{
+              fontFamily: "var(--font-serif)",
+              fontSize: 28,
+              fontWeight: 400,
+              letterSpacing: "-0.02em",
+            }}
+          >
+            Password updated
+          </h1>
+
+          <p className="mb-8 max-w-[280px] text-[14px] leading-relaxed text-white/40">
+            Your password has been reset. You can now sign in with your new password.
+          </p>
+
+          <button
+            onClick={() => router.push("/login")}
+            className="flex h-[50px] w-full max-w-[240px] items-center justify-center gap-2 rounded-[14px] text-[14px] font-medium text-white/90 transition-all active:scale-[0.98]"
+            style={{
+              background: "oklch(1 0 0 / 6%)",
+              boxShadow: "inset 0 0 0 1px oklch(0.5 0.15 275 / 25%), 0 0 30px oklch(0.4 0.12 275 / 15%)",
+            }}
+          >
+            Sign in
+          </button>
+        </div>
+      </div>
+    );
   }
 
   const activeField = FIELDS[activeIdx];
@@ -207,7 +385,6 @@ export default function LoginPage() {
     <div
       className="animate-page-in relative flex min-h-dvh flex-col overflow-hidden"
       style={{
-        transformOrigin: enterOrigin,
         background: [
           "radial-gradient(ellipse 80% 50% at 50% 20%, oklch(0.22 0.14 275) 0%, transparent 100%)",
           "radial-gradient(ellipse 50% 35% at 65% 50%, oklch(0.14 0.09 240) 0%, transparent 100%)",
@@ -228,14 +405,13 @@ export default function LoginPage() {
 
       <div className="animate-fade-in relative z-10 px-6 pt-4">
         <Link
-          href="/"
+          href="/login"
           className="inline-flex h-[44px] items-center text-white/30 active:text-white/60"
         >
           <ChevronLeft className="h-5 w-5" />
         </Link>
       </div>
 
-      {/* Constellation */}
       <div className="relative z-10 flex-1" style={{ minHeight: "50vh" }}>
         {/* "You" dot */}
         <div
@@ -260,7 +436,7 @@ export default function LoginPage() {
             />
             <div className="h-5 w-5 rounded-full bg-white/90 shadow-[0_0_24px_rgba(255,255,255,0.4)]" />
             <span className="mt-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/25">
-              You
+              New Password
             </span>
           </div>
         </div>
@@ -389,7 +565,7 @@ export default function LoginPage() {
           );
         })}
 
-        {/* Input panel — always visible */}
+        {/* Input panel */}
         <div
           className="absolute left-1/2"
           style={{
@@ -447,9 +623,9 @@ export default function LoginPage() {
                   caretColor: `rgba(${cr},${cg},${cb}, 0.7)`,
                 }}
               />
-              {/* Next / Submit arrow */}
               <button
                 type="button"
+                disabled={loading}
                 onPointerDown={(e) => {
                   e.preventDefault();
                   if (activeIdx < FIELDS.length - 1) {
@@ -458,7 +634,7 @@ export default function LoginPage() {
                     handleSubmit();
                   }
                 }}
-                className="ml-2 shrink-0 flex h-7 w-7 items-center justify-center rounded-full transition-all active:scale-90"
+                className="ml-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-all active:scale-90"
                 style={{
                   background: `rgba(${cr},${cg},${cb}, ${isLastField && allFilled ? 0.22 : 0.07})`,
                   border: `1px solid rgba(${cr},${cg},${cb}, ${isLastField && allFilled ? 0.45 : 0.18})`,
@@ -519,72 +695,6 @@ export default function LoginPage() {
           </div>
         )}
       </div>
-
-      {/* Google + footer */}
-      <div className="relative z-10 px-6 pb-8">
-        <div className="mb-4 flex items-center gap-4">
-          <div className="h-px flex-1 bg-white/[0.05]" />
-          <span className="text-[10px] uppercase tracking-[0.1em] text-white/14">
-            or
-          </span>
-          <div className="h-px flex-1 bg-white/[0.05]" />
-        </div>
-
-        <button
-          type="button"
-          className="animate-fade-in delay-500 flex h-[50px] w-full items-center justify-center gap-3 rounded-[14px] bg-white/[0.03] text-[14px] text-white/50 ring-1 ring-white/[0.05] transition-all active:scale-[0.98] active:bg-white/[0.06]"
-          onClick={handleGoogle}
-          disabled={googleLoading}
-        >
-          {googleLoading ? (
-            <Loader2 className="h-5 w-5 animate-spin text-white/30" />
-          ) : (
-            <GoogleIcon />
-          )}
-          Continue with Google
-        </button>
-
-        <div className="animate-fade-in delay-600 mt-5 flex flex-col items-center gap-2">
-          <Link
-            href="/forgot-password"
-            className="text-[12px] text-white/25 active:text-white/50"
-          >
-            Forgot password?
-          </Link>
-          <p className="text-[12px] text-white/18">
-            New here?{" "}
-            <Link
-              href="/signup"
-              className="font-semibold text-white/35 active:text-white/60"
-            >
-              Create an account
-            </Link>
-          </p>
-        </div>
-      </div>
     </div>
-  );
-}
-
-function GoogleIcon() {
-  return (
-    <svg className="h-[18px] w-[18px]" viewBox="0 0 24 24">
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-        fill="#EA4335"
-      />
-    </svg>
   );
 }

@@ -12,6 +12,7 @@ import {
   type ProfileDirectoryResponse,
 } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
+import { signOutUser } from "@/lib/signout";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
@@ -192,8 +193,7 @@ export default function DashboardPage() {
   }, [discoverEvents, discoverSearchText, myEvents]);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutUser();
     router.push("/");
     router.refresh();
   }
