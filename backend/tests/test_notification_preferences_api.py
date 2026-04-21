@@ -76,3 +76,61 @@ def test_update_notification_preferences_rejects_empty_payload(client: TestClien
     assert response.status_code == 400
     assert "At least one preference field must be provided." in response.json()["detail"]
     notification_dal.upsert_preferences.assert_not_awaited()
+
+
+def test_get_notification_preferences_returns_existing(client: TestClient):
+    user_id = uuid4()
+    now = datetime.now(timezone.utc)
+    existing = SimpleNamespace(
+        user_id=user_id,
+        email_notifications=True,
+        event_updates=True,
+        host_messages=False,
+        created_at=now,
+        updated_at=now,
+    )
+    notification_dal = SimpleNamespace(
+        get_preferences_by_user_id=AsyncMock(return_value=existing),
+        upsert_preferences=AsyncMock(),
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: _mock_user(user_id)
+    app.dependency_overrides[get_notification_dal] = lambda: notification_dal
+
+    response = client.get("/api/v1/profiles/me/notification-preferences")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user_id"] == str(user_id)
+    assert data["host_messages"] is False
+    notification_dal.get_preferences_by_user_id.assert_awaited_once_with(user_id)
+    notification_dal.upsert_preferences.assert_not_awaited()
+
+
+def test_get_notification_preferences_creates_defaults_when_missing(client: TestClient):
+    user_id = uuid4()
+    now = datetime.now(timezone.utc)
+    created = SimpleNamespace(
+        user_id=user_id,
+        email_notifications=True,
+        event_updates=True,
+        host_messages=True,
+        created_at=now,
+        updated_at=now,
+    )
+    notification_dal = SimpleNamespace(
+        get_preferences_by_user_id=AsyncMock(return_value=None),
+        upsert_preferences=AsyncMock(return_value=created),
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: _mock_user(user_id)
+    app.dependency_overrides[get_notification_dal] = lambda: notification_dal
+
+    response = client.get("/api/v1/profiles/me/notification-preferences")
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["user_id"] == str(user_id)
+    assert data["email_notifications"] is True
+    notification_dal.get_preferences_by_user_id.assert_awaited_once_with(user_id)
+    notification_dal.upsert_preferences.assert_awaited_once()

@@ -175,6 +175,25 @@ async def update_my_notification_preferences(
     return updated
 
 
+@router.get("/me/notification-preferences", response_model=NotificationPreferenceResponse)
+async def get_my_notification_preferences(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[NotificationDAL, Depends(get_notification_dal)],
+) -> NotificationPreferenceResponse:
+    """Get the current user's notification preferences."""
+    preferences = await dal.get_preferences_by_user_id(current_user.id)
+    if preferences:
+        return preferences
+
+    created = await dal.upsert_preferences(current_user.id, NotificationPreferenceUpdate())
+    if not created:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load notification preferences.",
+        )
+    return created
+
+
 @router.get("/me/photo-url", response_model=ProfilePhotoUrlResponse)
 async def get_my_profile_photo_url(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],

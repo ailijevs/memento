@@ -45,6 +45,22 @@ class ApiClient {
     return this.request<ProfileResponse>("/api/v1/profiles/me");
   }
 
+  async getMyNotificationPreferences() {
+    return this.request<NotificationPreferenceResponse>(
+      "/api/v1/profiles/me/notification-preferences"
+    );
+  }
+
+  async updateMyNotificationPreferences(data: NotificationPreferenceUpdateRequest) {
+    return this.request<NotificationPreferenceResponse>(
+      "/api/v1/profiles/me/notification-preferences",
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
   async getProfileCompletion() {
     return this.request<ProfileCompletionResponse>(
       "/api/v1/profiles/me/completion"
@@ -257,6 +273,12 @@ export interface ConsentUpdateRequest {
   allow_recognition?: boolean;
 }
 
+export interface NotificationPreferenceUpdateRequest {
+  email_notifications?: boolean;
+  event_updates?: boolean;
+  host_messages?: boolean;
+}
+
 export type ProfilePhotoUploadSource = "onboarding" | "linkedin";
 
 export interface ProfilePhotoUploadUrlRequest {
@@ -389,5 +411,14 @@ export interface ConsentResponse {
   allow_recognition: boolean;
   consented_at: string | null;
   revoked_at: string | null;
+  updated_at: string;
+}
+
+export interface NotificationPreferenceResponse {
+  user_id: string;
+  email_notifications: boolean;
+  event_updates: boolean;
+  host_messages: boolean;
+  created_at: string;
   updated_at: string;
 }
