@@ -54,3 +54,11 @@ class NotificationPreferenceResponse(BaseModel):
     host_messages: bool
     created_at: datetime
     updated_at: datetime
+
+
+class NotificationPreferenceUpdate(BaseModel):
+    """Schema for updating user notification preferences."""
+
+    email_notifications: bool | None = None
+    event_updates: bool | None = None
+    host_messages: bool | None = None

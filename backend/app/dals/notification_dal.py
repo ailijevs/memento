@@ -3,7 +3,11 @@
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
-from app.schemas.notification import NotificationLogCreate, NotificationPreferenceResponse
+from app.schemas.notification import (
+    NotificationLogCreate,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+)
 from supabase import Client
 
 
@@ -41,6 +45,23 @@ class NotificationDAL(BaseDAL):
         if response.data:
             return NotificationPreferenceResponse(**response.data)
         return None
+
+    async def upsert_preferences(
+        self,
+        user_id: UUID,
+        data: NotificationPreferenceUpdate,
+    ) -> NotificationPreferenceResponse | None:
+        """Upsert notification preferences for a user."""
+        payload: dict[str, object] = {
+            "user_id": str(user_id),
+            **data.model_dump(exclude_none=True),
+        }
+        response = (
+            self.client.table(self.PREF_TABLE).upsert(payload, on_conflict="user_id").execute()
+        )
+        if response.data:
+            return NotificationPreferenceResponse(**response.data[0])
+        return await self.get_preferences_by_user_id(user_id)
 
     async def get_event_update_opt_in_user_ids(self, user_ids: list[UUID]) -> set[UUID]:
         """

@@ -27,6 +27,7 @@ from .notification import (
     NotificationLogCreate,
     NotificationLogResponse,
     NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
     NotificationStatus,
     NotificationType,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "NotificationLogCreate",
     "NotificationLogResponse",
     "NotificationPreferenceResponse",
+    "NotificationPreferenceUpdate",
     "NotificationStatus",
     "NotificationType",
     # LinkedIn Enrichment
