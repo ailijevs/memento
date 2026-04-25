@@ -18,13 +18,11 @@ import {
   CalendarDays,
   ChevronRight,
   Clock,
-  Download,
   Eye,
   Handshake,
   Loader2,
   MapPin,
   Radio,
-  TrendingUp,
   Trophy,
   Users,
 } from "lucide-react";
@@ -288,11 +286,10 @@ function OrganizerEventView({
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-3 gap-3">
         <SmallStat label="Members" value={data.total_members} icon={Users} />
         <SmallStat label="Recognitions" value={data.total_recognitions} icon={Eye} />
         <SmallStat label="Unique Recognized" value={data.unique_recognized} icon={Handshake} />
-        <SmallStat label="Success Rate" value={`${data.success_rate}%`} icon={TrendingUp} />
       </div>
 
       {data.peak_hour ? (
@@ -561,6 +558,11 @@ function AttendeeEventView({
                   {report.networking_score}
                 </p>
                 <p className="text-[12px] text-white/40">out of 100</p>
+                {report.networking_summary ? (
+                  <p className="mt-3 text-[13px] leading-relaxed text-white/50">
+                    {report.networking_summary}
+                  </p>
+                ) : null}
               </div>
 
               <div className="grid grid-cols-3 gap-3">

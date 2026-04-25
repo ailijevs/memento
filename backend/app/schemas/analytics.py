@@ -61,8 +61,6 @@ class EventAnalytics(BaseModel):
     total_members: int = 0
     total_recognitions: int = 0
     unique_recognized: int = 0
-    total_attempts: int = 0
-    success_rate: float = 0.0
     peak_hour: str | None = None
 
     consent_breakdown: ConsentBreakdown = Field(default_factory=ConsentBreakdown)
@@ -124,7 +122,6 @@ class LiveEventStatus(BaseModel):
     recognitions_last_5min: int = 0
     total_recognitions: int = 0
     active_observers: int = 0
-    success_rate: float = 0.0
     recent_matches: list[TopRecognizedUser] = Field(default_factory=list)
 
 
@@ -154,4 +151,8 @@ class PostEventReport(BaseModel):
     networking_score: int = Field(
         default=0,
         description="0-100 score based on networking activity",
+    )
+    networking_summary: str | None = Field(
+        default=None,
+        description="AI-generated summary of networking performance",
     )

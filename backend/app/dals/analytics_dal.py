@@ -1,5 +1,6 @@
 """Data Access Layer for analytics queries."""
 
+import logging
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
@@ -19,6 +20,8 @@ from app.schemas.analytics import (
     TopRecognizedUser,
 )
 from supabase import Client
+
+logger = logging.getLogger(__name__)
 
 
 class AnalyticsDAL(BaseDAL):
@@ -41,15 +44,6 @@ class AnalyticsDAL(BaseDAL):
     async def _get_recognition_count(self, event_id: UUID) -> int:
         resp = (
             self.client.table("recognition_logs")
-            .select("id", count="exact", head=True)
-            .eq("event_id", str(event_id))
-            .execute()
-        )
-        return int(resp.count or 0)
-
-    async def _get_attempt_count(self, event_id: UUID) -> int:
-        resp = (
-            self.client.table("recognition_attempts")
             .select("id", count="exact", head=True)
             .eq("event_id", str(event_id))
             .execute()
@@ -321,14 +315,11 @@ class AnalyticsDAL(BaseDAL):
         members = await self._get_member_count(event_id)
         recogs = await self._get_recognition_count(event_id)
         unique = await self._get_unique_recognized_count(event_id)
-        attempts = await self._get_attempt_count(event_id)
         consent = await self._get_consent_breakdown(event_id)
         timeline = await self._get_recognition_timeline(event_id)
         join_tl = await self._get_join_timeline(event_id)
         top = await self._get_top_recognized(event_id)
         peak = await self._get_peak_hour(event_id)
-
-        success_rate = round(recogs / attempts * 100, 1) if attempts > 0 else 0.0
 
         return EventAnalytics(
             event_id=event_id,
@@ -341,8 +332,6 @@ class AnalyticsDAL(BaseDAL):
             total_members=members,
             total_recognitions=recogs,
             unique_recognized=unique,
-            total_attempts=attempts,
-            success_rate=success_rate,
             peak_hour=peak,
             consent_breakdown=consent,
             recognition_timeline=timeline,
@@ -470,25 +459,15 @@ class AnalyticsDAL(BaseDAL):
         five_min_ago = (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat()
         recent_resp = (
             self.client.table("recognition_logs")
-            .select("recognized_user_id")
+            .select("recognized_user_id,observer_user_id")
             .eq("event_id", str(event_id))
             .gte("created_at", five_min_ago)
             .execute()
         )
 
-        recent_attempts = (
-            self.client.table("recognition_attempts")
-            .select("observer_user_id")
-            .eq("event_id", str(event_id))
-            .gte("created_at", five_min_ago)
-            .execute()
-        )
         active_observers = len(
-            {row["observer_user_id"] for row in recent_attempts.data if row.get("observer_user_id")}
+            {row["observer_user_id"] for row in recent_resp.data if row.get("observer_user_id")}
         )
-
-        total_attempts = await self._get_attempt_count(event_id)
-        success_rate = round(total_recogs / total_attempts * 100, 1) if total_attempts > 0 else 0.0
 
         recent_match_counts: dict[str, int] = {}
         for row in recent_resp.data:
@@ -520,7 +499,6 @@ class AnalyticsDAL(BaseDAL):
             recognitions_last_5min=len(recent_resp.data),
             total_recognitions=total_recogs,
             active_observers=active_observers,
-            success_rate=success_rate,
             recent_matches=recent_matches,
         )
 
@@ -645,7 +623,16 @@ class AnalyticsDAL(BaseDAL):
             )
 
         people_met = len(met_counts)
-        networking_score = min(100, int((people_met / max(total_attendees - 1, 1)) * 100))
+        times_recognized = int(was_recognized_resp.count or 0)
+
+        connection_names = [c.full_name or "Unknown" for c in connections[:10]]
+        score, summary = await self._compute_networking_score(
+            event_name=ev.data["name"],
+            total_attendees=total_attendees,
+            people_met=people_met,
+            times_recognized=times_recognized,
+            connection_names=connection_names,
+        )
 
         return PostEventReport(
             event_id=event_id,
@@ -653,31 +640,78 @@ class AnalyticsDAL(BaseDAL):
             event_date=ev.data.get("starts_at"),
             total_attendees=total_attendees,
             people_you_met=people_met,
-            times_you_were_recognized=int(was_recognized_resp.count or 0),
+            times_you_were_recognized=times_recognized,
             connections=connections,
-            networking_score=networking_score,
+            networking_score=score,
+            networking_summary=summary,
         )
+
+    # ── AI scoring ─────────────────────────────────────────────────────────
+
+    async def _compute_networking_score(
+        self,
+        *,
+        event_name: str,
+        total_attendees: int,
+        people_met: int,
+        times_recognized: int,
+        connection_names: list[str],
+    ) -> tuple[int, str | None]:
+        """Use OpenAI to compute a networking score (0-100) and a short summary.
+
+        Falls back to a simple ratio-based formula if OpenAI is unavailable.
+        """
+        from app.config import get_settings
+
+        settings = get_settings()
+        if not settings.openai_api_key:
+            score = min(100, int((people_met / max(total_attendees - 1, 1)) * 100))
+            return score, None
+
+        try:
+            import openai
+
+            client = openai.OpenAI(api_key=settings.openai_api_key)
+
+            prompt = (
+                f"You are an event networking analyst. Score the "
+                f"attendee's networking performance at "
+                f'"{event_name}" from 0 to 100 and write a '
+                f"1-2 sentence summary.\n\n"
+                f"Stats:\n"
+                f"- Total attendees: {total_attendees}\n"
+                f"- People this person met (recognized): {people_met}\n"
+                f"- Times this person was recognized by others: {times_recognized}\n"
+                f"- People they connected with: {', '.join(connection_names) or 'none'}\n\n"
+                f"Consider: meeting a high percentage of attendees is impressive, being "
+                f"recognized by others shows visibility, and diverse connections matter.\n\n"
+                f"Respond in exactly this JSON format, nothing else:\n"
+                f'{{"score": <int 0-100>, "summary": "<1-2 sentence summary>"}}'
+            )
+
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7,
+                max_tokens=150,
+            )
+
+            import json
+
+            content = response.choices[0].message.content or ""
+            result = json.loads(content)
+            score = max(0, min(100, int(result["score"])))
+            summary = result.get("summary")
+            return score, summary
+
+        except Exception as e:
+            logger.warning("OpenAI networking score failed, using fallback: %s", e)
+            score = min(100, int((people_met / max(total_attendees - 1, 1)) * 100))
+            return score, None
 
     # ── logging ───────────────────────────────────────────────────────────
 
-    async def log_recognition_attempt(
-        self,
-        *,
-        event_id: UUID | None,
-        observer_user_id: UUID,
-        faces_detected: int,
-        faces_matched: int,
-    ) -> None:
-        """Insert a recognition_attempts row."""
-        insert_data: dict = {
-            "observer_user_id": str(observer_user_id),
-            "faces_detected": faces_detected,
-            "faces_matched": faces_matched,
-        }
-        if event_id is not None:
-            insert_data["event_id"] = str(event_id)
-
-        self.client.table("recognition_attempts").insert(insert_data).execute()
+    _DEDUP_WINDOW_SECONDS = 60
 
     async def log_recognition_match(
         self,
@@ -687,7 +721,31 @@ class AnalyticsDAL(BaseDAL):
         observer_user_id: UUID,
         confidence: float,
     ) -> None:
-        """Insert a recognition_logs row."""
+        """Insert a recognition_logs row, skipping if a duplicate exists within the dedup window.
+
+        The frontend sends frames every ~500ms, so without dedup, staring at
+        one person for 10 seconds would create ~20 log rows. This checks for
+        a recent log with the same (observer, recognized, event) tuple and
+        skips the insert if one exists within the last 60 seconds.
+        """
+        since = (
+            datetime.now(timezone.utc) - timedelta(seconds=self._DEDUP_WINDOW_SECONDS)
+        ).isoformat()
+
+        query = (
+            self.client.table("recognition_logs")
+            .select("id", count="exact", head=True)
+            .eq("observer_user_id", str(observer_user_id))
+            .eq("recognized_user_id", str(recognized_user_id))
+            .gte("created_at", since)
+        )
+        if event_id is not None:
+            query = query.eq("event_id", str(event_id))
+
+        existing = query.execute()
+        if existing.count and existing.count > 0:
+            return
+
         insert_data: dict = {
             "recognized_user_id": str(recognized_user_id),
             "observer_user_id": str(observer_user_id),

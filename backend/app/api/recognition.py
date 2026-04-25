@@ -116,15 +116,9 @@ async def detect_faces_in_frame(
 
         processing_time = (time.perf_counter() - start_time) * 1000
 
-        # Log analytics asynchronously (best-effort)
+        # Log successful matches for analytics (best-effort, deduplicated)
         try:
             analytics_dal = AnalyticsDAL(admin_client)
-            await analytics_dal.log_recognition_attempt(
-                event_id=request.event_id,
-                observer_user_id=current_user.id,
-                faces_detected=len(matches_raw),
-                faces_matched=len(profile_cards),
-            )
             for card in profile_cards:
                 await analytics_dal.log_recognition_match(
                     event_id=request.event_id,
