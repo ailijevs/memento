@@ -7,6 +7,7 @@ import { Aurora } from "@/components/aurora";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
 import { getNextRoute } from "@/lib/onboarding";
+import { uploadProfilePhoto } from "@/lib/profile-photo-upload";
 
 export default function PhotoPage() {
   const router = useRouter();
@@ -14,6 +15,7 @@ export default function PhotoPage() {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -27,26 +29,19 @@ export default function PhotoPage() {
     if (!file) { router.push(getNextRoute("photo")); return; }
     setLoading(true);
     setError(null);
+    setSuccess(null);
     try {
       const supabase = createClient();
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setError("Session expired. Please sign in again."); return; }
 
-      const filePath = `${session.user.id}.jpg`;
-      const { error: uploadError } = await supabase.storage
-        .from("profile-photos")
-        .upload(filePath, file, { upsert: true, contentType: file.type });
-      if (uploadError) throw new Error(uploadError.message);
-
-      const { data: { publicUrl } } = supabase.storage
-        .from("profile-photos")
-        .getPublicUrl(filePath);
-
       api.setToken(session.access_token);
-      await api.updateProfile({ photo_path: publicUrl });
+      await uploadProfilePhoto(file, "onboarding");
+      setSuccess("Upload complete.");
+      await new Promise((resolve) => setTimeout(resolve, 500));
       router.push(getNextRoute("photo"));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload photo");
+    } catch {
+      setError("Upload failed. Please try again later.");
     } finally {
       setLoading(false);
     }
@@ -170,6 +165,7 @@ export default function PhotoPage() {
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin text-white/60" /> : "Continue"}
         </button>
+        {success && <p className="mt-2 text-center text-[13px] text-emerald-300/80">{success}</p>}
         {error && <p className="mt-2 text-center text-[13px] text-red-400/80">{error}</p>}
 
         <button

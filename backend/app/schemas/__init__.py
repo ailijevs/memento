@@ -45,6 +45,10 @@ from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
     ProfileDirectoryResponse,
+    ProfilePhotoUploadConfirmRequest,
+    ProfilePhotoUploadUrlRequest,
+    ProfilePhotoUploadUrlResponse,
+    ProfilePhotoUrlResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -83,6 +87,10 @@ __all__ = [
     "ProfileCreate",
     "ProfileDirectoryEntry",
     "ProfileDirectoryResponse",
+    "ProfilePhotoUploadConfirmRequest",
+    "ProfilePhotoUrlResponse",
+    "ProfilePhotoUploadUrlRequest",
+    "ProfilePhotoUploadUrlResponse",
     "ProfileResponse",
     "ProfileUpdate",
     # Recognition

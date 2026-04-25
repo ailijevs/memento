@@ -26,7 +26,9 @@ class DummyS3Client:
         self.calls: list[dict] = []
         self.delete_calls: list[dict] = []
         self.presign_calls: list[dict] = []
+        self.head_calls: list[dict] = []
         self.presign_url = "https://example.com/presigned"
+        self.head_exception: Exception | None = None
 
     def upload_fileobj(self, fileobj, bucket, key, ExtraArgs):  # noqa: N803
         """Record upload details from boto3-compatible upload call."""
@@ -49,6 +51,13 @@ class DummyS3Client:
             {"client_method": ClientMethod, "params": Params, "expires_in": ExpiresIn}
         )
         return self.presign_url
+
+    def head_object(self, Bucket, Key):  # noqa: N803
+        """Record head_object checks or raise a configured exception."""
+        self.head_calls.append({"bucket": Bucket, "key": Key})
+        if self.head_exception is not None:
+            raise self.head_exception
+        return {"ResponseMetadata": {"HTTPStatusCode": 200}}
 
 
 def _png_bytes(mode: str = "RGB") -> bytes:
@@ -341,5 +350,148 @@ def test_get_profile_picture_presigned_url_raises_on_presign_error():
     with pytest.raises(RuntimeError, match="Failed to generate pre-signed URL"):
         service.get_profile_picture_presigned_url(
             s3_key="profiles/u1-linkedin.jpg",
+            bucket_name="bucket",
+        )
+
+
+def test_generate_upload_url_validates_inputs():
+    """generate_upload_url validates required inputs."""
+    service = S3Service(s3_client=DummyS3Client())
+
+    with pytest.raises(ValueError, match="bucket_name must not be empty"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="   ",
+            source="onboarding",
+        )
+
+    with pytest.raises(ValueError, match="user_id must not be empty"):
+        service.generate_upload_url(
+            user_id=" ",
+            bucket_name="bucket",
+            source="onboarding",
+        )
+
+    with pytest.raises(ValueError, match="content_type must not be empty"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="bucket",
+            source="onboarding",
+            content_type="   ",
+        )
+
+    with pytest.raises(ValueError, match="expires_in_seconds must be greater than 0"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="bucket",
+            source="onboarding",
+            expires_in_seconds=0,
+        )
+
+
+def test_generate_upload_url_returns_put_presigned_url_and_key():
+    """generate_upload_url returns upload URL metadata for direct PUT uploads."""
+    client = DummyS3Client()
+    service = S3Service(s3_client=client)
+
+    result = service.generate_upload_url(
+        user_id=" u123 ",
+        bucket_name=" my-bucket ",
+        source="onboarding",
+        expires_in_seconds=900,
+        content_type=" image/png ",
+    )
+
+    assert result == {
+        "upload_url": "https://example.com/presigned",
+        "s3_key": "profiles/u123-onboarding",
+        "content_type": "image/png",
+    }
+    assert client.presign_calls == [
+        {
+            "client_method": "put_object",
+            "params": {
+                "Bucket": "my-bucket",
+                "Key": "profiles/u123-onboarding",
+                "ContentType": "image/png",
+            },
+            "expires_in": 900,
+        }
+    ]
+
+
+def test_generate_upload_url_raises_on_presign_error():
+    """generate_upload_url wraps presign failures with RuntimeError."""
+
+    class FailingPresignClient(DummyS3Client):
+        def generate_presigned_url(self, ClientMethod, Params, ExpiresIn):  # noqa: N803
+            raise Exception("boom")
+
+    service = S3Service(s3_client=FailingPresignClient())
+
+    with pytest.raises(RuntimeError, match="Failed to generate upload URL"):
+        service.generate_upload_url(
+            user_id="u1",
+            bucket_name="bucket",
+            source="linkedin",
+        )
+
+
+def test_profile_picture_exists_validates_inputs():
+    """profile_picture_exists validates required inputs."""
+    service = S3Service(s3_client=DummyS3Client())
+
+    with pytest.raises(ValueError, match="bucket_name must not be empty"):
+        service.profile_picture_exists(
+            s3_key="profiles/u1-onboarding",
+            bucket_name="   ",
+        )
+
+    with pytest.raises(ValueError, match="s3_key must not be empty"):
+        service.profile_picture_exists(
+            s3_key="  ",
+            bucket_name="bucket",
+        )
+
+
+def test_profile_picture_exists_returns_true_when_head_object_succeeds():
+    """profile_picture_exists returns True when head_object succeeds."""
+    client = DummyS3Client()
+    service = S3Service(s3_client=client)
+
+    result = service.profile_picture_exists(
+        s3_key=" profiles/u1-onboarding ",
+        bucket_name=" my-bucket ",
+    )
+
+    assert result is True
+    assert client.head_calls == [
+        {"bucket": "my-bucket", "key": "profiles/u1-onboarding"},
+    ]
+
+
+def test_profile_picture_exists_returns_false_on_not_found():
+    """profile_picture_exists returns False for NoSuchKey errors."""
+    client = DummyS3Client()
+    client.head_exception = Exception("NoSuchKey")
+    service = S3Service(s3_client=client)
+
+    result = service.profile_picture_exists(
+        s3_key="profiles/u1-onboarding",
+        bucket_name="bucket",
+    )
+
+    assert result is False
+
+
+def test_profile_picture_exists_raises_on_unexpected_error():
+    """profile_picture_exists wraps unexpected errors in RuntimeError."""
+    client = DummyS3Client()
+    client.head_exception = Exception("boom")
+    service = S3Service(s3_client=client)
+
+    with pytest.raises(RuntimeError, match="Failed to verify existence"):
+        service.profile_picture_exists(
+            s3_key="profiles/u1-onboarding",
             bucket_name="bucket",
         )
