@@ -440,8 +440,6 @@ export interface EventAnalytics {
   total_members: number;
   total_recognitions: number;
   unique_recognized: number;
-  total_attempts: number;
-  success_rate: number;
   peak_hour: string | null;
   consent_breakdown: ConsentBreakdown;
   recognition_timeline: TimeSeriesBucket[];
@@ -469,7 +467,6 @@ export interface LiveEventStatus {
   recognitions_last_5min: number;
   total_recognitions: number;
   active_observers: number;
-  success_rate: number;
   recent_matches: TopRecognizedUser[];
 }
 
@@ -487,4 +484,5 @@ export interface PostEventReport {
   times_you_were_recognized: number;
   connections: TopRecognizedUser[];
   networking_score: number;
+  networking_summary: string | null;
 }
