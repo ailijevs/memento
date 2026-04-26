@@ -7,12 +7,9 @@ Tests cover:
 
 import os
 
-import pytest
-
 os.environ["DEBUG"] = "false"
 
 from app.api.profiles import _parse_graduation_year, _title_case_name  # noqa: E402
-
 
 # ---------------------------------------------------------------------------
 # _title_case_name
