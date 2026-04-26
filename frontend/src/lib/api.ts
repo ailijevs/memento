@@ -135,6 +135,13 @@ class ApiClient {
     });
   }
 
+  async sendHostMessage(eventId: string, data: HostMessageRequest) {
+    return this.request<HostMessageResponse>(`/api/v1/events/${eventId}/message-members`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
   async joinEvent(eventId: string) {
     return this.request<MembershipResponse>(`/api/v1/events/${eventId}/join`, {
       method: "POST",
@@ -279,6 +286,11 @@ export interface NotificationPreferenceUpdateRequest {
   host_messages?: boolean;
 }
 
+export interface HostMessageRequest {
+  subject: string;
+  message: string;
+}
+
 export type ProfilePhotoUploadSource = "onboarding" | "linkedin";
 
 export interface ProfilePhotoUploadUrlRequest {
@@ -421,4 +433,11 @@ export interface NotificationPreferenceResponse {
   host_messages: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface HostMessageResponse {
+  event_id: string;
+  recipient_count: number;
+  subject: string;
+  queued: boolean;
 }

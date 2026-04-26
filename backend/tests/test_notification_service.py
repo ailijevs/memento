@@ -1,12 +1,14 @@
-"""Tests for event update notification decision logic."""
+"""Tests for notification service behavior."""
 
+import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 from app.config import Settings
-from app.schemas import EventProcessingStatus, EventResponse
-from app.services.notification import NotificationService
+from app.schemas import EventProcessingStatus, EventResponse, NotificationType
+from app.services.notification import NotificationRecipient, NotificationService
 
 
 def _event(
@@ -118,3 +120,65 @@ def test_should_send_for_archival_change():
 
     assert should_send is True
     assert "archived" in reasons
+
+
+def test_filter_opted_in_user_ids_uses_host_message_preferences():
+    """Host-message delivery should honor the host_messages preference flag."""
+    service = _service()
+    user_ids = [uuid4(), uuid4()]
+    service.notification_dal.get_host_message_opt_in_user_ids = AsyncMock(
+        return_value={user_ids[0]}
+    )
+
+    opted_in_user_ids = asyncio.run(
+        service._filter_opted_in_user_ids(
+            user_ids=user_ids,
+            notification_type=NotificationType.HOST_MESSAGE,
+        )
+    )
+
+    assert opted_in_user_ids == [user_ids[0]]
+    service.notification_dal.get_host_message_opt_in_user_ids.assert_awaited_once_with(user_ids)
+
+
+def test_build_host_message_email_body_renders_message_and_event_details():
+    """Host-message emails should include the attendee message and event metadata."""
+    service = _service()
+    event = _event(location="Main Hall")
+
+    body = service._build_host_message_email_body(
+        event=event,
+        message="Please arrive 15 minutes early.\nBring your badge.",
+        actor_email="host@example.com",
+    )
+
+    assert "Please arrive 15 minutes early." in body
+    assert "Bring your badge." in body
+    assert event.name in body
+    assert "Main Hall" in body
+    assert "host@example.com" in body
+
+
+def test_send_and_log_emits_info_log_on_success(caplog):
+    """Successful sends should emit an info log entry."""
+    service = _service()
+    recipient = NotificationRecipient(user_id=uuid4(), email="member@example.com")
+    event_id = uuid4()
+    service._send_email = AsyncMock(return_value=True)
+    service._log_notification = AsyncMock()
+
+    with caplog.at_level(logging.INFO, logger="app.services.notification"):
+        asyncio.run(
+            service._send_and_log(
+                recipients=[recipient],
+                subject="Subject",
+                body="<p>Hello</p>",
+                event_id=event_id,
+                notification_type=NotificationType.HOST_MESSAGE,
+            )
+        )
+
+    assert (
+        f"Notification email sent to user={recipient.user_id} email={recipient.email} "
+        f"type=host_message event={event_id}"
+    ) in caplog.text

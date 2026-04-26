@@ -18,6 +18,7 @@ import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
 import { EventDetailSheetContent } from "./event-detail-sheet-content";
+import { HostMessageSheetContent } from "./host-message-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
 import { RsvpListSheetContent } from "./rsvp-list-sheet-content";
 import { EventConsentsSheetContent } from "./event-consents-sheet-content";
@@ -35,6 +36,7 @@ type ConsentUpdateDialogState = {
   title: string;
   message: string;
 };
+const HOST_MESSAGE_STATUS_TIMEOUT_MS = 5000;
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -62,6 +64,10 @@ export default function DashboardPage() {
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<EventResponse | null>(null);
+  const [detailEventMode, setDetailEventMode] = useState<DashboardTab>("attendee");
+  const [messageEvent, setMessageEvent] = useState<EventResponse | null>(null);
+  const [sendingHostMessage, setSendingHostMessage] = useState(false);
+  const [hostMessageSuccess, setHostMessageSuccess] = useState<string | null>(null);
   const [isRsvpListOpen, setIsRsvpListOpen] = useState(false);
   const [rsvpListLoading, setRsvpListLoading] = useState(false);
   const [rsvpListEventName, setRsvpListEventName] = useState<string>("");
@@ -133,6 +139,20 @@ export default function DashboardPage() {
       document.removeEventListener("touchstart", handlePointerDown);
     };
   }, [openEventMenuId]);
+
+  useEffect(() => {
+    if (!hostMessageSuccess) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setHostMessageSuccess(null);
+    }, HOST_MESSAGE_STATUS_TIMEOUT_MS);
+
+    return () => {
+      window.clearTimeout(timeoutId);
+    };
+  }, [hostMessageSuccess]);
 
   const upcomingEvents = useMemo(() => {
     const now = Date.now();
@@ -316,8 +336,41 @@ export default function DashboardPage() {
     }
   }
 
-  function handleViewEventDetail(event: EventResponse) {
+  function handleViewEventDetail(event: EventResponse, mode: DashboardTab = "attendee") {
     setDetailEvent(event);
+    setDetailEventMode(mode);
+  }
+
+  function handleOpenHostMessage(event: EventResponse) {
+    setHostMessageSuccess(null);
+    setMessageEvent(event);
+  }
+
+  async function handleSendHostMessage(input: { subject: string; message: string }) {
+    if (!messageEvent) {
+      return;
+    }
+
+    setSendingHostMessage(true);
+    setActionError(null);
+    setHostMessageSuccess(null);
+    try {
+      const response = await api.sendHostMessage(messageEvent.event_id, input);
+      setMessageEvent(null);
+      setHostMessageSuccess(
+        response.recipient_count > 0
+          ? "Message sent successfully."
+          : "No members are currently opted in for host messages for this event."
+      );
+    } catch (error) {
+      console.error("Failed to send host message:", error);
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error("Could not send your message right now. Please try again.");
+    } finally {
+      setSendingHostMessage(false);
+    }
   }
 
   function handleStartRecognition(event: EventResponse) {
@@ -515,6 +568,17 @@ export default function DashboardPage() {
             {actionError}
           </div>
         ) : null}
+        {hostMessageSuccess ? (
+          <div
+            className="mb-3 rounded-2xl px-3 py-2 text-[12px] text-emerald-100/90"
+            style={{
+              background: "oklch(0.28 0.08 165 / 24%)",
+              border: "1px solid oklch(0.68 0.13 165 / 34%)",
+            }}
+          >
+            {hostMessageSuccess}
+          </div>
+        ) : null}
 
         <div
           className="mb-3 grid grid-cols-2 gap-2 rounded-full p-1"
@@ -576,7 +640,7 @@ export default function DashboardPage() {
             deletingEventId={deletingOrganizedEventId}
             archivingEventId={archivingOrganizedEventId}
             unarchivingEventId={unarchivingOrganizedEventId}
-            onViewEventDetail={handleViewEventDetail}
+            onViewEventDetail={(event) => handleViewEventDetail(event, "organizer")}
             onEditEventRequest={handleEditEventRequest}
             onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onArchiveEvent={handleArchiveOrganizedEvent}
@@ -686,13 +750,42 @@ export default function DashboardPage() {
 
       <ModalBottomSheet
         isOpen={Boolean(detailEvent)}
-        onClose={() => setDetailEvent(null)}
+        onClose={() => {
+          setDetailEvent(null);
+          setDetailEventMode("attendee");
+        }}
         title="Event Details"
       >
         {detailEvent ? (
           <EventDetailSheetContent
             event={detailEvent}
             formatEventDate={formatEventDate}
+            onSendMessage={
+              detailEventMode === "organizer"
+                ? (event) => {
+                    setDetailEvent(null);
+                    handleOpenHostMessage(event);
+                  }
+                : undefined
+            }
+          />
+        ) : null}
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={Boolean(messageEvent)}
+        onClose={() => {
+          if (!sendingHostMessage) {
+            setMessageEvent(null);
+          }
+        }}
+        title={messageEvent ? `Message Members · ${messageEvent.name}` : "Message Members"}
+      >
+        {messageEvent ? (
+          <HostMessageSheetContent
+            event={messageEvent}
+            isSubmitting={sendingHostMessage}
+            onSubmit={handleSendHostMessage}
           />
         ) : null}
       </ModalBottomSheet>

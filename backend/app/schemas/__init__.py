@@ -24,6 +24,8 @@ from .membership import (
     MembershipUpdate,
 )
 from .notification import (
+    HostMessageRequest,
+    HostMessageResponse,
     NotificationLogCreate,
     NotificationLogResponse,
     NotificationPreferenceResponse,
@@ -70,6 +72,8 @@ __all__ = [
     "MembershipRole",
     "MembershipUpdate",
     # Notification
+    "HostMessageRequest",
+    "HostMessageResponse",
     "NotificationLogCreate",
     "NotificationLogResponse",
     "NotificationPreferenceResponse",

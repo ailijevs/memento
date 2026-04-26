@@ -106,6 +106,57 @@ class NotificationService:
             notification_type=NotificationType.EVENT_UPDATE,
         )
 
+    async def notify_host_message(
+        self,
+        *,
+        event: EventResponse,
+        actor_user_id: UUID,
+        subject: str,
+        message: str,
+        recipients: list[NotificationRecipient] | None = None,
+    ) -> None:
+        """Send a host-authored message to opted-in event members."""
+        logger.info(
+            (
+                "notify_host_message called for event=%s actor_user=%s "
+                "subject=%r provided_recipient_count=%s"
+            ),
+            event.event_id,
+            actor_user_id,
+            subject,
+            len(recipients) if recipients is not None else None,
+        )
+        resolved_recipients = recipients or await self._resolve_recipients(
+            event_id=event.event_id,
+            exclude_user_id=actor_user_id,
+            notification_type=NotificationType.HOST_MESSAGE,
+        )
+        if not resolved_recipients:
+            logger.warning(
+                "No host message recipients resolved for event=%s actor_user=%s",
+                event.event_id,
+                actor_user_id,
+            )
+            return
+
+        body = self._build_host_message_email_body(
+            event=event,
+            message=message,
+        )
+        logger.info(
+            "Sending host message for event=%s actor_user=%s resolved_recipient_count=%s",
+            event.event_id,
+            actor_user_id,
+            len(resolved_recipients),
+        )
+        await self._send_and_log(
+            recipients=resolved_recipients,
+            subject=subject,
+            body=body,
+            event_id=event.event_id,
+            notification_type=NotificationType.HOST_MESSAGE,
+        )
+
     async def prepare_event_update_recipients(
         self,
         *,
@@ -115,14 +166,26 @@ class NotificationService:
         """Resolve opted-in recipients for a specific event."""
         return await self._resolve_recipients(event_id=event_id, exclude_user_id=actor_user_id)
 
+    async def prepare_host_message_recipients(
+        self,
+        *,
+        event_id: UUID,
+        actor_user_id: UUID,
+    ) -> list[NotificationRecipient]:
+        """Resolve recipients for organizer-sent messages for a specific event."""
+        return await self._resolve_recipients(
+            event_id=event_id,
+            exclude_user_id=actor_user_id,
+            notification_type=NotificationType.HOST_MESSAGE,
+        )
+
     def should_send_event_update(
         self,
         *,
         old_event: EventResponse,
         new_event: EventResponse,
     ) -> tuple[bool, list[str]]:
-        """
-        Return whether update notifications should be sent and why.
+        """Return whether update notifications should be sent and why.
 
         Rules:
         - send on start/end time changes
@@ -154,7 +217,14 @@ class NotificationService:
         *,
         event_id: UUID,
         exclude_user_id: UUID | None = None,
+        notification_type: NotificationType = NotificationType.EVENT_UPDATE,
     ) -> list[NotificationRecipient]:
+        logger.info(
+            "Resolving recipients for event=%s notification_type=%s exclude_user_id=%s",
+            event_id,
+            notification_type.value,
+            exclude_user_id,
+        )
         membership_response = (
             self.admin_client.table("event_memberships")
             .select("user_id")
@@ -163,6 +233,12 @@ class NotificationService:
         )
         user_ids: list[UUID] = []
         rows = membership_response.data or []
+        logger.info(
+            "Fetched %s membership rows for event=%s notification_type=%s",
+            len(rows),
+            event_id,
+            notification_type.value,
+        )
         for row in rows:
             if not isinstance(row, Mapping):
                 continue
@@ -170,13 +246,51 @@ class NotificationService:
             user_id_raw = row_dict.get("user_id")
             if isinstance(user_id_raw, str):
                 user_ids.append(UUID(user_id_raw))
+        logger.info(
+            "Parsed %s user ids for event=%s before exclusion notification_type=%s",
+            len(user_ids),
+            event_id,
+            notification_type.value,
+        )
         if exclude_user_id:
             user_ids = [user_id for user_id in user_ids if user_id != exclude_user_id]
+            logger.info(
+                (
+                    "Recipient candidates reduced to %s after excluding user=%s "
+                    "for event=%s notification_type=%s"
+                ),
+                len(user_ids),
+                exclude_user_id,
+                event_id,
+                notification_type.value,
+            )
         if not user_ids:
+            logger.warning(
+                "No recipient candidates found for event=%s notification_type=%s after exclusion",
+                event_id,
+                notification_type.value,
+            )
             return []
 
-        opted_in_user_ids = set(await self._filter_opted_in_user_ids(user_ids=user_ids))
+        opted_in_user_ids = set(
+            await self._filter_opted_in_user_ids(
+                user_ids=user_ids,
+                notification_type=notification_type,
+            )
+        )
+        logger.info(
+            "Opt-in filter kept %s of %s users for event=%s notification_type=%s",
+            len(opted_in_user_ids),
+            len(user_ids),
+            event_id,
+            notification_type.value,
+        )
         if not opted_in_user_ids:
+            logger.warning(
+                "All recipient candidates opted out for event=%s notification_type=%s",
+                event_id,
+                notification_type.value,
+            )
             return []
 
         recipients: list[NotificationRecipient] = []
@@ -185,13 +299,32 @@ class NotificationService:
                 continue
             email = self._get_user_email(user_id)
             if not email:
+                logger.warning(
+                    (
+                        "Skipping recipient user=%s for event=%s notification_type=%s "
+                        "because no email was found"
+                    ),
+                    user_id,
+                    event_id,
+                    notification_type.value,
+                )
                 continue
             recipients.append(NotificationRecipient(user_id=user_id, email=email))
+        logger.info(
+            "Resolved %s deliverable recipients for event=%s notification_type=%s",
+            len(recipients),
+            event_id,
+            notification_type.value,
+        )
         return recipients
 
-    async def _filter_opted_in_user_ids(self, *, user_ids: list[UUID]) -> list[UUID]:
-        """
-        Keep users with both email_notifications and event_updates enabled.
+    async def _filter_opted_in_user_ids(
+        self,
+        *,
+        user_ids: list[UUID],
+        notification_type: NotificationType,
+    ) -> list[UUID]:
+        """Keep users opted in for the requested notification type.
 
         Missing preference rows default to opted-in behavior.
         """
@@ -199,6 +332,8 @@ class NotificationService:
             return []
 
         try:
+            if notification_type == NotificationType.HOST_MESSAGE:
+                return list(await self.notification_dal.get_host_message_opt_in_user_ids(user_ids))
             return list(await self.notification_dal.get_event_update_opt_in_user_ids(user_ids))
         except Exception as exc:
             logger.warning(
@@ -240,10 +375,46 @@ class NotificationService:
         event_id: UUID | None,
         notification_type: NotificationType,
     ) -> None:
+        logger.info(
+            (
+                "Beginning notification send for event=%s notification_type=%s "
+                "recipient_count=%s subject=%r"
+            ),
+            event_id,
+            notification_type.value,
+            len(recipients),
+            subject,
+        )
         for recipient in recipients:
+            logger.info(
+                "Attempting notification send to user=%s email=%s event=%s type=%s",
+                recipient.user_id,
+                recipient.email,
+                event_id,
+                notification_type.value,
+            )
             sent = await self._send_email(
                 recipient_email=recipient.email, subject=subject, body=body
             )
+            if sent:
+                logger.info(
+                    "Notification email sent to user=%s email=%s type=%s event=%s",
+                    recipient.user_id,
+                    recipient.email,
+                    notification_type.value,
+                    event_id,
+                )
+            else:
+                logger.warning(
+                    (
+                        "Notification email send reported failure for "
+                        "user=%s email=%s type=%s event=%s"
+                    ),
+                    recipient.user_id,
+                    recipient.email,
+                    notification_type.value,
+                    event_id,
+                )
             await self._log_notification(
                 user_id=recipient.user_id,
                 event_id=event_id,
@@ -253,6 +424,11 @@ class NotificationService:
 
     async def _send_email(self, *, recipient_email: str, subject: str, body: str) -> bool:
         if not self.settings.mail_enabled:
+            logger.warning(
+                "Mail disabled; skipping notification email to %s with subject=%r",
+                recipient_email,
+                subject,
+            )
             return False
 
         try:
@@ -324,6 +500,23 @@ class NotificationService:
             "app_name": _APP_BRAND_NAME,
         }
         return self._render_email_template("event_deleted.html", context)
+
+    def _build_host_message_email_body(
+        self,
+        *,
+        event: EventResponse,
+        message: str,
+    ) -> str:
+        paragraphs = [line.strip() for line in message.splitlines() if line.strip()]
+        context: dict[str, object] = {
+            "event_name": event.name,
+            "scheduled_time": self._format_time(event.starts_at, event.ends_at),
+            "location": event.location or "TBD",
+            "message_paragraphs": paragraphs or [message.strip()],
+            "cta_url": self._build_dashboard_url(event_id=event.event_id),
+            "app_name": _APP_BRAND_NAME,
+        }
+        return self._render_email_template("host_message.html", context)
 
     @staticmethod
     def _format_time(starts_at: datetime | None, ends_at: datetime | None) -> str:
