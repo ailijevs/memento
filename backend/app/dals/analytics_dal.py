@@ -30,6 +30,42 @@ class AnalyticsDAL(BaseDAL):
     def __init__(self, client: Client):
         super().__init__(client)
 
+    # ── membership / role checks ─────────────────────────────────────────
+
+    async def verify_membership(self, event_id: UUID, user_id: UUID) -> bool:
+        """Return True if the user is a member of the event."""
+        resp = (
+            self.client.table("event_memberships")
+            .select("user_id")
+            .eq("event_id", str(event_id))
+            .eq("user_id", str(user_id))
+            .execute()
+        )
+        return bool(resp.data)
+
+    async def is_organizer(self, event_id: UUID, user_id: UUID) -> bool:
+        """Return True if the user is the creator (organizer) of the event."""
+        resp = (
+            self.client.table("events").select("created_by").eq("event_id", str(event_id)).execute()
+        )
+        if not resp.data:
+            return False
+        row = resp.data[0]
+        return bool(isinstance(row, dict) and row.get("created_by") == str(user_id))
+
+    # ── privacy helpers ────────────────────────────────────────────────────
+
+    async def _get_display_opted_in_ids(self, event_id: UUID) -> set[str]:
+        """Return set of user_ids that have allow_profile_display=True."""
+        resp = (
+            self.client.table("event_consents")
+            .select("user_id")
+            .eq("event_id", str(event_id))
+            .eq("allow_profile_display", True)
+            .execute()
+        )
+        return {str(row["user_id"]) for row in resp.data}
+
     # ── helpers ────────────────────────────────────────────────────────────
 
     async def _get_member_count(self, event_id: UUID) -> int:
@@ -342,7 +378,11 @@ class AnalyticsDAL(BaseDAL):
     async def get_event_analytics_attendee(
         self, event_id: UUID, user_id: UUID
     ) -> AttendeeEventAnalytics:
-        """Attendee-scoped analytics for a single event."""
+        """Attendee-scoped analytics for a single event.
+
+        Profile info (name/photo) is only shown for users who have
+        opted in to profile display for this event.
+        """
         ev_resp = (
             self.client.table("events")
             .select("*")
@@ -355,6 +395,7 @@ class AnalyticsDAL(BaseDAL):
 
         ev = ev_resp.data
         members = await self._get_member_count(event_id)
+        display_ok = await self._get_display_opted_in_ids(event_id)
 
         user_recogs_resp = (
             self.client.table("recognition_logs")
@@ -379,18 +420,25 @@ class AnalyticsDAL(BaseDAL):
             met_counts[uid] = met_counts.get(uid, 0) + 1
 
         for uid, count in sorted(met_counts.items(), key=lambda x: x[1], reverse=True)[:10]:
-            profile = (
-                self.client.table("profiles")
-                .select("full_name,photo_path")
-                .eq("user_id", uid)
-                .maybe_single()
-                .execute()
-            )
+            if uid in display_ok:
+                profile = (
+                    self.client.table("profiles")
+                    .select("full_name,photo_path")
+                    .eq("user_id", uid)
+                    .maybe_single()
+                    .execute()
+                )
+                name = profile.data.get("full_name") if profile.data else None
+                photo = profile.data.get("photo_path") if profile.data else None
+            else:
+                name = "Anonymous Attendee"
+                photo = None
+
             people_met.append(
                 TopRecognizedUser(
                     user_id=UUID(uid),
-                    full_name=profile.data.get("full_name") if profile.data else None,
-                    photo_path=profile.data.get("photo_path") if profile.data else None,
+                    full_name=name,
+                    photo_path=photo,
                     times_recognized=count,
                 )
             )
@@ -541,14 +589,11 @@ class AnalyticsDAL(BaseDAL):
                 .execute()
             )
 
-            user_resp = (
-                self.client.table("auth.users")
-                .select("email")
-                .eq("id", uid)
-                .maybe_single()
-                .execute()
-            )
-            email = user_resp.data.get("email") if user_resp.data else None
+            try:
+                user_resp = self.client.auth.admin.get_user_by_id(uid)
+                email = user_resp.user.email if user_resp.user else None
+            except Exception:
+                email = None
 
             rows.append(
                 AttendeeExportRow(
@@ -570,7 +615,10 @@ class AnalyticsDAL(BaseDAL):
         return rows
 
     async def get_post_event_report(self, event_id: UUID, user_id: UUID) -> PostEventReport:
-        """Personalized post-event networking report for an attendee."""
+        """Personalized post-event networking report for an attendee.
+
+        Profile info in connections respects allow_profile_display consent.
+        """
         ev = (
             self.client.table("events")
             .select("name,starts_at")
@@ -582,6 +630,7 @@ class AnalyticsDAL(BaseDAL):
             raise ValueError("Event not found")
 
         total_attendees = await self._get_member_count(event_id)
+        display_ok = await self._get_display_opted_in_ids(event_id)
 
         user_recogs_resp = (
             self.client.table("recognition_logs")
@@ -606,18 +655,25 @@ class AnalyticsDAL(BaseDAL):
 
         connections: list[TopRecognizedUser] = []
         for uid, count in sorted(met_counts.items(), key=lambda x: x[1], reverse=True):
-            profile = (
-                self.client.table("profiles")
-                .select("full_name,photo_path")
-                .eq("user_id", uid)
-                .maybe_single()
-                .execute()
-            )
+            if uid in display_ok:
+                profile = (
+                    self.client.table("profiles")
+                    .select("full_name,photo_path")
+                    .eq("user_id", uid)
+                    .maybe_single()
+                    .execute()
+                )
+                name = profile.data.get("full_name") if profile.data else None
+                photo = profile.data.get("photo_path") if profile.data else None
+            else:
+                name = "Anonymous Attendee"
+                photo = None
+
             connections.append(
                 TopRecognizedUser(
                     user_id=UUID(uid),
-                    full_name=profile.data.get("full_name") if profile.data else None,
-                    photo_path=profile.data.get("photo_path") if profile.data else None,
+                    full_name=name,
+                    photo_path=photo,
                     times_recognized=count,
                 )
             )
@@ -625,7 +681,11 @@ class AnalyticsDAL(BaseDAL):
         people_met = len(met_counts)
         times_recognized = int(was_recognized_resp.count or 0)
 
-        connection_names = [c.full_name or "Unknown" for c in connections[:10]]
+        connection_names = [
+            c.full_name or "Unknown"
+            for c in connections[:10]
+            if c.full_name != "Anonymous Attendee"
+        ]
         score, summary = await self._compute_networking_score(
             event_name=ev.data["name"],
             total_attendees=total_attendees,

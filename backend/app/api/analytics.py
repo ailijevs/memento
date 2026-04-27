@@ -36,14 +36,7 @@ def get_analytics_dal() -> AnalyticsDAL:
 
 async def _verify_membership(dal: AnalyticsDAL, event_id: UUID, user_id: UUID) -> None:
     """Raise 403 if the user is not a member of the event."""
-    resp = (
-        dal.client.table("event_memberships")
-        .select("user_id")
-        .eq("event_id", str(event_id))
-        .eq("user_id", str(user_id))
-        .execute()
-    )
-    if not resp.data:
+    if not await dal.verify_membership(event_id, user_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You are not a member of this event.",
@@ -52,11 +45,7 @@ async def _verify_membership(dal: AnalyticsDAL, event_id: UUID, user_id: UUID) -
 
 async def _is_organizer(dal: AnalyticsDAL, event_id: UUID, user_id: UUID) -> bool:
     """Check if the user is the creator (organizer) of the event."""
-    resp = dal.client.table("events").select("created_by").eq("event_id", str(event_id)).execute()
-    if not resp.data:
-        return False
-    row = resp.data[0]
-    return bool(isinstance(row, dict) and row.get("created_by") == str(user_id))
+    return await dal.is_organizer(event_id, user_id)
 
 
 # ── Overview endpoints ────────────────────────────────────────────────────
