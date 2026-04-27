@@ -245,7 +245,6 @@ def test_message_event_members_dispatches_host_message_in_background(
     notification_service.notify_host_message.assert_awaited_once_with(
         event=event,
         actor_user_id=user_id,
-        actor_email="host@example.com",
         subject="Schedule update",
         message="Please use the south entrance.",
         recipients=recipients,

@@ -149,14 +149,12 @@ def test_build_host_message_email_body_renders_message_and_event_details():
     body = service._build_host_message_email_body(
         event=event,
         message="Please arrive 15 minutes early.\nBring your badge.",
-        actor_email="host@example.com",
     )
 
     assert "Please arrive 15 minutes early." in body
     assert "Bring your badge." in body
     assert event.name in body
     assert "Main Hall" in body
-    assert "host@example.com" in body
 
 
 def test_send_and_log_emits_info_log_on_success(caplog):
