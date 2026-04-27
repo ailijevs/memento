@@ -34,7 +34,7 @@ export default function ProfilePage() {
   const [photoStatus, setPhotoStatus] = useState<string | null>(null);
   const [photoStatusError, setPhotoStatusError] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
-  const [deletePhase, setDeletePhase] = useState<"closed" | "first" | "second">("closed");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -466,7 +466,7 @@ export default function ProfilePage() {
             onClick={() => {
               setDeleteError(null);
               setDeleteSubmitting(false);
-              setDeletePhase("first");
+              setDeleteDialogOpen(true);
             }}
             className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
             style={{
@@ -481,21 +481,7 @@ export default function ProfilePage() {
         </div>
 
         <ConfirmationDialog
-          open={deletePhase === "first"}
-          title="Delete your account?"
-          message="Do you want to delete your account? Tap Yes to continue, or Cancel to go back."
-          cancelLabel="Cancel"
-          confirmLabel="Yes"
-          onCancel={() => setDeletePhase("closed")}
-          onConfirm={() => {
-            setDeleteError(null);
-            setDeleteSubmitting(false);
-            setDeletePhase("second");
-          }}
-        />
-
-        <ConfirmationDialog
-          open={deletePhase === "second"}
+          open={deleteDialogOpen}
           title="Are you sure?"
           message={
             deleteError
@@ -507,7 +493,7 @@ export default function ProfilePage() {
           confirmDisabled={deleteSubmitting}
           onCancel={() => {
             if (!deleteSubmitting) {
-              setDeletePhase("closed");
+              setDeleteDialogOpen(false);
               setDeleteError(null);
             }
           }}
