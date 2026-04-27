@@ -34,7 +34,7 @@ export default function ProfilePage() {
   const [photoStatus, setPhotoStatus] = useState<string | null>(null);
   const [photoStatusError, setPhotoStatusError] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletePhase, setDeletePhase] = useState<"closed" | "first" | "second">("closed");
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,8 +47,16 @@ export default function ProfilePage() {
     router.refresh();
   }
 
+  const firstDeleteMessage =
+    "Deleting your account will remove your profile, photos, and event participation from Memento. You'll be asked to confirm one more time before anything is removed.";
   const finalDeleteMessage =
     "If you continue, your event consents will be revoked automatically. You will no longer be able to access liked profiles or connections you have made. All of your data will be lost forever. This cannot be undone.";
+
+  function closeDeleteDialog() {
+    if (deleteSubmitting) return;
+    setDeletePhase("closed");
+    setDeleteError(null);
+  }
 
   async function confirmDeleteAccount() {
     if (deleteSubmitting) return;
@@ -466,7 +474,7 @@ export default function ProfilePage() {
             onClick={() => {
               setDeleteError(null);
               setDeleteSubmitting(false);
-              setDeleteDialogOpen(true);
+              setDeletePhase("first");
             }}
             className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
             style={{
@@ -481,7 +489,20 @@ export default function ProfilePage() {
         </div>
 
         <ConfirmationDialog
-          open={deleteDialogOpen}
+          open={deletePhase === "first"}
+          title="Delete your account?"
+          message={firstDeleteMessage}
+          cancelLabel="Cancel"
+          confirmLabel="Continue"
+          onCancel={closeDeleteDialog}
+          onConfirm={() => {
+            setDeleteError(null);
+            setDeletePhase("second");
+          }}
+        />
+
+        <ConfirmationDialog
+          open={deletePhase === "second"}
           title="Are you sure?"
           message={
             deleteError
@@ -491,12 +512,7 @@ export default function ProfilePage() {
           cancelLabel="Cancel"
           confirmLabel={deleteSubmitting ? "Deleting…" : "Yes, delete my account"}
           confirmDisabled={deleteSubmitting}
-          onCancel={() => {
-            if (!deleteSubmitting) {
-              setDeleteDialogOpen(false);
-              setDeleteError(null);
-            }
-          }}
+          onCancel={closeDeleteDialog}
           onConfirm={() => void confirmDeleteAccount()}
           confirmIcon={
             deleteSubmitting ? (
