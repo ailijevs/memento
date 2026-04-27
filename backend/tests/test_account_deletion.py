@@ -28,6 +28,7 @@ def _mock_user(user_id: UUID | None = None) -> CurrentUser:
 
 @pytest.fixture
 def client() -> Generator[TestClient, None, None]:
+    """Yield a TestClient with dependency overrides reset before/after each test."""
     app.dependency_overrides.clear()
     with TestClient(app) as test_client:
         yield test_client
@@ -155,7 +156,7 @@ class _AuthApi:
 class _AdminStub:
     """Records operations performed by delete_current_account."""
 
-    def __init__(self, events_rows: list[dict]) -> None:
+    def __init__(self, events_rows: object) -> None:
         self.events_rows = events_rows
         self.deleted_event_ids: list[str] = []
         self.removed_storage_keys: list[str] | None = None
@@ -195,7 +196,7 @@ def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+    delete_current_account(admin=admin, user_id=user_id)
 
     assert admin.deleted_event_ids == [eid]
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -205,6 +206,7 @@ def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
 def test_delete_current_account_calls_rekognition_when_indexing_completed(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Completed-indexing events should attempt Rekognition collection cleanup."""
     eid = str(uuid4())
     user_id = uuid4()
     admin = _AdminStub(
@@ -225,7 +227,7 @@ def test_delete_current_account_calls_rekognition_when_indexing_completed(
         _RecordingRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+    delete_current_account(admin=admin, user_id=user_id)
 
     assert len(rek_calls) == 1
     assert f"memento_event_{eid}" == rek_calls[0]
@@ -250,7 +252,7 @@ def test_delete_current_account_continues_when_rekognition_delete_fails(
         _FailingRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+    delete_current_account(admin=admin, user_id=user_id)
 
     assert admin.deleted_event_ids == [eid]
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -260,9 +262,7 @@ def test_delete_current_account_continues_when_rekognition_delete_fails(
 def test_delete_current_account_skips_malformed_event_rows(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Service ignores malformed rows (non-dict / missing event_id) and still completes.
-    """
+    """Service ignores malformed rows (non-dict / missing event_id) and still completes."""
     valid_eid = str(uuid4())
     user_id = uuid4()
     admin = _AdminStub(
@@ -283,7 +283,7 @@ def test_delete_current_account_skips_malformed_event_rows(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+    delete_current_account(admin=admin, user_id=user_id)
 
     assert admin.deleted_event_ids == [valid_eid]
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -296,7 +296,7 @@ def test_delete_current_account_handles_non_list_events_payload(
     """If events query returns non-list data, service treats it as empty safely."""
     user_id = uuid4()
     admin = _AdminStub(events_rows=[])
-    admin.events_rows = {"unexpected": "shape"}  # type: ignore[assignment]
+    admin.events_rows = {"unexpected": "shape"}
 
     class _StubRekognitionService:
         def delete_collection(self, *, collection_id: str) -> dict:
@@ -307,7 +307,7 @@ def test_delete_current_account_handles_non_list_events_payload(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+    delete_current_account(admin=admin, user_id=user_id)
 
     assert admin.deleted_event_ids == []
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -319,7 +319,6 @@ def test_delete_current_account_continues_when_storage_remove_fails(
 ) -> None:
     """Storage photo delete failure is best-effort and should not block auth deletion."""
     user_id = uuid4()
-    admin = _AdminStub(events_rows=[])
 
     class _StubRekognitionService:
         def delete_collection(self, *, collection_id: str) -> dict:
@@ -330,22 +329,28 @@ def test_delete_current_account_continues_when_storage_remove_fails(
         _StubRekognitionService,
     )
 
-    class _FailingStorageBucket:
+    class _FailingStorageBucket(_StorageBucket):
+        def __init__(self, root: "_AdminStub") -> None:
+            super().__init__(root)
+
         def remove(self, keys: list[str]) -> None:
             raise RuntimeError(f"storage unavailable for {keys}")
 
-    class _FailingStorageApi:
+    class _FailingStorageApi(_StorageApi):
+        def __init__(self, root: "_AdminStub") -> None:
+            super().__init__(root)
+
         def from_(self, bucket: str) -> _FailingStorageBucket:
             assert bucket == "profile-photos"
-            return _FailingStorageBucket()
+            return _FailingStorageBucket(self._root)
 
     class _AdminWithFailingStorage(_AdminStub):
         @property
         def storage(self) -> _FailingStorageApi:
-            return _FailingStorageApi()
+            return _FailingStorageApi(self)
 
     failing_admin = _AdminWithFailingStorage(events_rows=[])
-    delete_current_account(admin=failing_admin, user_id=user_id)  # type: ignore[arg-type]
+    delete_current_account(admin=failing_admin, user_id=user_id)
 
     assert failing_admin.deleted_event_ids == []
     assert failing_admin.deleted_auth_user_id == str(user_id)
