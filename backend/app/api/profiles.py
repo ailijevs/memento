@@ -43,6 +43,7 @@ from app.services import (
 )
 from app.services.account_deletion import delete_current_account
 from app.services.resume_parser import ResumeData, ResumeParser
+from supabase import Client
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +74,13 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     """Dependency to get ConsentDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ConsentDAL(client)
+
+
+def get_authed_supabase_client(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> Client:
+    """Dependency to get a Supabase client bound to the caller's JWT (RLS-bound)."""
+    return get_supabase_client(current_user.access_token)
 
 
 @router.get("/me", response_model=ProfileResponse)
@@ -431,16 +439,23 @@ async def delete_my_account(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
     event_dal: Annotated[EventDAL, Depends(get_event_dal)],
+    client: Annotated[Client, Depends(get_authed_supabase_client)],
 ) -> None:
     """
     Permanently delete the current user's account.
 
-    Removes events they created (and related data), profile photo in Storage,
-    then deletes the Supabase Auth user (cascading profile, memberships, consents).
+    Performs best-effort AWS cleanup (Rekognition collections / face entries
+    and the profile photo in S3), then invokes the ``delete_my_account``
+    SECURITY DEFINER RPC under the caller's own JWT to atomically delete the
+    events they created and their ``auth.users`` row (which cascades the
+    profile, memberships, consents, and auth-side session/token rows).
+
+    No service-role key is used.
     """
     try:
         await delete_current_account(
             user_id=current_user.id,
+            client=client,
             profile_dal=profile_dal,
             event_dal=event_dal,
         )
