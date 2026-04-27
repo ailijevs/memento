@@ -91,6 +91,31 @@ class EventDAL(BaseDAL):
             return []
         return [row for row in rows if isinstance(row, dict)]
 
+    async def get_attended_events_for_account_deletion(self, user_id: UUID) -> list[dict[str, Any]]:
+        """
+        Get events the user joined but did not create.
+
+        Returns minimal fields (``event_id``, ``indexing_status``) used to remove
+        the user's face entries from each event's Rekognition collection during
+        account deletion.
+        """
+        memberships = await MembershipDAL(self.client).get_user_memberships(user_id)
+        if not memberships:
+            return []
+
+        event_ids = [str(m.event_id) for m in memberships]
+        response = (
+            self.client.table(self.TABLE)
+            .select("event_id", "indexing_status")
+            .in_("event_id", event_ids)
+            .neq("created_by", str(user_id))
+            .execute()
+        )
+        rows = response.data
+        if not isinstance(rows, list):
+            return []
+        return [row for row in rows if isinstance(row, dict)]
+
     async def create(self, created_by: UUID, data: EventCreate) -> EventResponse:
         """
         Create a new event.

@@ -25,11 +25,12 @@ async def delete_current_account(
 ) -> None:
     """
     Hard-delete events created by the user (with best-effort Rekognition cleanup),
-    remove canonical profile photo from S3, delete profile row, then delete
-    the Supabase Auth user.
+    remove the user's face entries from collections of events they only attended,
+    remove the canonical profile photo from S3, delete the profile row, then
+    delete the Supabase Auth user.
 
-    Events created by the user must be removed first
-    because ``events.created_by`` references ``auth.users`` with ON DELETE RESTRICT.
+    Events created by the user must be removed first because
+    ``events.created_by`` references ``auth.users`` with ON DELETE RESTRICT.
     """
     uid_str = str(user_id)
     rekognition = RekognitionService()
@@ -60,6 +61,39 @@ async def delete_current_account(
             await event_dal.delete(UUID(eid))
         except ValueError:
             logger.warning("Skipping malformed event_id during deletion: %s", eid)
+
+    attended_rows = await event_dal.get_attended_events_for_account_deletion(user_id)
+    if not isinstance(attended_rows, list):
+        attended_rows = []
+
+    for raw in attended_rows:
+        if not isinstance(raw, dict):
+            continue
+        eid_val = raw.get("event_id")
+        if eid_val is None:
+            continue
+        eid = str(eid_val)
+        status_raw = raw.get("indexing_status")
+        idx = (str(status_raw) if status_raw is not None else "").lower()
+        if idx != EventProcessingStatus.COMPLETED.value:
+            continue
+        try:
+            UUID(eid)
+        except ValueError:
+            logger.warning("Skipping malformed attended event_id during face cleanup: %s", eid)
+            continue
+        collection_id = build_event_collection_id(eid)
+        try:
+            rekognition.delete_faces_by_user(
+                collection_id=collection_id,
+                user_id=user_id,
+            )
+        except (RekognitionError, RuntimeError, ValueError) as exc:
+            logger.warning(
+                "Rekognition face cleanup skipped for attended event_id=%s: %s",
+                eid,
+                exc,
+            )
 
     photo_path = await profile_dal.get_photo_path(user_id)
     settings = get_settings()
