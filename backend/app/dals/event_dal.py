@@ -1,6 +1,7 @@
 """Data Access Layer for events."""
 
 from datetime import datetime, timedelta, timezone
+from typing import Any
 from uuid import UUID
 
 from app.dals.base_dal import BaseDAL
@@ -74,6 +75,21 @@ class EventDAL(BaseDAL):
         )
 
         return [EventResponse(**event) for event in response.data]
+
+    async def get_events_for_account_deletion(self, user_id: UUID) -> list[dict[str, Any]]:
+        """
+        Get all events created by a user with minimal fields required for deletion.
+        """
+        response = (
+            self.client.table(self.TABLE)
+            .select("event_id", "indexing_status")
+            .eq("created_by", str(user_id))
+            .execute()
+        )
+        rows = response.data
+        if not isinstance(rows, list):
+            return []
+        return [row for row in rows if isinstance(row, dict)]
 
     async def create(self, created_by: UUID, data: EventCreate) -> EventResponse:
         """

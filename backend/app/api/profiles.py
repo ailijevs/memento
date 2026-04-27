@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
 from app.dals import ConsentDAL, EventDAL, MembershipDAL, ProfileDAL
-from app.db import get_admin_client, get_supabase_client
+from app.db import get_supabase_client
 from app.schemas import (
     LinkedInEnrichmentRequest,
     LinkedInEnrichmentResponse,
@@ -43,7 +43,6 @@ from app.services import (
 )
 from app.services.account_deletion import delete_current_account
 from app.services.resume_parser import ResumeData, ResumeParser
-from supabase import Client
 
 logger = logging.getLogger(__name__)
 
@@ -445,7 +444,8 @@ async def delete_my_profile(
 @accounts_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_my_account(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    admin: Annotated[Client, Depends(get_admin_client)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> None:
     """
     Permanently delete the current user's account.
@@ -454,7 +454,11 @@ async def delete_my_account(
     then deletes the Supabase Auth user (cascading profile, memberships, consents).
     """
     try:
-        delete_current_account(admin=admin, user_id=current_user.id)
+        await delete_current_account(
+            user_id=current_user.id,
+            profile_dal=profile_dal,
+            event_dal=event_dal,
+        )
     except Exception as exc:
         logger.exception("Account deletion failed for user_id=%s", current_user.id)
         raise HTTPException(

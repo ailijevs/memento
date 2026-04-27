@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Generator
-from types import SimpleNamespace
-from typing import Any, cast
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -13,8 +12,8 @@ from fastapi.testclient import TestClient
 
 import app.api.profiles as accounts_api
 from app.auth import CurrentUser, get_current_user
-from app.db import get_admin_client
 from app.main import app
+from app.services import account_deletion as account_deletion_service
 from app.services.account_deletion import delete_current_account
 
 
@@ -47,13 +46,15 @@ def test_delete_me_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) 
     user = _mock_user()
     called: dict[str, object] = {}
 
-    def fake_delete(*, admin, user_id: UUID) -> None:
-        called["admin"] = admin
+    async def fake_delete(*, user_id: UUID, profile_dal, event_dal) -> None:
+        called["profile_dal"] = profile_dal
+        called["event_dal"] = event_dal
         called["user_id"] = user_id
 
     monkeypatch.setattr(accounts_api, "delete_current_account", fake_delete)
     app.dependency_overrides[get_current_user] = lambda: user
-    app.dependency_overrides[get_admin_client] = lambda: MagicMock(name="admin_client")
+    app.dependency_overrides[accounts_api.get_profile_dal] = lambda: MagicMock(name="profile_dal")
+    app.dependency_overrides[accounts_api.get_event_dal] = lambda: MagicMock(name="event_dal")
 
     response = client.delete(
         "/api/v1/accounts/me",
@@ -63,7 +64,8 @@ def test_delete_me_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) 
     assert response.status_code == 204
     assert response.content == b""
     assert called["user_id"] == user.id
-    assert called["admin"] is not None
+    assert called["profile_dal"] is not None
+    assert called["event_dal"] is not None
 
 
 def test_delete_me_returns_502_when_orchestration_fails(
@@ -72,12 +74,13 @@ def test_delete_me_returns_502_when_orchestration_fails(
 ) -> None:
     """Any exception from delete_current_account is mapped to 502."""
 
-    def boom(*, admin, user_id: UUID) -> None:
+    async def boom(*, user_id: UUID, profile_dal, event_dal) -> None:
         raise RuntimeError("simulated failure")
 
     monkeypatch.setattr(accounts_api, "delete_current_account", boom)
     app.dependency_overrides[get_current_user] = lambda: _mock_user()
-    app.dependency_overrides[get_admin_client] = lambda: MagicMock()
+    app.dependency_overrides[accounts_api.get_profile_dal] = lambda: MagicMock(name="profile_dal")
+    app.dependency_overrides[accounts_api.get_event_dal] = lambda: MagicMock(name="event_dal")
 
     response = client.delete(
         "/api/v1/accounts/me",
@@ -86,57 +89,6 @@ def test_delete_me_returns_502_when_orchestration_fails(
 
     assert response.status_code == 502
     assert "could not complete" in response.json()["detail"].lower()
-
-
-class _TableQuery:
-    """Minimal PostgREST-style chain for account_deletion tests."""
-
-    def __init__(self, root: "_AdminStub", table: str) -> None:
-        self._root = root
-        self._table = table
-        self._kind: str | None = None
-        self._eq_col: str | None = None
-        self._eq_val: str | None = None
-
-    def select(self, *_cols: str) -> _TableQuery:
-        self._kind = "select"
-        return self
-
-    def delete(self) -> _TableQuery:
-        self._kind = "delete"
-        return self
-
-    def eq(self, col: str, val: str) -> _TableQuery:
-        self._eq_col = col
-        self._eq_val = val
-        return self
-
-    def execute(self) -> SimpleNamespace:
-        if self._table == "events" and self._kind == "select" and self._eq_col == "created_by":
-            return SimpleNamespace(data=self._root.events_rows)
-        if self._table == "events" and self._kind == "delete" and self._eq_col == "event_id":
-            event_id = self._eq_val
-            assert event_id is not None
-            self._root.deleted_event_ids.append(event_id)
-            return SimpleNamespace(data=[{"event_id": event_id}])
-        raise AssertionError(f"Unexpected table chain: {self._table} {self._kind} {self._eq_col}")
-
-
-class _StorageBucket:
-    def __init__(self, root: "_AdminStub") -> None:
-        self._root = root
-
-    def remove(self, keys: list[str]) -> None:
-        self._root.removed_storage_keys = list(keys)
-
-
-class _StorageApi:
-    def __init__(self, root: "_AdminStub") -> None:
-        self._root = root
-
-    def from_(self, bucket: str) -> _StorageBucket:
-        assert bucket == "profile-photos"
-        return _StorageBucket(self._root)
 
 
 class _AuthAdmin:
@@ -155,36 +107,55 @@ class _AuthApi:
 
 
 class _AdminStub:
-    """Records operations performed by delete_current_account."""
+    """Records auth-user deletion performed by delete_current_account."""
 
-    def __init__(self, events_rows: object) -> None:
-        self.events_rows = events_rows
-        self.deleted_event_ids: list[str] = []
-        self.removed_storage_keys: list[str] | None = None
+    def __init__(self) -> None:
         self.deleted_auth_user_id: str | None = None
-
-    def table(self, name: str) -> _TableQuery:
-        assert name == "events"
-        return _TableQuery(self, name)
-
-    @property
-    def storage(self) -> _StorageApi:
-        return _StorageApi(self)
 
     @property
     def auth(self) -> _AuthApi:
         return _AuthApi(self)
 
 
+class _EventDalStub:
+    def __init__(self, events_rows: list[object]) -> None:
+        self.events_rows = events_rows
+        self.deleted_event_ids: list[str] = []
+
+    async def get_events_for_account_deletion(self, user_id: UUID) -> list[object]:
+        _ = user_id
+        return self.events_rows
+
+    async def delete(self, event_id: UUID) -> bool:
+        self.deleted_event_ids.append(str(event_id))
+        return True
+
+
+class _ProfileDalStub:
+    def __init__(self, photo_path: str | None) -> None:
+        self.photo_path = photo_path
+        self.deleted_profile = False
+
+    async def get_photo_path(self, user_id: UUID) -> str | None:
+        _ = user_id
+        return self.photo_path
+
+    async def delete(self, user_id: UUID) -> bool:
+        _ = user_id
+        self.deleted_profile = True
+        return True
+
+
 def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Service deletes each owned event row, removes profile photo, then auth user."""
+    """Service deletes owned events, removes S3 photo, then auth user."""
     eid = str(uuid4())
     user_id = uuid4()
-    admin = _AdminStub(
-        events_rows=[{"event_id": eid, "indexing_status": "pending"}],
-    )
+    event_dal = _EventDalStub(events_rows=[{"event_id": eid, "indexing_status": "pending"}])
+    profile_dal = _ProfileDalStub(photo_path=f"profiles/{user_id}-onboarding.jpg")
+    admin = _AdminStub()
+    deleted_s3: list[str] = []
 
     class _StubRekognitionService:
         """Avoid real boto3 in CI; ``delete_current_account`` constructs this."""
@@ -192,15 +163,29 @@ def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
         def delete_collection(self, *, collection_id: str) -> dict:
             raise AssertionError("Rekognition should not run when indexing_status is pending")
 
+    class _StubS3Service:
+        def delete_profile_picture(self, *, s3_key: str, bucket_name: str) -> None:
+            deleted_s3.append(f"{bucket_name}:{s3_key}")
+
     monkeypatch.setattr(
         "app.services.account_deletion.RekognitionService",
         _StubRekognitionService,
     )
+    monkeypatch.setattr(account_deletion_service, "S3Service", _StubS3Service)
+    monkeypatch.setattr(
+        account_deletion_service,
+        "get_settings",
+        lambda: MagicMock(s3_bucket_name="test-bucket"),
+    )
+    monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
-    delete_current_account(admin=cast(Any, admin), user_id=user_id)
+    asyncio.run(
+        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+    )
 
-    assert admin.deleted_event_ids == [eid]
-    assert admin.removed_storage_keys == [f"{user_id}.jpg"]
+    assert event_dal.deleted_event_ids == [eid]
+    assert deleted_s3 == [f"test-bucket:profiles/{user_id}-onboarding.jpg"]
+    assert profile_dal.deleted_profile is True
     assert admin.deleted_auth_user_id == str(user_id)
 
 
@@ -210,9 +195,9 @@ def test_delete_current_account_calls_rekognition_when_indexing_completed(
     """Completed-indexing events should attempt Rekognition collection cleanup."""
     eid = str(uuid4())
     user_id = uuid4()
-    admin = _AdminStub(
-        events_rows=[{"event_id": eid, "indexing_status": "completed"}],
-    )
+    event_dal = _EventDalStub(events_rows=[{"event_id": eid, "indexing_status": "completed"}])
+    profile_dal = _ProfileDalStub(photo_path=None)
+    admin = _AdminStub()
 
     rek_calls: list[str] = []
 
@@ -228,10 +213,20 @@ def test_delete_current_account_calls_rekognition_when_indexing_completed(
         _RecordingRekognitionService,
     )
 
-    delete_current_account(admin=cast(Any, admin), user_id=user_id)
+    monkeypatch.setattr(
+        account_deletion_service,
+        "get_settings",
+        lambda: MagicMock(s3_bucket_name=None),
+    )
+    monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
+
+    asyncio.run(
+        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+    )
 
     assert len(rek_calls) == 1
     assert f"memento_event_{eid}" == rek_calls[0]
+    assert profile_dal.deleted_profile is True
 
 
 def test_delete_current_account_continues_when_rekognition_delete_fails(
@@ -240,9 +235,9 @@ def test_delete_current_account_continues_when_rekognition_delete_fails(
     """Rekognition cleanup is best-effort; event/storage/auth deletion still proceed."""
     eid = str(uuid4())
     user_id = uuid4()
-    admin = _AdminStub(
-        events_rows=[{"event_id": eid, "indexing_status": "completed"}],
-    )
+    event_dal = _EventDalStub(events_rows=[{"event_id": eid, "indexing_status": "completed"}])
+    profile_dal = _ProfileDalStub(photo_path=None)
+    admin = _AdminStub()
 
     class _FailingRekognitionService:
         def delete_collection(self, *, collection_id: str) -> dict:
@@ -253,10 +248,19 @@ def test_delete_current_account_continues_when_rekognition_delete_fails(
         _FailingRekognitionService,
     )
 
-    delete_current_account(admin=cast(Any, admin), user_id=user_id)
+    monkeypatch.setattr(
+        account_deletion_service,
+        "get_settings",
+        lambda: MagicMock(s3_bucket_name=None),
+    )
+    monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
-    assert admin.deleted_event_ids == [eid]
-    assert admin.removed_storage_keys == [f"{user_id}.jpg"]
+    asyncio.run(
+        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+    )
+
+    assert event_dal.deleted_event_ids == [eid]
+    assert profile_dal.deleted_profile is True
     assert admin.deleted_auth_user_id == str(user_id)
 
 
@@ -266,7 +270,7 @@ def test_delete_current_account_skips_malformed_event_rows(
     """Service ignores malformed rows (non-dict / missing event_id) and still completes."""
     valid_eid = str(uuid4())
     user_id = uuid4()
-    admin = _AdminStub(
+    event_dal = _EventDalStub(
         events_rows=[
             "not-a-dict",  # ignored
             {"indexing_status": "completed"},  # missing event_id -> ignored
@@ -274,6 +278,8 @@ def test_delete_current_account_skips_malformed_event_rows(
             {"event_id": valid_eid, "indexing_status": "pending"},  # deleted
         ],
     )
+    profile_dal = _ProfileDalStub(photo_path=None)
+    admin = _AdminStub()
 
     class _StubRekognitionService:
         def delete_collection(self, *, collection_id: str) -> dict:
@@ -284,10 +290,19 @@ def test_delete_current_account_skips_malformed_event_rows(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=cast(Any, admin), user_id=user_id)
+    monkeypatch.setattr(
+        account_deletion_service,
+        "get_settings",
+        lambda: MagicMock(s3_bucket_name=None),
+    )
+    monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
-    assert admin.deleted_event_ids == [valid_eid]
-    assert admin.removed_storage_keys == [f"{user_id}.jpg"]
+    asyncio.run(
+        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+    )
+
+    assert event_dal.deleted_event_ids == [valid_eid]
+    assert profile_dal.deleted_profile is True
     assert admin.deleted_auth_user_id == str(user_id)
 
 
@@ -296,8 +311,9 @@ def test_delete_current_account_handles_non_list_events_payload(
 ) -> None:
     """If events query returns non-list data, service treats it as empty safely."""
     user_id = uuid4()
-    admin = _AdminStub(events_rows=[])
-    admin.events_rows = {"unexpected": "shape"}
+    event_dal = _EventDalStub(events_rows=[])
+    profile_dal = _ProfileDalStub(photo_path=None)
+    admin = _AdminStub()
 
     class _StubRekognitionService:
         def delete_collection(self, *, collection_id: str) -> dict:
@@ -308,10 +324,24 @@ def test_delete_current_account_handles_non_list_events_payload(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=cast(Any, admin), user_id=user_id)
+    monkeypatch.setattr(
+        account_deletion_service,
+        "get_settings",
+        lambda: MagicMock(s3_bucket_name=None),
+    )
+    monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
+    monkeypatch.setattr(
+        event_dal,
+        "get_events_for_account_deletion",
+        AsyncMock(return_value={"unexpected": "shape"}),
+    )
 
-    assert admin.deleted_event_ids == []
-    assert admin.removed_storage_keys == [f"{user_id}.jpg"]
+    asyncio.run(
+        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+    )
+
+    assert event_dal.deleted_event_ids == []
+    assert profile_dal.deleted_profile is True
     assert admin.deleted_auth_user_id == str(user_id)
 
 
@@ -330,28 +360,26 @@ def test_delete_current_account_continues_when_storage_remove_fails(
         _StubRekognitionService,
     )
 
-    class _FailingStorageBucket(_StorageBucket):
-        def __init__(self, root: "_AdminStub") -> None:
-            super().__init__(root)
+    event_dal = _EventDalStub(events_rows=[])
+    profile_dal = _ProfileDalStub(photo_path="profiles/test-onboarding.jpg")
+    admin = _AdminStub()
 
-        def remove(self, keys: list[str]) -> None:
-            raise RuntimeError(f"storage unavailable for {keys}")
+    class _FailingS3Service:
+        def delete_profile_picture(self, *, s3_key: str, bucket_name: str) -> None:
+            raise RuntimeError(f"storage unavailable for {bucket_name}:{s3_key}")
 
-    class _FailingStorageApi(_StorageApi):
-        def __init__(self, root: "_AdminStub") -> None:
-            super().__init__(root)
+    monkeypatch.setattr(account_deletion_service, "S3Service", _FailingS3Service)
+    monkeypatch.setattr(
+        account_deletion_service,
+        "get_settings",
+        lambda: MagicMock(s3_bucket_name="test-bucket"),
+    )
+    monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
-        def from_(self, bucket: str) -> _FailingStorageBucket:
-            assert bucket == "profile-photos"
-            return _FailingStorageBucket(self._root)
+    asyncio.run(
+        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+    )
 
-    class _AdminWithFailingStorage(_AdminStub):
-        @property
-        def storage(self) -> _FailingStorageApi:
-            return _FailingStorageApi(self)
-
-    failing_admin = _AdminWithFailingStorage(events_rows=[])
-    delete_current_account(admin=cast(Any, failing_admin), user_id=user_id)
-
-    assert failing_admin.deleted_event_ids == []
-    assert failing_admin.deleted_auth_user_id == str(user_id)
+    assert event_dal.deleted_event_ids == []
+    assert profile_dal.deleted_profile is True
+    assert admin.deleted_auth_user_id == str(user_id)

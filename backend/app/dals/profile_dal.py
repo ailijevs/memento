@@ -48,6 +48,21 @@ class ProfileDAL(BaseDAL):
             return ProfileResponse(**response.data)
         return None
 
+    async def get_photo_path(self, user_id: UUID) -> str | None:
+        """Get the current profile photo key/path for a user."""
+        response = (
+            self.client.table(self.TABLE)
+            .select("photo_path")
+            .eq("user_id", str(user_id))
+            .maybe_single()
+            .execute()
+        )
+        if response.data and isinstance(response.data, dict):
+            photo_path = response.data.get("photo_path")
+            if isinstance(photo_path, str) and photo_path.strip():
+                return photo_path.strip()
+        return None
+
     async def create(self, user_id: UUID, data: ProfileCreate) -> ProfileResponse:
         """
         Create a new profile for a user.
