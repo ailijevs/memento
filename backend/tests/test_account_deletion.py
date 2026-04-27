@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Generator
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock
 from uuid import UUID, uuid4
 
@@ -180,7 +181,11 @@ def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
     monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
     asyncio.run(
-        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+        delete_current_account(
+            user_id=user_id,
+            profile_dal=cast(Any, profile_dal),
+            event_dal=cast(Any, event_dal),
+        )
     )
 
     assert event_dal.deleted_event_ids == [eid]
@@ -221,7 +226,11 @@ def test_delete_current_account_calls_rekognition_when_indexing_completed(
     monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
     asyncio.run(
-        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+        delete_current_account(
+            user_id=user_id,
+            profile_dal=cast(Any, profile_dal),
+            event_dal=cast(Any, event_dal),
+        )
     )
 
     assert len(rek_calls) == 1
@@ -256,7 +265,11 @@ def test_delete_current_account_continues_when_rekognition_delete_fails(
     monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
     asyncio.run(
-        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+        delete_current_account(
+            user_id=user_id,
+            profile_dal=cast(Any, profile_dal),
+            event_dal=cast(Any, event_dal),
+        )
     )
 
     assert event_dal.deleted_event_ids == [eid]
@@ -298,7 +311,11 @@ def test_delete_current_account_skips_malformed_event_rows(
     monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
     asyncio.run(
-        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+        delete_current_account(
+            user_id=user_id,
+            profile_dal=cast(Any, profile_dal),
+            event_dal=cast(Any, event_dal),
+        )
     )
 
     assert event_dal.deleted_event_ids == [valid_eid]
@@ -337,7 +354,11 @@ def test_delete_current_account_handles_non_list_events_payload(
     )
 
     asyncio.run(
-        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+        delete_current_account(
+            user_id=user_id,
+            profile_dal=cast(Any, profile_dal),
+            event_dal=cast(Any, event_dal),
+        )
     )
 
     assert event_dal.deleted_event_ids == []
@@ -377,7 +398,11 @@ def test_delete_current_account_continues_when_storage_remove_fails(
     monkeypatch.setattr(account_deletion_service, "get_admin_client", lambda: admin)
 
     asyncio.run(
-        delete_current_account(user_id=user_id, profile_dal=profile_dal, event_dal=event_dal)
+        delete_current_account(
+            user_id=user_id,
+            profile_dal=cast(Any, profile_dal),
+            event_dal=cast(Any, event_dal),
+        )
     )
 
     assert event_dal.deleted_event_ids == []
