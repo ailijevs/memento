@@ -6,6 +6,7 @@
 
 - **`docs/testing/`** – Verification Test Inventory, manual test template, manual test reports
 - **`backend/tests/`** – Automated unit/integration tests (pytest)
+- **`frontend/src/**/__tests__/`** – Automated frontend unit tests (Vitest + React Testing Library)
 - **`docs/testing/manual-reports/`** – Manual test reports with evidence
 
 ---
@@ -35,11 +36,20 @@
 | MT-06 | FR-MentraOS-End-to-End-Recognition | MentraOS end-to-end recognition | MentraOS device/webview + proxy logs | Team | No | No | [`docs/testing/manual-reports/manual-test-report-006.md`](manual-reports/manual-test-report-006.md) |
 | MT-08 | FR-4.1 | Recognition endpoint returns ProfileCard data for known face | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-008.md`](manual-reports/manual-test-report-008.md) |
 | UAT-01 | FR-2.1, FR-2.3 | End-to-end resume upload onboarding user acceptance test | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-003-uat.md`](manual-reports/manual-test-report-003-uat.md) |
+| FE-UT-01 | FR-3.2 | Frontend component tests: ConfirmationDialog, BottomTabBar, ModalBottomSheet, LoginContent, SignupContent (50 tests) | Vitest | Marty | Yes | Yes | [`frontend/src/components/__tests__/`](https://github.com/ailijevs/memento/tree/main/frontend/src/components/__tests__) |
+| FE-UT-02 | FR-3.2 | Frontend library tests: API client, consent cache, onboarding helpers, WebSocket client (54 tests) | Vitest | Marty | Yes | Yes | [`frontend/src/lib/__tests__/`](https://github.com/ailijevs/memento/tree/main/frontend/src/lib/__tests__) |
+| FE-UT-03 | FR-3.3 | Dashboard page tests: loading, event list, tab switching, sign out, empty state (10 tests) | Vitest | Marty | Yes | Yes | [`frontend/src/app/(app)/dashboard/__tests__/dashboard-page.test.tsx`](https://github.com/ailijevs/memento/blob/main/frontend/src/app/(app)/dashboard/__tests__/dashboard-page.test.tsx) |
+| FE-UT-04 | FR-3.3 | Dashboard sub-component tests: AttendeeContent, OrganizerContent, CreateEventSheet, EventDetailSheet, EventConsentsSheet (51 tests) | Vitest | Marty | Yes | Yes | [`frontend/src/app/(app)/dashboard/__tests__/`](https://github.com/ailijevs/memento/tree/main/frontend/src/app/(app)/dashboard/__tests__) |
+| FE-UT-05 | FR-4.1 | Recognition page tests: loading, card rendering, camera toggle, consent warnings, socket connection, compatibility scores (20 tests) | Vitest | Marty | Yes | Yes | [`frontend/src/app/(app)/recognition/__tests__/recognition-page.test.tsx`](https://github.com/ailijevs/memento/blob/main/frontend/src/app/(app)/recognition/__tests__/recognition-page.test.tsx) |
+| FE-UT-06 | FR-2.1 | Profile and onboarding page tests: profile rendering, sign out, edit mode, user profile viewing, onboarding LinkedIn/resume flow (31 tests) | Vitest | Marty | Yes | Yes | [`frontend/src/app/(app)/profile/__tests__/`](https://github.com/ailijevs/memento/tree/main/frontend/src/app/(app)/profile/__tests__) |
+| FE-IT-01 | FR-1.1 | SignupContent integration test: full sign-up lifecycle with mocked Supabase auth, error handling, email verification routing (9 tests) | Vitest | Marty | Yes | Yes | [`frontend/src/components/__tests__/signup-content.test.tsx`](https://github.com/ailijevs/memento/blob/main/frontend/src/components/__tests__/signup-content.test.tsx) |
 
 ### Legend
 
-- **UT** – Unit test
-- **IT** – Integration test
+- **UT** – Backend unit test
+- **FE-UT** – Frontend unit test
+- **IT** – Backend integration test
+- **FE-IT** – Frontend integration test
 - **MT** – Manual test
 - **FR** – Functional requirement (per RVTM)
 
