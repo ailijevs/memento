@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Generator
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
@@ -196,7 +197,7 @@ def test_delete_current_account_deletes_owned_events_storage_and_auth_user(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)
+    delete_current_account(admin=cast(Any, admin), user_id=user_id)
 
     assert admin.deleted_event_ids == [eid]
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -227,7 +228,7 @@ def test_delete_current_account_calls_rekognition_when_indexing_completed(
         _RecordingRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)
+    delete_current_account(admin=cast(Any, admin), user_id=user_id)
 
     assert len(rek_calls) == 1
     assert f"memento_event_{eid}" == rek_calls[0]
@@ -252,7 +253,7 @@ def test_delete_current_account_continues_when_rekognition_delete_fails(
         _FailingRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)
+    delete_current_account(admin=cast(Any, admin), user_id=user_id)
 
     assert admin.deleted_event_ids == [eid]
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -283,7 +284,7 @@ def test_delete_current_account_skips_malformed_event_rows(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)
+    delete_current_account(admin=cast(Any, admin), user_id=user_id)
 
     assert admin.deleted_event_ids == [valid_eid]
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -307,7 +308,7 @@ def test_delete_current_account_handles_non_list_events_payload(
         _StubRekognitionService,
     )
 
-    delete_current_account(admin=admin, user_id=user_id)
+    delete_current_account(admin=cast(Any, admin), user_id=user_id)
 
     assert admin.deleted_event_ids == []
     assert admin.removed_storage_keys == [f"{user_id}.jpg"]
@@ -350,7 +351,7 @@ def test_delete_current_account_continues_when_storage_remove_fails(
             return _FailingStorageApi(self)
 
     failing_admin = _AdminWithFailingStorage(events_rows=[])
-    delete_current_account(admin=failing_admin, user_id=user_id)
+    delete_current_account(admin=cast(Any, failing_admin), user_id=user_id)
 
     assert failing_admin.deleted_event_ids == []
     assert failing_admin.deleted_auth_user_id == str(user_id)
