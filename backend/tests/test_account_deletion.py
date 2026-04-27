@@ -11,7 +11,7 @@ from uuid import UUID, uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-import app.api.accounts as accounts_api
+import app.api.profiles as accounts_api
 from app.auth import CurrentUser, get_current_user
 from app.db import get_admin_client
 from app.main import app
