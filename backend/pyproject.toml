@@ -6,6 +6,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py", "*_test.py"]
 python_functions = ["test_*"]
 addopts = "-v --tb=short"
+markers = [
+    "live: opt-in tests that exercise real external infrastructure",
+]
 filterwarnings = [
     "ignore:.*:pyparsing.exceptions.PyparsingDeprecationWarning:pyiceberg\\.expressions\\.parser",
     "ignore:.*:pydantic.warnings.PydanticDeprecatedSince212:pyiceberg\\.table\\.metadata",
