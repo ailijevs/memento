@@ -3,12 +3,10 @@
 from .consents import router as consents_router
 from .events import router as events_router
 from .memberships import router as memberships_router
-from .profiles import accounts_router
 from .profiles import router as profiles_router
 from .recognition import router as recognition_router
 
 __all__ = [
-    "accounts_router",
     "consents_router",
     "events_router",
     "memberships_router",

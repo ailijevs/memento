@@ -14,7 +14,6 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
-    accounts_router,
     consents_router,
     events_router,
     memberships_router,
@@ -73,7 +72,6 @@ def create_app() -> FastAPI:
 
     # Register routers
     app.include_router(auth_router, prefix="/api/v1")
-    app.include_router(accounts_router, prefix="/api/v1")
     app.include_router(profiles_router, prefix="/api/v1")
     app.include_router(events_router, prefix="/api/v1")
     app.include_router(memberships_router, prefix="/api/v1/events")

@@ -47,7 +47,6 @@ from app.services.resume_parser import ResumeData, ResumeParser
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
-accounts_router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
 def get_profile_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> ProfileDAL:
@@ -428,20 +427,6 @@ async def onboard_from_linkedin_url(
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_my_profile(
-    current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
-) -> None:
-    """Delete the current user's profile."""
-    deleted = await dal.delete(current_user.id)
-    if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found.",
-        )
-
-
-@accounts_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_my_account(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],

@@ -37,8 +37,8 @@ def client() -> Generator[TestClient, None, None]:
 
 
 def test_delete_me_requires_auth(client: TestClient) -> None:
-    """DELETE /api/v1/accounts/me without Bearer token returns 401."""
-    response = client.delete("/api/v1/accounts/me")
+    """DELETE /api/v1/profiles/me without Bearer token returns 401."""
+    response = client.delete("/api/v1/profiles/me")
     assert response.status_code == 401
 
 
@@ -58,7 +58,7 @@ def test_delete_me_success(monkeypatch: pytest.MonkeyPatch, client: TestClient) 
     app.dependency_overrides[accounts_api.get_event_dal] = lambda: MagicMock(name="event_dal")
 
     response = client.delete(
-        "/api/v1/accounts/me",
+        "/api/v1/profiles/me",
         headers={"Authorization": "Bearer fake-access-token"},
     )
 
@@ -84,7 +84,7 @@ def test_delete_me_returns_502_when_orchestration_fails(
     app.dependency_overrides[accounts_api.get_event_dal] = lambda: MagicMock(name="event_dal")
 
     response = client.delete(
-        "/api/v1/accounts/me",
+        "/api/v1/profiles/me",
         headers={"Authorization": "Bearer fake-access-token"},
     )
 

@@ -113,7 +113,7 @@ class ApiClient {
   }
 
   async deleteMyAccount() {
-    return this.request<void>("/api/v1/accounts/me", {
+    return this.request<void>("/api/v1/profiles/me", {
       method: "DELETE",
     });
   }
