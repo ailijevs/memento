@@ -39,6 +39,10 @@
 | MT-05 | FR-WebSocket-Realtime-Recognition | WebSocket real-time recognition | Browser DevTools + WebSocket server logs | Team | No | No | [`docs/testing/manual-reports/manual-test-report-005.md`](manual-reports/manual-test-report-005.md) |
 | MT-06 | FR-MentraOS-End-to-End-Recognition | MentraOS end-to-end recognition | MentraOS device/webview + proxy logs | Team | No | No | [`docs/testing/manual-reports/manual-test-report-006.md`](manual-reports/manual-test-report-006.md) |
 | MT-08 | FR-4.1 | Recognition endpoint returns ProfileCard data for known face | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-008.md`](manual-reports/manual-test-report-008.md) |
+| MT-09 | FR-3.1, FR-3.2 | External-user manual testing of event CRUD and membership flow | Manual | Noddie | No | N/A | [`docs/testing/manual-reports/manual-test-report-009.md`](manual-reports/manual-test-report-009.md) |
+| MT-10 | FR-Privacy-Consent, FR-4.1 | External-user manual testing of consent toggle flow and privacy behavior | Manual | Noddie | No | N/A | [`docs/testing/manual-reports/manual-test-report-010.md`](manual-reports/manual-test-report-010.md) |
+| MT-11 | FR-Privacy-Consent, UX-Privacy-Clarity | External-user manual validation that privacy rules are clearly explained in the UI | Manual | Noddie | No | N/A | [`docs/testing/manual-reports/manual-test-report-011.md`](manual-reports/manual-test-report-011.md) |
+| MT-12 | FR-Recognition-Storage | Manual integration testing of profile photo upload, replacement, and retrieval flow | Manual | Noddie | No | N/A | [`docs/testing/manual-reports/manual-test-report-012.md`](manual-reports/manual-test-report-012.md) |
 | UAT-01 | FR-2.1, FR-2.3 | End-to-end resume upload onboarding user acceptance test | Manual | Marty | No | N/A | [`docs/testing/manual-reports/manual-test-report-003-uat.md`](manual-reports/manual-test-report-003-uat.md) |
 
 ### Legend
