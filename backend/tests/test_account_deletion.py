@@ -229,3 +229,123 @@ def test_delete_current_account_calls_rekognition_when_indexing_completed(
 
     assert len(rek_calls) == 1
     assert f"memento_event_{eid}" == rek_calls[0]
+
+
+def test_delete_current_account_continues_when_rekognition_delete_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Rekognition cleanup is best-effort; event/storage/auth deletion still proceed."""
+    eid = str(uuid4())
+    user_id = uuid4()
+    admin = _AdminStub(
+        events_rows=[{"event_id": eid, "indexing_status": "completed"}],
+    )
+
+    class _FailingRekognitionService:
+        def delete_collection(self, *, collection_id: str) -> dict:
+            raise RuntimeError(f"boom for {collection_id}")
+
+    monkeypatch.setattr(
+        "app.services.account_deletion.RekognitionService",
+        _FailingRekognitionService,
+    )
+
+    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+
+    assert admin.deleted_event_ids == [eid]
+    assert admin.removed_storage_keys == [f"{user_id}.jpg"]
+    assert admin.deleted_auth_user_id == str(user_id)
+
+
+def test_delete_current_account_skips_malformed_event_rows(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    Service ignores malformed rows (non-dict / missing event_id) and still completes.
+    """
+    valid_eid = str(uuid4())
+    user_id = uuid4()
+    admin = _AdminStub(
+        events_rows=[
+            "not-a-dict",  # ignored
+            {"indexing_status": "completed"},  # missing event_id -> ignored
+            {"event_id": None, "indexing_status": "completed"},  # ignored
+            {"event_id": valid_eid, "indexing_status": "pending"},  # deleted
+        ],
+    )
+
+    class _StubRekognitionService:
+        def delete_collection(self, *, collection_id: str) -> dict:
+            raise AssertionError("No completed event with a valid ID should reach Rekognition")
+
+    monkeypatch.setattr(
+        "app.services.account_deletion.RekognitionService",
+        _StubRekognitionService,
+    )
+
+    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+
+    assert admin.deleted_event_ids == [valid_eid]
+    assert admin.removed_storage_keys == [f"{user_id}.jpg"]
+    assert admin.deleted_auth_user_id == str(user_id)
+
+
+def test_delete_current_account_handles_non_list_events_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """If events query returns non-list data, service treats it as empty safely."""
+    user_id = uuid4()
+    admin = _AdminStub(events_rows=[])
+    admin.events_rows = {"unexpected": "shape"}  # type: ignore[assignment]
+
+    class _StubRekognitionService:
+        def delete_collection(self, *, collection_id: str) -> dict:
+            raise AssertionError("Rekognition should not run when no valid event rows exist")
+
+    monkeypatch.setattr(
+        "app.services.account_deletion.RekognitionService",
+        _StubRekognitionService,
+    )
+
+    delete_current_account(admin=admin, user_id=user_id)  # type: ignore[arg-type]
+
+    assert admin.deleted_event_ids == []
+    assert admin.removed_storage_keys == [f"{user_id}.jpg"]
+    assert admin.deleted_auth_user_id == str(user_id)
+
+
+def test_delete_current_account_continues_when_storage_remove_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Storage photo delete failure is best-effort and should not block auth deletion."""
+    user_id = uuid4()
+    admin = _AdminStub(events_rows=[])
+
+    class _StubRekognitionService:
+        def delete_collection(self, *, collection_id: str) -> dict:
+            raise AssertionError("No events should trigger Rekognition in this test")
+
+    monkeypatch.setattr(
+        "app.services.account_deletion.RekognitionService",
+        _StubRekognitionService,
+    )
+
+    class _FailingStorageBucket:
+        def remove(self, keys: list[str]) -> None:
+            raise RuntimeError(f"storage unavailable for {keys}")
+
+    class _FailingStorageApi:
+        def from_(self, bucket: str) -> _FailingStorageBucket:
+            assert bucket == "profile-photos"
+            return _FailingStorageBucket()
+
+    class _AdminWithFailingStorage(_AdminStub):
+        @property
+        def storage(self) -> _FailingStorageApi:
+            return _FailingStorageApi()
+
+    failing_admin = _AdminWithFailingStorage(events_rows=[])
+    delete_current_account(admin=failing_admin, user_id=user_id)  # type: ignore[arg-type]
+
+    assert failing_admin.deleted_event_ids == []
+    assert failing_admin.deleted_auth_user_id == str(user_id)
