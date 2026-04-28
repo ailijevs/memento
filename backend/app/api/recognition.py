@@ -157,7 +157,6 @@ def _attach_presigned_profile_photo_urls(
                 bucket_name=settings.s3_bucket_name,
                 expires_in_seconds=expires_in_seconds,
             )
-            print(f"presigned_url: {presigned_url}")
             cards_with_urls.append(card.model_copy(update={"photo_path": presigned_url}))
         except Exception as exc:
             logger.warning(
