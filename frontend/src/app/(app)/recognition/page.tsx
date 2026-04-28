@@ -294,8 +294,8 @@ export default function RecognitionPage() {
       setResults((prev) =>
         prev.map((r) => (r.matched_user_id === userId ? { ...r, compatibility: compat } : r))
       );
-    } catch {
-      // Not fatal — compatibility is a nice-to-have
+    } catch (err) {
+      console.warn("[Compatibility] Failed for", userId, err);
     }
   }
 

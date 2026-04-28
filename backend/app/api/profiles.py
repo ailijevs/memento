@@ -14,7 +14,7 @@ from pydantic import BaseModel
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
 from app.dals import ConsentDAL, EventDAL, MembershipDAL, ProfileDAL
-from app.db import get_supabase_client
+from app.db import get_admin_client, get_supabase_client
 from app.schemas import (
     LinkedInEnrichmentRequest,
     LinkedInEnrichmentResponse,
@@ -52,6 +52,11 @@ def get_profile_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     """Dependency to get ProfileDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ProfileDAL(client)
+
+
+def get_admin_profile_dal() -> ProfileDAL:
+    """ProfileDAL using the service-role client (bypasses RLS). For compatibility endpoint."""
+    return ProfileDAL(get_admin_client())
 
 
 def get_event_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> EventDAL:
@@ -471,11 +476,15 @@ class CompatibilityResponse(BaseModel):
 async def get_compatibility(
     user_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    admin_dal: Annotated[ProfileDAL, Depends(get_admin_profile_dal)],
 ) -> CompatibilityResponse:
     """
     Compute a compatibility score between the current user and another user,
     and generate conversation starters based on shared background.
+
+    Uses the admin client so the recognition device account (which may not have
+    its own profile row) can still fetch both profiles. Recognition already
+    verified that the target consented to be visible.
     """
     if user_id == current_user.id:
         raise HTTPException(
@@ -483,14 +492,19 @@ async def get_compatibility(
             detail="Cannot compute compatibility with yourself.",
         )
 
-    viewer_profile = await dal.get_by_user_id(current_user.id)
+    viewer_profile = await admin_dal.get_by_user_id(current_user.id)
+    # Viewer may be a device/kiosk account with no profile; use an empty shell so
+    # DSPy can still generate starters based on the target's profile alone.
     if not viewer_profile:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Your profile was not found. Please create one first.",
+        _now = datetime.now(timezone.utc)
+        viewer_profile = ProfileResponse.model_construct(
+            user_id=current_user.id,
+            full_name="",
+            created_at=_now,
+            updated_at=_now,
         )
 
-    target_profile = await dal.get_by_user_id(user_id)
+    target_profile = await admin_dal.get_by_user_id(user_id)
     if not target_profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

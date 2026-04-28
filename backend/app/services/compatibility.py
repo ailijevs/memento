@@ -35,7 +35,7 @@ class CompatibilityService:
             and viewer.location.strip().lower() == target.location.strip().lower()
         )
 
-        score = min(
+        rule_score = min(
             100.0,
             len(shared_companies) * 30.0
             + len(shared_schools) * 25.0
@@ -43,9 +43,12 @@ class CompatibilityService:
             + (10.0 if same_location else 0.0),
         )
 
-        starters = self._generate_starters(
+        dspy_score, starters = self._generate_starters(
             viewer, target, shared_companies, shared_schools, shared_fields
         )
+
+        # Prefer the DSPy score (richer semantic judgment); fall back to rule-based.
+        score = dspy_score if dspy_score is not None else rule_score
 
         return CompatibilityResult(
             score=round(score, 1),
@@ -62,7 +65,8 @@ class CompatibilityService:
         shared_companies: list[str],
         shared_schools: list[str],
         shared_fields: list[str],
-    ) -> list[str]:
+    ) -> tuple[float | None, list[str]]:
+        """Return (dspy_score_or_None, starters)."""
         settings = get_settings()
         if settings.openai_api_key:
             try:
@@ -78,7 +82,7 @@ class CompatibilityService:
             except Exception as exc:
                 logger.warning("DSPy conversation starter generation failed: %s", exc)
 
-        return _template_starters(target, shared_companies, shared_schools, shared_fields)
+        return None, _template_starters(target, shared_companies, shared_schools, shared_fields)
 
 
 # ---------------------------------------------------------------------------
@@ -139,20 +143,38 @@ def _build_context(
     shared_schools: list[str],
     shared_fields: list[str],
 ) -> str:
-    parts = [
-        f"You are {viewer.full_name}.",
-        f"You just met {target.full_name} ({target.headline or ''}, {target.company or ''}).",
-    ]
-    if shared_companies:
-        parts.append(f"Shared employers: {', '.join(shared_companies)}.")
-    if shared_schools:
-        parts.append(f"Shared schools: {', '.join(shared_schools)}.")
-    if shared_fields:
-        parts.append(f"Shared fields of study: {', '.join(shared_fields)}.")
+    viewer_name = viewer.full_name or "an attendee"
+    parts = [f"You are {viewer_name}."]
+
+    target_desc = target.full_name or "someone"
+    if target.headline or target.company:
+        target_desc += f" ({', '.join(x for x in [target.headline, target.company] if x)})"
+    parts.append(f"You just met {target_desc} at a networking event.")
+
     if target.bio:
-        parts.append(f"Their bio: {target.bio[:300]}")
+        parts.append(f"Their bio: {target.bio[:400]}")
+    if target.major:
+        parts.append(f"Their field: {target.major}.")
     if target.location:
         parts.append(f"Based in: {target.location}.")
+    if target.education:
+        schools = [str(e.get("school") or "") for e in (target.education or []) if e.get("school")]
+        if schools:
+            parts.append(f"Studied at: {', '.join(schools[:2])}.")
+    if target.experiences:
+        recent = [str(e.get("company") or "") for e in (target.experiences or []) if e.get("company")]
+        if recent:
+            parts.append(f"Has worked at: {', '.join(recent[:3])}.")
+    if target.profile_one_liner:
+        parts.append(f"In their own words: {target.profile_one_liner}")
+
+    if shared_companies:
+        parts.append(f"You've both worked at: {', '.join(shared_companies)}.")
+    if shared_schools:
+        parts.append(f"You both attended: {', '.join(shared_schools)}.")
+    if shared_fields:
+        parts.append(f"You share fields of study: {', '.join(shared_fields)}.")
+
     return " ".join(p for p in parts if p.strip())
 
 
@@ -164,15 +186,24 @@ def _generate_with_dspy(
     shared_companies: list[str],
     shared_schools: list[str],
     shared_fields: list[str],
-) -> list[str]:
+) -> tuple[float | None, list[str]]:
+    """Return (score_or_None, starters). Score is None if DSPy couldn't parse it."""
     predictor = _get_dspy_predictor(model, api_key)
     context = _build_context(viewer, target, shared_companies, shared_schools, shared_fields)
     prediction = predictor(context=context)
+
+    raw_score = str(getattr(prediction, "compatibility_score", "")).strip()
+    dspy_score: float | None = None
+    try:
+        dspy_score = max(0.0, min(100.0, float(raw_score)))
+    except (ValueError, TypeError):
+        pass
+
     starters = [str(getattr(prediction, f"starter_{i}", "")).strip() for i in range(1, 4)]
     starters = [s for s in starters if s]
     if not starters:
         raise ValueError("DSPy returned empty starter fields.")
-    return starters
+    return dspy_score, starters
 
 
 @lru_cache(maxsize=4)
@@ -185,25 +216,28 @@ def _get_dspy_predictor(model: str, api_key: str):  # pragma: no cover - runtime
     except ImportError as exc:
         raise RuntimeError("DSPy is not installed. Install dspy-ai to enable AI starters.") from exc
 
-    class ConversationStarterSignature(dspy.Signature):
-        """Generate natural ice-breaker conversation starters for a networking event."""
+    class CompatibilitySignature(dspy.Signature):
+        """Score compatibility and generate ice-breaker starters for a networking event."""
 
         context = dspy.InputField(
-            desc="Profile context: who you are, who you met, and any shared background."
+            desc="Profile context: who you are, who you just met, and any shared background."
+        )
+        compatibility_score = dspy.OutputField(
+            desc="Integer from 0 to 100 representing how valuable this connection would be professionally."
         )
         starter_1 = dspy.OutputField(
-            desc="First conversation starter, one sentence, first-person, natural."
+            desc="First conversation starter — one sentence, first-person, specific to this person."
         )
         starter_2 = dspy.OutputField(
-            desc="Second conversation starter, one sentence, first-person, natural."
+            desc="Second conversation starter — one sentence, first-person, specific to this person."
         )
         starter_3 = dspy.OutputField(
-            desc="Third conversation starter, one sentence, first-person, natural."
+            desc="Third conversation starter — one sentence, first-person, specific to this person."
         )
 
     lm = dspy.LM(model=model, api_key=api_key)
     dspy.configure(lm=lm)
-    return dspy.Predict(ConversationStarterSignature)
+    return dspy.Predict(CompatibilitySignature)
 
 
 def _template_starters(
