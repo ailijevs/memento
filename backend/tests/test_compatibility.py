@@ -136,36 +136,48 @@ class TestSharedHelpers:
 
 
 class TestCompatibilityServiceScore:
+    """Score tests patch get_settings so DSPy is disabled and rule-based scoring is exercised."""
+
     def _service(self):
         return CompatibilityService()
 
-    def test_no_overlap_yields_zero(self):
+    @patch("app.services.compatibility.get_settings")
+    def test_no_overlap_yields_zero(self, mock_settings):
+        mock_settings.return_value = MagicMock(openai_api_key=None)
         viewer = _make_profile(full_name="Alice")
         target = _make_profile(full_name="Bob", company="Beta")
         result = self._service().compute(viewer, target)
         assert result.score == 0.0
 
-    def test_shared_company_adds_thirty_points(self):
+    @patch("app.services.compatibility.get_settings")
+    def test_shared_company_adds_thirty_points(self, mock_settings):
+        mock_settings.return_value = MagicMock(openai_api_key=None)
         viewer = _make_profile(full_name="Alice", company="Acme")
         target = _make_profile(full_name="Bob", company="Acme")
         result = self._service().compute(viewer, target)
         assert result.score == 30.0
         assert "Acme" in result.shared_companies
 
-    def test_shared_school_adds_twenty_five_points(self):
+    @patch("app.services.compatibility.get_settings")
+    def test_shared_school_adds_twenty_five_points(self, mock_settings):
+        mock_settings.return_value = MagicMock(openai_api_key=None)
         viewer = _make_profile(full_name="Alice", education=[{"school": "MIT"}])
         target = _make_profile(full_name="Bob", education=[{"school": "MIT"}])
         result = self._service().compute(viewer, target)
         assert result.score == 25.0
 
-    def test_same_location_adds_ten_points(self):
+    @patch("app.services.compatibility.get_settings")
+    def test_same_location_adds_ten_points(self, mock_settings):
+        mock_settings.return_value = MagicMock(openai_api_key=None)
         viewer = _make_profile(full_name="Alice", location="Boston, MA")
         target = _make_profile(full_name="Bob", location="Boston, MA")
         result = self._service().compute(viewer, target)
         assert result.score == 10.0
 
-    def test_score_capped_at_100(self):
-        """Multiple overlapping signals don't push score past 100."""
+    @patch("app.services.compatibility.get_settings")
+    def test_score_capped_at_100(self, mock_settings):
+        """Multiple overlapping signals don't push rule-based score past 100."""
+        mock_settings.return_value = MagicMock(openai_api_key=None)
         viewer = _make_profile(
             full_name="Alice",
             company="Acme",

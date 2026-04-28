@@ -7,14 +7,14 @@ into CompatibilityService, mocking only ProfileDAL so no real DB is needed.
 import os
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 os.environ["DEBUG"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.api.profiles import get_profile_dal  # noqa: E402
+from app.api.profiles import get_admin_profile_dal, get_profile_dal  # noqa: E402
 from app.auth import CurrentUser, get_current_user  # noqa: E402
 from app.main import app  # noqa: E402
 from app.schemas import ProfileResponse  # noqa: E402
@@ -51,10 +51,10 @@ def _mock_user(user_id):
     return CurrentUser(id=user_id, email="sasha@test.com", access_token="fake-token")
 
 
-def _client_with_mocks(current_user_id, profile_dal_mock):
-    app.dependency_overrides[get_current_user] = lambda: _mock_user(current_user_id)
-    app.dependency_overrides[get_profile_dal] = lambda: profile_dal_mock
-    return TestClient(app)
+def _override_dals(dal):
+    """Override both DALs with the same mock (admin for viewer, user-scoped for target)."""
+    app.dependency_overrides[get_admin_profile_dal] = lambda: dal
+    app.dependency_overrides[get_profile_dal] = lambda: dal
 
 
 def test_compatibility_endpoint_self_returns_400():
@@ -63,7 +63,7 @@ def test_compatibility_endpoint_self_returns_400():
     dal = SimpleNamespace(get_by_user_id=AsyncMock())
 
     app.dependency_overrides[get_current_user] = lambda: _mock_user(user_id)
-    app.dependency_overrides[get_profile_dal] = lambda: dal
+    _override_dals(dal)
 
     try:
         with TestClient(app) as client:
@@ -75,26 +75,33 @@ def test_compatibility_endpoint_self_returns_400():
         app.dependency_overrides.clear()
 
 
-def test_compatibility_endpoint_missing_viewer_profile_returns_404():
-    """Returns 404 when the authenticated user has no profile yet."""
+def test_compatibility_endpoint_missing_viewer_profile_still_returns_result():
+    """No-profile viewer (device/kiosk account) gets a 200 with the target's starters."""
     viewer_id = uuid4()
     target_id = uuid4()
-    dal = SimpleNamespace(get_by_user_id=AsyncMock(return_value=None))
+    target_profile = _profile(user_id=target_id, full_name="Bob", headline="ML Engineer")
+
+    async def fake_get(uid):
+        return None if uid == viewer_id else target_profile
+
+    dal = SimpleNamespace(get_by_user_id=fake_get)
 
     app.dependency_overrides[get_current_user] = lambda: _mock_user(viewer_id)
-    app.dependency_overrides[get_profile_dal] = lambda: dal
+    _override_dals(dal)
 
     try:
         with TestClient(app) as client:
             response = client.get(f"/api/v1/profiles/{target_id}/compatibility")
-        assert response.status_code == 404
-        assert "your profile" in response.json()["detail"].lower()
+        assert response.status_code == 200
+        body = response.json()
+        assert isinstance(body["score"], (int, float))
+        assert len(body["conversation_starters"]) >= 1
     finally:
         app.dependency_overrides.clear()
 
 
 def test_compatibility_endpoint_missing_target_profile_returns_404():
-    """Returns 404 when the target user profile is not found or not visible."""
+    """Returns 404 when the target user profile is not found or not visible (RLS)."""
     viewer_id = uuid4()
     target_id = uuid4()
     viewer_profile = _profile(user_id=viewer_id, full_name="Sasha")
@@ -109,7 +116,7 @@ def test_compatibility_endpoint_missing_target_profile_returns_404():
     dal = SimpleNamespace(get_by_user_id=fake_get)
 
     app.dependency_overrides[get_current_user] = lambda: _mock_user(viewer_id)
-    app.dependency_overrides[get_profile_dal] = lambda: dal
+    _override_dals(dal)
 
     try:
         with TestClient(app) as client:
@@ -120,8 +127,10 @@ def test_compatibility_endpoint_missing_target_profile_returns_404():
         app.dependency_overrides.clear()
 
 
-def test_compatibility_endpoint_returns_score_and_fields():
-    """Shared company produces a non-zero score with conversation starters."""
+@patch("app.services.compatibility.get_settings")
+def test_compatibility_endpoint_returns_score_and_fields(mock_settings):
+    """Shared company produces a non-zero rule-based score with conversation starters."""
+    mock_settings.return_value = MagicMock(openai_api_key=None)
     viewer_id = uuid4()
     target_id = uuid4()
     viewer_profile = _profile(user_id=viewer_id, full_name="Sasha", company="Memento")
@@ -135,7 +144,7 @@ def test_compatibility_endpoint_returns_score_and_fields():
     dal = SimpleNamespace(get_by_user_id=fake_get)
 
     app.dependency_overrides[get_current_user] = lambda: _mock_user(viewer_id)
-    app.dependency_overrides[get_profile_dal] = lambda: dal
+    _override_dals(dal)
 
     try:
         with TestClient(app) as client:
@@ -151,8 +160,10 @@ def test_compatibility_endpoint_returns_score_and_fields():
         app.dependency_overrides.clear()
 
 
-def test_compatibility_endpoint_no_overlap_returns_zero_score():
-    """Users with no shared background yield a score of 0."""
+@patch("app.services.compatibility.get_settings")
+def test_compatibility_endpoint_no_overlap_returns_zero_score(mock_settings):
+    """Users with no shared background yield a rule-based score of 0."""
+    mock_settings.return_value = MagicMock(openai_api_key=None)
     viewer_id = uuid4()
     target_id = uuid4()
     viewer_profile = _profile(user_id=viewer_id, full_name="Sasha", company="Memento")
@@ -164,7 +175,7 @@ def test_compatibility_endpoint_no_overlap_returns_zero_score():
     dal = SimpleNamespace(get_by_user_id=fake_get)
 
     app.dependency_overrides[get_current_user] = lambda: _mock_user(viewer_id)
-    app.dependency_overrides[get_profile_dal] = lambda: dal
+    _override_dals(dal)
 
     try:
         with TestClient(app) as client:
@@ -179,8 +190,10 @@ def test_compatibility_endpoint_no_overlap_returns_zero_score():
         app.dependency_overrides.clear()
 
 
-def test_compatibility_endpoint_shared_school_adds_twenty_five_points():
-    """Shared school correctly contributes 25 points to the score."""
+@patch("app.services.compatibility.get_settings")
+def test_compatibility_endpoint_shared_school_adds_twenty_five_points(mock_settings):
+    """Shared school correctly contributes 25 rule-based points to the score."""
+    mock_settings.return_value = MagicMock(openai_api_key=None)
     viewer_id = uuid4()
     target_id = uuid4()
     viewer_profile = _profile(
@@ -200,7 +213,7 @@ def test_compatibility_endpoint_shared_school_adds_twenty_five_points():
     dal = SimpleNamespace(get_by_user_id=fake_get)
 
     app.dependency_overrides[get_current_user] = lambda: _mock_user(viewer_id)
-    app.dependency_overrides[get_profile_dal] = lambda: dal
+    _override_dals(dal)
 
     try:
         with TestClient(app) as client:
