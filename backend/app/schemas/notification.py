@@ -4,7 +4,7 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class NotificationType(str, Enum):
@@ -62,3 +62,27 @@ class NotificationPreferenceUpdate(BaseModel):
     email_notifications: bool | None = None
     event_updates: bool | None = None
     host_messages: bool | None = None
+
+
+class HostMessageRequest(BaseModel):
+    """Schema for a host-sent message to event members."""
+
+    subject: str = Field(..., min_length=1, max_length=160)
+    message: str = Field(..., min_length=1, max_length=5000)
+
+    @field_validator("subject", "message")
+    @classmethod
+    def not_blank(cls, value: str) -> str:
+        """Reject values that are only whitespace."""
+        if not value.strip():
+            raise ValueError("must not be blank")
+        return value
+
+
+class HostMessageResponse(BaseModel):
+    """Response for queued host-message delivery."""
+
+    event_id: UUID
+    recipient_count: int
+    subject: str
+    queued: bool = True

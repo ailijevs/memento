@@ -186,3 +186,130 @@ def test_delete_event_prefetches_recipients_and_dispatches_background_notificati
         actor_user_id=user_id,
         recipients=recipients,
     )
+
+
+def test_message_event_members_dispatches_host_message_in_background(
+    client: TestClient,
+    monkeypatch,
+):
+    """POST should queue and run organizer messages via background task."""
+    event_id = uuid4()
+    user_id = uuid4()
+    recipient_id = uuid4()
+    starts_at = datetime.now(timezone.utc) + timedelta(days=1)
+    ends_at = starts_at + timedelta(hours=2)
+    event = _event_response(
+        event_id=event_id,
+        created_by=user_id,
+        location="Room 101",
+        starts_at=starts_at,
+        ends_at=ends_at,
+    )
+    recipients = [NotificationRecipient(user_id=recipient_id, email="member@example.com")]
+
+    event_dal = SimpleNamespace(
+        get_by_id=AsyncMock(return_value=event),
+    )
+    notification_service = SimpleNamespace(
+        prepare_host_message_recipients=AsyncMock(return_value=recipients),
+        notify_host_message=AsyncMock(),
+    )
+
+    monkeypatch.setattr(events_api, "NotificationService", lambda: notification_service)
+    app.dependency_overrides[get_current_user] = lambda: CurrentUser(
+        id=user_id,
+        email="host@example.com",
+        access_token="test-token",
+    )
+    app.dependency_overrides[get_events_event_dal] = lambda: event_dal
+
+    response = client.post(
+        f"/api/v1/events/{event_id}/message-members",
+        json={
+            "subject": "Schedule update",
+            "message": "Please use the south entrance.",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json() == {
+        "event_id": str(event_id),
+        "recipient_count": 1,
+        "subject": "Schedule update",
+        "queued": True,
+    }
+    notification_service.prepare_host_message_recipients.assert_awaited_once_with(
+        event_id=event_id,
+        actor_user_id=user_id,
+    )
+    notification_service.notify_host_message.assert_awaited_once_with(
+        event=event,
+        actor_user_id=user_id,
+        subject="Schedule update",
+        message="Please use the south entrance.",
+        recipients=recipients,
+    )
+
+
+def test_message_event_members_rejects_non_hosts(client: TestClient):
+    """Only the event creator should be allowed to message members."""
+    event_id = uuid4()
+    host_id = uuid4()
+    requester_id = uuid4()
+    starts_at = datetime.now(timezone.utc) + timedelta(days=1)
+    ends_at = starts_at + timedelta(hours=2)
+    event = _event_response(
+        event_id=event_id,
+        created_by=host_id,
+        location="Room 101",
+        starts_at=starts_at,
+        ends_at=ends_at,
+    )
+
+    event_dal = SimpleNamespace(
+        get_by_id=AsyncMock(return_value=event),
+    )
+    app.dependency_overrides[get_current_user] = lambda: _mock_user(requester_id)
+    app.dependency_overrides[get_events_event_dal] = lambda: event_dal
+
+    response = client.post(
+        f"/api/v1/events/{event_id}/message-members",
+        json={
+            "subject": "Schedule update",
+            "message": "Please use the south entrance.",
+        },
+    )
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Only event hosts can message members."
+
+
+def test_message_event_members_rejects_blank_subject_and_message(client: TestClient):
+    """Whitespace-only host messages should fail request validation."""
+    event_id = uuid4()
+    host_id = uuid4()
+    starts_at = datetime.now(timezone.utc) + timedelta(days=1)
+    ends_at = starts_at + timedelta(hours=2)
+    event = _event_response(
+        event_id=event_id,
+        created_by=host_id,
+        location="Room 101",
+        starts_at=starts_at,
+        ends_at=ends_at,
+    )
+
+    event_dal = SimpleNamespace(
+        get_by_id=AsyncMock(return_value=event),
+    )
+    app.dependency_overrides[get_current_user] = lambda: _mock_user(host_id)
+    app.dependency_overrides[get_events_event_dal] = lambda: event_dal
+
+    response = client.post(
+        f"/api/v1/events/{event_id}/message-members",
+        json={
+            "subject": "   ",
+            "message": "   ",
+        },
+    )
+
+    assert response.status_code == 422

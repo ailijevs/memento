@@ -73,13 +73,34 @@ class NotificationDAL(BaseDAL):
 
         If a user has no preference row, default to opted-in behavior.
         """
+        return await self._get_opt_in_user_ids(user_ids, preference_field="event_updates")
+
+    async def get_host_message_opt_in_user_ids(self, user_ids: list[UUID]) -> set[UUID]:
+        """
+        Return users who should receive host-message emails.
+
+        Users must have:
+        - email_notifications = true
+        - host_messages = true
+
+        If a user has no preference row, default to opted-in behavior.
+        """
+        return await self._get_opt_in_user_ids(user_ids, preference_field="host_messages")
+
+    async def _get_opt_in_user_ids(
+        self,
+        user_ids: list[UUID],
+        *,
+        preference_field: str,
+    ) -> set[UUID]:
+        """Return opted-in users for the requested notification preference."""
         if not user_ids:
             return set()
 
         user_id_strings = [str(user_id) for user_id in user_ids]
         response = (
             self.client.table(self.PREF_TABLE)
-            .select("user_id,email_notifications,event_updates")
+            .select(f"user_id,email_notifications,{preference_field}")
             .in_("user_id", user_id_strings)
             .execute()
         )
@@ -90,7 +111,7 @@ class NotificationDAL(BaseDAL):
             for row in rows
             if row.get("user_id")
             and bool(row.get("email_notifications", False))
-            and bool(row.get("event_updates", False))
+            and bool(row.get(preference_field, False))
         }
         with_row = {UUID(row["user_id"]) for row in rows if row.get("user_id")}
         missing_row_defaults = {user_id for user_id in user_ids if user_id not in with_row}
