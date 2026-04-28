@@ -658,14 +658,16 @@ async def get_compatibility(
     user_id: UUID,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     admin_dal: Annotated[ProfileDAL, Depends(get_admin_profile_dal)],
+    user_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
 ) -> CompatibilityResponse:
     """
     Compute a compatibility score between the current user and another user,
     and generate conversation starters based on shared background.
 
-    Uses the admin client so the recognition device account (which may not have
-    its own profile row) can still fetch both profiles. Recognition already
-    verified that the target consented to be visible.
+    Viewer profile uses the admin client so device/kiosk accounts (which may
+    have no profile row) get an empty shell instead of a 404.
+    Target profile uses the user-scoped client so RLS still enforces visibility
+    (shared event membership + consent).
     """
     if user_id == current_user.id:
         raise HTTPException(
@@ -685,7 +687,8 @@ async def get_compatibility(
             updated_at=_now,
         )
 
-    target_profile = await admin_dal.get_by_user_id(user_id)
+    # RLS-scoped fetch: target must be visible to the current user.
+    target_profile = await user_dal.get_by_user_id(user_id)
     if not target_profile:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
