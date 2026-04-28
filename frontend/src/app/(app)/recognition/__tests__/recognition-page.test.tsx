@@ -160,7 +160,32 @@ describe("RecognitionPage", () => {
     });
   });
 
-  it("displays confidence score on recognition card", async () => {
+  it("displays compatibility score on recognition card", async () => {
+    sessionStorage.setItem(
+      "recognition_results_cache",
+      JSON.stringify([MOCK_RECOGNITION_RESULT]),
+    );
+    mockSessionWith();
+    mockGetMyEventConsent.mockResolvedValue({
+      allow_profile_display: true,
+      allow_recognition: true,
+    });
+    mockGetCompatibility.mockResolvedValue({
+      score: 42,
+      shared_companies: [],
+      shared_schools: [],
+      shared_fields: [],
+      conversation_starters: [],
+    });
+
+    render(<RecognitionPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("42% match")).toBeInTheDocument();
+    });
+  });
+
+  it("shows zero compatibility score when compat returns 0", async () => {
     sessionStorage.setItem(
       "recognition_results_cache",
       JSON.stringify([MOCK_RECOGNITION_RESULT]),
@@ -181,7 +206,7 @@ describe("RecognitionPage", () => {
     render(<RecognitionPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("93% face")).toBeInTheDocument();
+      expect(screen.getByText("0% match")).toBeInTheDocument();
     });
   });
 
