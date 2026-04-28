@@ -236,7 +236,7 @@ describe("RecognitionPage", () => {
 
     await userEvent.click(screen.getByText("Sarah Chen"));
 
-    expect(mockPush).toHaveBeenCalledWith("/profile/user-abc");
+    expect(mockPush).toHaveBeenCalledWith("/profile/user-abc?accuracy=93");
   });
 
   it("caches profile to sessionStorage when clicking a card", async () => {
