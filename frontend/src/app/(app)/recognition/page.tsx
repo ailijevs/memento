@@ -563,6 +563,7 @@ function RecognitionCard({
   const name = profile?.full_name ?? "Unknown person";
   const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
   const photoUrl = resolvePhotoUrl(profile?.photo_path ?? null);
+  const confidencePct = result.confidence != null ? Math.round(result.confidence) : null;
 
   const sharedThings = [
   ...(compat?.shared_companies ?? []),
