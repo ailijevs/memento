@@ -23,6 +23,7 @@ export default function UserProfilePage() {
   const eventId = searchParams.get("event_id")?.trim() || null;
   const source = searchParams.get("source")?.trim() || null;
   const cameFromFavorites = source === "favorites";
+  const accuracy = searchParams.get("accuracy");
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgFailed, setImgFailed] = useState(false);
@@ -203,9 +204,28 @@ export default function UserProfilePage() {
             <p className="mt-1 text-center text-[15px] text-white/50">{profile.headline}</p>
           )}
 
+          {accuracy && (
+            <div className="mt-2 flex items-center gap-1.5">
+              <span
+                className="rounded-full px-3 py-1 text-[12px] font-medium"
+                style={{
+                  background: "oklch(0.35 0.12 275 / 40%)",
+                  border: "1px solid oklch(0.5 0.15 275 / 25%)",
+                  color: "oklch(0.8 0.1 275)",
+                }}
+              >
+                Accuracy: {accuracy}%
+              </span>
+            </div>
+          )}
+
           {profile.linkedin_url && (
             <a
-              href={profile.linkedin_url}
+              href={
+                profile.linkedin_url.startsWith("http")
+                  ? profile.linkedin_url
+                  : `https://${profile.linkedin_url}`
+              }
               target="_blank"
               rel="noopener noreferrer"
               className="mt-3 flex items-center gap-1.5 text-[12px] text-white/30 active:text-white/60"

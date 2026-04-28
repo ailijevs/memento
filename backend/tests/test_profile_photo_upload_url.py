@@ -510,3 +510,52 @@ def test_get_my_profile_photo_url_404_when_profile_missing(client: TestClient, m
 
     assert response.status_code == 404
     assert response.json()["detail"] == "Profile not found. Please create one first."
+
+
+def test_get_profile_by_id_presigns_photo_path(client: TestClient, monkeypatch):
+    """GET /profiles/{user_id} returns a renderable profile photo URL."""
+    user = _mock_user()
+    profile = _profile_response(user_id=uuid4(), photo_path="profiles/other-user-onboarding")
+
+    class FakeS3Service:
+        def get_profile_picture_presigned_url(self, *, s3_key, bucket_name, expires_in_seconds):
+            assert s3_key == "profiles/other-user-onboarding"
+            assert bucket_name == "profile-bucket"
+            assert expires_in_seconds == 600
+            return "https://example.com/presigned-get"
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_profile_dal] = lambda: SimpleNamespace(
+        get_by_user_id=AsyncMock(return_value=profile)
+    )
+    monkeypatch.setattr(
+        profiles_api,
+        "get_settings",
+        lambda: SimpleNamespace(s3_bucket_name="profile-bucket"),
+    )
+    monkeypatch.setattr(profiles_api, "S3Service", FakeS3Service)
+
+    response = client.get(f"/api/v1/profiles/{profile.user_id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["photo_path"] == "https://example.com/presigned-get"
+
+
+def test_get_profile_by_id_preserves_existing_absolute_photo_url(client: TestClient, monkeypatch):
+    """GET /profiles/{user_id} leaves already-renderable photo URLs unchanged."""
+    user = _mock_user()
+    profile = _profile_response(
+        user_id=uuid4(), photo_path="https://example.com/already-renderable.jpg"
+    )
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    app.dependency_overrides[get_profile_dal] = lambda: SimpleNamespace(
+        get_by_user_id=AsyncMock(return_value=profile)
+    )
+
+    response = client.get(f"/api/v1/profiles/{profile.user_id}")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["photo_path"] == "https://example.com/already-renderable.jpg"

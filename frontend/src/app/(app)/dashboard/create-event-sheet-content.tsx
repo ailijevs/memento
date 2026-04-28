@@ -82,6 +82,8 @@ function EventFormSheetContent({
   const [startTime, setStartTime] = useState("");
   const [endDate, setEndDate] = useState("");
   const [endTime, setEndTime] = useState("");
+  const [endDateWasManuallyEdited, setEndDateWasManuallyEdited] = useState(false);
+  const [endTimeWasManuallyEdited, setEndTimeWasManuallyEdited] = useState(false);
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [maxParticipants, setMaxParticipants] = useState("");
@@ -101,7 +103,26 @@ function EventFormSheetContent({
     setStartTime(toTimeInputValue(initialValues.starts_at));
     setEndDate(toDateInputValue(initialValues.ends_at));
     setEndTime(toTimeInputValue(initialValues.ends_at));
+    setEndDateWasManuallyEdited(false);
+    setEndTimeWasManuallyEdited(false);
   }, [initialValues]);
+
+  useEffect(() => {
+    if (mode !== "create" || !startDate || endDateWasManuallyEdited) {
+      return;
+    }
+    setEndDate(startDate);
+  }, [endDateWasManuallyEdited, mode, startDate]);
+
+  useEffect(() => {
+    if (mode !== "create" || !startTime || endTimeWasManuallyEdited) {
+      return;
+    }
+    const nextHour = addOneHour(startTime);
+    if (nextHour) {
+      setEndTime(nextHour);
+    }
+  }, [endTimeWasManuallyEdited, mode, startTime]);
 
   const hasRequiredFields = useMemo(() => {
     return !(
@@ -175,6 +196,8 @@ function EventFormSheetContent({
         setStartTime("");
         setEndDate("");
         setEndTime("");
+        setEndDateWasManuallyEdited(false);
+        setEndTimeWasManuallyEdited(false);
         setLocation("");
         setDescription("");
         setMaxParticipants("");
@@ -296,7 +319,12 @@ function EventFormSheetContent({
                 id={`${mode}-event-end-date`}
                 type="date"
                 value={endDate}
-                onChange={setEndDate}
+                onChange={(value) => {
+                  setEndDate(value);
+                  if (mode === "create") {
+                    setEndDateWasManuallyEdited(true);
+                  }
+                }}
                 placeholder="Select date"
                 displayValue={formatDateForDisplay(endDate)}
               />
@@ -309,7 +337,12 @@ function EventFormSheetContent({
                 id={`${mode}-event-end-time`}
                 type="time"
                 value={endTime}
-                onChange={setEndTime}
+                onChange={(value) => {
+                  setEndTime(value);
+                  if (mode === "create") {
+                    setEndTimeWasManuallyEdited(true);
+                  }
+                }}
                 placeholder="Select time"
                 displayValue={formatTimeForDisplay(endTime)}
               />
@@ -450,4 +483,15 @@ function toTimeInputValue(value?: string | null): string {
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
   return `${hours}:${minutes}`;
+}
+
+function addOneHour(value: string): string | null {
+  const [hours, minutes] = value.split(":").map(Number);
+  if (Number.isNaN(hours) || Number.isNaN(minutes)) {
+    return null;
+  }
+  const date = new Date();
+  date.setHours(hours, minutes, 0, 0);
+  date.setHours(date.getHours() + 1);
+  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }

@@ -72,6 +72,8 @@ export default function RecognitionPage() {
     return process.env.NEXT_PUBLIC_RECOGNITION_EVENT_ID?.trim() ?? null;
   }, [searchParams]);
   const [results, setResults] = useState<RecognitionResult[]>(loadCachedResults);
+  const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState<"recent" | "compatible">("recent");
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
@@ -137,6 +139,13 @@ export default function RecognitionPage() {
       }
       socket.connect(session.access_token);
       setLoading(false);
+
+      // Fetch compat for any results already in the cache
+      for (const result of loadCachedResults()) {
+        if (result.matched_user_id && !result.compatibility) {
+          void attachCompatibility(result.matched_user_id);
+        }
+      }
     }
 
     void init();
@@ -414,6 +423,41 @@ export default function RecognitionPage() {
     }
   }
 
+  const filteredAndSortedResults = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    const filtered = query
+      ? results.filter((result) => {
+          const profile = result.profile;
+          const haystack = [
+            profile?.full_name ?? "",
+            profile?.headline ?? "",
+            profile?.company ?? "",
+            profile?.major ?? "",
+            profile?.location ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(query);
+        })
+      : [...results];
+
+    if (sortMode === "compatible") {
+      filtered.sort((a, b) => {
+        const aScore = a.compatibility?.score ?? -1;
+        const bScore = b.compatibility?.score ?? -1;
+        if (aScore !== bScore) return bScore - aScore;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      return filtered;
+    }
+
+    filtered.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    return filtered;
+  }, [results, searchText, sortMode]);
+
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Hidden camera elements for phone camera mode */}
@@ -535,7 +579,29 @@ export default function RecognitionPage() {
           <EmptyState />
         ) : (
           <div className="space-y-3">
-            {results.map((result, i) => (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Search recognized profiles..."
+                className="h-9 w-full rounded-full border border-white/10 bg-white/[0.04] px-3 text-[13px] text-white placeholder:text-white/30 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setSortMode((prev) => (prev === "recent" ? "compatible" : "recent"))}
+                className="h-9 shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-white/70 transition-colors hover:text-white"
+                title="Toggle sort mode"
+              >
+                {sortMode === "recent" ? "Recent" : "Compatible"}
+              </button>
+            </div>
+
+            {filteredAndSortedResults.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-[13px] text-white/40">
+                No recognized profiles match your search.
+              </div>
+            ) : filteredAndSortedResults.map((result, i) => (
               <RecognitionCard
                 key={result.id}
                 result={result}
@@ -546,10 +612,15 @@ export default function RecognitionPage() {
                   if (r.profile) {
                     sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(r.profile));
                   }
-                  const profilePath = selectedEventId
-                    ? `/profile/${userId}?event_id=${encodeURIComponent(selectedEventId)}`
-                    : `/profile/${userId}`;
-                  router.push(profilePath);
+                  const params = new URLSearchParams();
+                  if (selectedEventId) {
+                    params.set("event_id", selectedEventId);
+                  }
+                  if (r.confidence != null) {
+                    params.set("accuracy", String(Math.round(r.confidence)));
+                  }
+                  const qs = params.toString();
+                  router.push(`/profile/${userId}${qs ? `?${qs}` : ""}`);
                 }}
                 liked={Boolean(result.matched_user_id && likedUserIds.has(result.matched_user_id))}
                 likePending={Boolean(
@@ -626,15 +697,17 @@ function RecognitionCard({
   const compat = result.compatibility;
   const name = profile?.full_name ?? "Unknown person";
   const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
-  const confidencePct = result.confidence != null ? Math.round(result.confidence) : null;
   const photoUrl = resolvePhotoUrl(profile?.photo_path ?? null);
+  const confidencePct = result.confidence != null ? Math.round(result.confidence) : null;
 
   const sharedThings = [
   ...(compat?.shared_companies ?? []),
   ...(compat?.shared_schools ?? []),
   ...(compat?.shared_fields ?? []),
 ];
-const firstStarter = compat?.conversation_starters?.[0];
+const firstStarter =
+    compat?.conversation_starters?.[0] ??
+    (profile ? `Hi ${profile.full_name ?? name}, great to meet you — what brings you to this event?` : undefined);
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr);
@@ -685,19 +758,7 @@ const firstStarter = compat?.conversation_starters?.[0];
               <div className="flex items-center gap-2">
                 <p className="truncate text-[15px] font-semibold text-white">{name}</p>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {confidencePct != null && (
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        background: "oklch(0.35 0.12 275 / 40%)",
-                        border: "1px solid oklch(0.5 0.15 275 / 25%)",
-                        color: "oklch(0.8 0.1 275)",
-                      }}
-                    >
-                      {confidencePct}%
-                    </span>
-                  )}
-                  {compat && compat.score > 0 && (
+                  {compat ? (
                     <span
                       className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                       style={{
@@ -707,6 +768,17 @@ const firstStarter = compat?.conversation_starters?.[0];
                       }}
                     >
                       {Math.round(compat.score)}% match
+                    </span>
+                  ) : (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        background: "oklch(0.30 0.12 145 / 40%)",
+                        border: "1px solid oklch(0.5 0.15 145 / 30%)",
+                        color: "oklch(0.78 0.14 145 / 40%)",
+                      }}
+                    >
+                      …% match
                     </span>
                   )}
                 </div>
