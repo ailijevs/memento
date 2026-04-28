@@ -448,6 +448,27 @@ async def onboard_from_linkedin_url(
         raise HTTPException(status_code=exc.status_code, detail=exc.message)
 
     enrichment = LinkedInEnrichmentResponse(**enrichment_result)
+    logger.info(
+        "LinkedIn enrichment source=%s, experiences=%d, education=%d",
+        enrichment_result.get("source", "unknown"),
+        len(enrichment.experiences),
+        len(enrichment.education),
+    )
+    if enrichment.experiences:
+        for i, exp in enumerate(enrichment.experiences):
+            logger.info(
+                "  enrichment experience[%d]: title=%s company=%s", i, exp.title, exp.company
+            )
+    else:
+        logger.warning("  LinkedIn enrichment returned ZERO experiences")
+    if enrichment.education:
+        for i, edu in enumerate(enrichment.education):
+            logger.info(
+                "  enrichment education[%d]: school=%s degree=%s", i, edu.school, edu.degree
+            )
+    else:
+        logger.warning("  LinkedIn enrichment returned ZERO education entries")
+
     if not enrichment.full_name:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -480,12 +501,21 @@ async def onboard_from_linkedin_url(
 
     existing = await dal.get_by_user_id(current_user.id)
     if existing:
-        merged_experiences = _merge_experiences(
-            existing.experiences or [], [item.model_dump() for item in enrichment.experiences]
+        existing_exp = existing.experiences or []
+        incoming_exp = [item.model_dump() for item in enrichment.experiences]
+        logger.info(
+            "Merge: existing experiences=%d, incoming=%d", len(existing_exp), len(incoming_exp)
         )
-        merged_education = _merge_education(
-            existing.education or [], [item.model_dump() for item in enrichment.education]
+        merged_experiences = _merge_experiences(existing_exp, incoming_exp)
+        logger.info("Merge result: %d experiences after merge", len(merged_experiences))
+
+        existing_edu = existing.education or []
+        incoming_edu = [item.model_dump() for item in enrichment.education]
+        logger.info(
+            "Merge: existing education=%d, incoming=%d", len(existing_edu), len(incoming_edu)
         )
+        merged_education = _merge_education(existing_edu, incoming_edu)
+        logger.info("Merge result: %d education after merge", len(merged_education))
 
         saved_profile = await dal.update(
             current_user.id,
