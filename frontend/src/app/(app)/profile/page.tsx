@@ -106,12 +106,12 @@ export default function ProfilePage() {
       }
       api.setToken(session.access_token);
       try {
-        const [p, prefs] = await Promise.all([
+        const [p, prefs] = await Promise.allSettled([
           api.getProfile(),
           api.getMyNotificationPreferences(),
         ]);
-        setProfile(p);
-        setNotificationPrefs(prefs);
+        if (p.status === "fulfilled") setProfile(p.value);
+        if (prefs.status === "fulfilled") setNotificationPrefs(prefs.value);
       } finally {
         setPrefsLoading(false);
         setLoading(false);
