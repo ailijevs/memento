@@ -494,15 +494,14 @@ async def onboard_from_linkedin_url(
                 headline=enrichment.headline or existing.headline,
                 bio=enrichment.bio or existing.bio,
                 location=enrichment.location or existing.location,
-                company=(
-                    first_experience.company if first_experience else None
-                ) or existing.company,
-                major=(
-                    first_education.field_of_study if first_education else None
-                ) or existing.major,
+                company=(first_experience.company if first_experience else None)
+                or existing.company,
+                major=(first_education.field_of_study if first_education else None)
+                or existing.major,
                 graduation_year=_parse_graduation_year(
                     first_education.end_date if first_education else None
-                ) or existing.graduation_year,
+                )
+                or existing.graduation_year,
                 linkedin_url=enrichment.linkedin_url,
                 photo_path=photo_path or existing.photo_path,
                 experiences=merged_experiences,
@@ -956,9 +955,7 @@ def _normalize_key(value: str | None) -> str:
     return (value or "").strip().lower()
 
 
-def _merge_experiences(
-    existing: list[dict], incoming: list[dict]
-) -> list[dict]:
+def _merge_experiences(existing: list[dict], incoming: list[dict]) -> list[dict]:
     """Merge LinkedIn experiences into existing list, deduplicating by company+title."""
     seen: set[tuple[str, str]] = set()
     merged: list[dict] = []
@@ -986,9 +983,7 @@ def _merge_experiences(
     return merged
 
 
-def _merge_education(
-    existing: list[dict], incoming: list[dict]
-) -> list[dict]:
+def _merge_education(existing: list[dict], incoming: list[dict]) -> list[dict]:
     """Merge LinkedIn education into existing list, deduplicating by school+degree."""
     seen: set[tuple[str, str]] = set()
     merged: list[dict] = []
