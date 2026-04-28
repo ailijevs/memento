@@ -66,8 +66,10 @@ class ProfileSummaryService:
         context = _build_profile_context(profile)
 
         try:
-            predictor = _get_dspy_predictor(model, api_key)
-            prediction = predictor(profile_context=context)
+            import dspy
+            lm, predictor = _get_dspy_predictor(model, api_key)
+            with dspy.context(lm=lm):
+                prediction = predictor(profile_context=context)
         except Exception as exc:  # pragma: no cover - network/runtime dependent
             raise ProfileSummaryError(f"DSPy generation failed: {exc}") from exc
 
@@ -194,5 +196,4 @@ def _get_dspy_predictor(model: str, api_key: str):  # pragma: no cover - runtime
         )
 
     lm = dspy.LM(model=model, api_key=api_key)
-    dspy.configure(lm=lm)
-    return dspy.Predict(ProfileSummarySignature)
+    return lm, dspy.Predict(ProfileSummarySignature)
