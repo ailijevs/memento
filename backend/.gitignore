@@ -158,7 +158,7 @@ ENV/
 env.bak/
 venv.bak/
 venv
-.temp
+supabase/.temp/
 
 # Spyder project settings
 .spyderproject
