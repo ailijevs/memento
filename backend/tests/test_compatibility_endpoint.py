@@ -14,7 +14,7 @@ os.environ["DEBUG"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app.api.profiles import get_admin_profile_dal, get_profile_dal  # noqa: E402
+from app.api.profiles import get_admin_profile_dal  # noqa: E402
 from app.auth import CurrentUser, get_current_user  # noqa: E402
 from app.main import app  # noqa: E402
 from app.schemas import ProfileResponse  # noqa: E402
@@ -52,9 +52,8 @@ def _mock_user(user_id):
 
 
 def _override_dals(dal):
-    """Override both DALs with the same mock (admin for viewer, user-scoped for target)."""
+    """Override the admin DAL used for both viewer and target profile fetches."""
     app.dependency_overrides[get_admin_profile_dal] = lambda: dal
-    app.dependency_overrides[get_profile_dal] = lambda: dal
 
 
 def test_compatibility_endpoint_self_returns_400():
