@@ -86,7 +86,7 @@ async def get_my_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found. Please create one first.",
         )
-    return _presign_photo_if_needed(profile)
+    return profile
 
 
 @router.get("/me/completion", response_model=ProfileCompletionResponse)
@@ -454,7 +454,7 @@ async def get_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found or not visible.",
         )
-    return _presign_photo_if_needed(profile)
+    return profile
 
 
 class CompatibilityResponse(BaseModel):
@@ -773,28 +773,6 @@ def _parse_graduation_year(end_date: str | None) -> int | None:
         if 1900 <= year <= 2100:
             return year
     return None
-
-
-def _presign_photo_if_needed(profile: ProfileResponse) -> ProfileResponse:
-    """Replace an S3 key in photo_path with a presigned URL when S3 is configured."""
-    settings = get_settings()
-    if not settings.s3_bucket_name:
-        return profile
-    if not profile.photo_path:
-        return profile
-    if profile.photo_path.startswith("http://") or profile.photo_path.startswith("https://"):
-        return profile
-    try:
-        s3_service = S3Service()
-        presigned_url = s3_service.get_profile_picture_presigned_url(
-            s3_key=profile.photo_path,
-            bucket_name=settings.s3_bucket_name,
-            expires_in_seconds=3600,
-        )
-        return profile.model_copy(update={"photo_path": presigned_url})
-    except Exception as exc:
-        logger.warning("Failed to presign photo for user %s: %s", profile.user_id, exc)
-        return profile
 
 
 async def _refresh_generated_profile_summary(

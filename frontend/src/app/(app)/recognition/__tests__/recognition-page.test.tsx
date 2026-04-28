@@ -181,7 +181,7 @@ describe("RecognitionPage", () => {
     render(<RecognitionPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("93%")).toBeInTheDocument();
+      expect(screen.getByText("93% face")).toBeInTheDocument();
     });
   });
 
