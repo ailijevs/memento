@@ -362,76 +362,6 @@ export default function ProfilePage() {
           </button>
         </div>
 
-        <div
-          className="mt-10 rounded-2xl p-4"
-          style={{
-            background: "rgba(255, 60, 60, 0.08)",
-            border: "2px solid rgba(255, 100, 100, 0.45)",
-            boxShadow: "0 0 24px rgba(255, 60, 60, 0.12)",
-          }}
-        >
-          <div className="mb-3 flex items-center gap-2">
-            <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" aria-hidden />
-            <span className="text-[13px] font-semibold uppercase tracking-[0.12em] text-red-200/90">
-              Danger zone
-            </span>
-          </div>
-          <p className="mb-4 text-[13px] leading-relaxed text-red-100/75">
-            Permanently delete your Memento account and all associated data. This action cannot be
-            undone.
-          </p>
-          <button
-            type="button"
-            onClick={() => {
-              setDeleteError(null);
-              setDeleteSubmitting(false);
-              setDeletePhase("first");
-            }}
-            className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
-            style={{
-              background: "linear-gradient(180deg, oklch(0.52 0.22 25) 0%, oklch(0.4 0.2 22) 100%)",
-              border: "1px solid oklch(0.65 0.2 25 / 55%)",
-              boxShadow: "0 4px 20px rgba(220, 38, 38, 0.35)",
-            }}
-          >
-            <Trash2 className="h-5 w-5" aria-hidden />
-            Delete my account
-          </button>
-        </div>
-
-        <ConfirmationDialog
-          open={deletePhase === "first"}
-          title="Delete your account?"
-          message={firstDeleteMessage}
-          cancelLabel="Cancel"
-          confirmLabel="Continue"
-          onCancel={closeDeleteDialog}
-          onConfirm={() => {
-            setDeleteError(null);
-            setDeletePhase("second");
-          }}
-        />
-
-        <ConfirmationDialog
-          open={deletePhase === "second"}
-          title="Are you sure?"
-          message={
-            deleteError
-              ? `${finalDeleteMessage}\n\n${deleteError}`
-              : finalDeleteMessage
-          }
-          cancelLabel="Cancel"
-          confirmLabel={deleteSubmitting ? "Deleting…" : "Yes, delete my account"}
-          confirmDisabled={deleteSubmitting}
-          onCancel={closeDeleteDialog}
-          onConfirm={() => void confirmDeleteAccount()}
-          confirmIcon={
-            deleteSubmitting ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-            ) : undefined
-          }
-        />
-
         {activeTab === "profile" ? (
           <div className="space-y-3">
             {/* About */}
@@ -665,6 +595,78 @@ export default function ProfilePage() {
             Sign Out
           </button>
         ) : null}
+
+        {activeTab === "settings" && (
+          <div
+            className="mt-10 rounded-2xl p-4"
+            style={{
+              background: "rgba(255, 60, 60, 0.08)",
+              border: "2px solid rgba(255, 100, 100, 0.45)",
+              boxShadow: "0 0 24px rgba(255, 60, 60, 0.12)",
+            }}
+          >
+            <div className="mb-3 flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 shrink-0 text-red-400" aria-hidden />
+              <span className="text-[13px] font-semibold uppercase tracking-[0.12em] text-red-200/90">
+                Danger zone
+              </span>
+            </div>
+            <p className="mb-4 text-[13px] leading-relaxed text-red-100/75">
+              Permanently delete your Memento account and all associated data. This action cannot be
+              undone.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteSubmitting(false);
+                setDeletePhase("first");
+              }}
+              className="flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-[14px] font-semibold text-white transition-transform active:scale-[0.99]"
+              style={{
+                background: "linear-gradient(180deg, oklch(0.52 0.22 25) 0%, oklch(0.4 0.2 22) 100%)",
+                border: "1px solid oklch(0.65 0.2 25 / 55%)",
+                boxShadow: "0 4px 20px rgba(220, 38, 38, 0.35)",
+              }}
+            >
+              <Trash2 className="h-5 w-5" aria-hidden />
+              Delete my account
+            </button>
+          </div>
+        )}
+
+        <ConfirmationDialog
+          open={deletePhase === "first"}
+          title="Delete your account?"
+          message={firstDeleteMessage}
+          cancelLabel="Cancel"
+          confirmLabel="Continue"
+          onCancel={closeDeleteDialog}
+          onConfirm={() => {
+            setDeleteError(null);
+            setDeletePhase("second");
+          }}
+        />
+
+        <ConfirmationDialog
+          open={deletePhase === "second"}
+          title="Are you sure?"
+          message={
+            deleteError
+              ? `${finalDeleteMessage}\n\n${deleteError}`
+              : finalDeleteMessage
+          }
+          cancelLabel="Cancel"
+          confirmLabel={deleteSubmitting ? "Deleting…" : "Yes, delete my account"}
+          confirmDisabled={deleteSubmitting}
+          onCancel={closeDeleteDialog}
+          onConfirm={() => void confirmDeleteAccount()}
+          confirmIcon={
+            deleteSubmitting ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
+            ) : undefined
+          }
+        />
       </div>
     </div>
   );
