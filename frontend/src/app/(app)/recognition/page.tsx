@@ -546,7 +546,7 @@ const firstStarter = compat?.conversation_starters?.[0];
                         color: "oklch(0.8 0.1 275)",
                       }}
                     >
-                      {confidencePct}%
+                      {confidencePct}% face
                     </span>
                   )}
                   {compat && compat.score > 0 && (
