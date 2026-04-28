@@ -45,6 +45,22 @@ class ApiClient {
     return this.request<ProfileResponse>("/api/v1/profiles/me");
   }
 
+  async getMyNotificationPreferences() {
+    return this.request<NotificationPreferenceResponse>(
+      "/api/v1/profiles/me/notification-preferences"
+    );
+  }
+
+  async updateMyNotificationPreferences(data: NotificationPreferenceUpdateRequest) {
+    return this.request<NotificationPreferenceResponse>(
+      "/api/v1/profiles/me/notification-preferences",
+      {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
   async getProfileCompletion() {
     return this.request<ProfileCompletionResponse>(
       "/api/v1/profiles/me/completion"
@@ -150,6 +166,23 @@ class ApiClient {
 
   async getEventDirectory(eventId: string) {
     return this.request<ProfileDirectoryResponse>(`/api/v1/profiles/directory/${eventId}`);
+  }
+
+  async getMyProfileLikes() {
+    return this.request<ProfileLikeResponse[]>("/api/v1/profiles/me/likes");
+  }
+
+  async likeProfile(userId: string, eventId: string) {
+    return this.request<ProfileLikeResponse>(`/api/v1/profiles/${userId}/like`, {
+      method: "POST",
+      body: JSON.stringify({ event_id: eventId }),
+    });
+  }
+
+  async unlikeProfile(userId: string) {
+    return this.request<void>(`/api/v1/profiles/${userId}/like`, {
+      method: "DELETE",
+    });
   }
 
   async onboardFromLinkedIn(linkedinUrl: string) {
@@ -295,6 +328,12 @@ export interface ConsentUpdateRequest {
   allow_recognition?: boolean;
 }
 
+export interface NotificationPreferenceUpdateRequest {
+  email_notifications?: boolean;
+  event_updates?: boolean;
+  host_messages?: boolean;
+}
+
 export type ProfilePhotoUploadSource = "onboarding" | "linkedin";
 
 export interface ProfilePhotoUploadUrlRequest {
@@ -420,6 +459,15 @@ export interface ProfileDirectoryResponse {
   hidden_count: number;
 }
 
+export interface ProfileLikeResponse {
+  user_id: string;
+  liked_profile_id: string;
+  event_id: string | null;
+  event_name: string | null;
+  liked_profile: ProfileResponse | null;
+  created_at: string;
+}
+
 export interface ConsentResponse {
   event_id: string;
   user_id: string;
@@ -427,6 +475,15 @@ export interface ConsentResponse {
   allow_recognition: boolean;
   consented_at: string | null;
   revoked_at: string | null;
+  updated_at: string;
+}
+
+export interface NotificationPreferenceResponse {
+  user_id: string;
+  email_notifications: boolean;
+  event_updates: boolean;
+  host_messages: boolean;
+  created_at: string;
   updated_at: string;
 }
 
