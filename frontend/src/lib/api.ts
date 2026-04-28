@@ -162,6 +162,38 @@ class ApiClient {
     );
   }
 
+  // ── Analytics ───────────────────────────────────────────────────────────
+
+  async getOrganizerOverview() {
+    return this.request<OrganizerOverview>("/api/v1/analytics/overview/organizer");
+  }
+
+  async getAttendeeOverview() {
+    return this.request<AttendeeOverview>("/api/v1/analytics/overview/attendee");
+  }
+
+  async getEventAnalyticsOrganizer(eventId: string) {
+    return this.request<EventAnalytics>(`/api/v1/analytics/events/${eventId}/organizer`);
+  }
+
+  async getEventAnalyticsAttendee(eventId: string) {
+    return this.request<AttendeeEventAnalytics>(`/api/v1/analytics/events/${eventId}/attendee`);
+  }
+
+  async getLiveEventStatus(eventId: string) {
+    return this.request<LiveEventStatus>(`/api/v1/analytics/events/${eventId}/live`);
+  }
+
+  async compareEvents(eventA: string, eventB: string) {
+    return this.request<EventComparison>(
+      `/api/v1/analytics/compare?event_a=${eventA}&event_b=${eventB}`
+    );
+  }
+
+  async getPostEventReport(eventId: string) {
+    return this.request<PostEventReport>(`/api/v1/analytics/events/${eventId}/report`);
+  }
+
   async uploadResume(file: File) {
     if (!this.accessToken) throw new ApiError(401, "Not authenticated");
 
@@ -396,4 +428,110 @@ export interface ConsentResponse {
   consented_at: string | null;
   revoked_at: string | null;
   updated_at: string;
+}
+
+// ─── Analytics types ─────────────────────────────────────────────────────────
+
+export interface TimeSeriesBucket {
+  timestamp: string;
+  count: number;
+}
+
+export interface ConsentBreakdown {
+  recognition_opted_in: number;
+  recognition_opted_out: number;
+  display_opted_in: number;
+  display_opted_out: number;
+}
+
+export interface TopRecognizedUser {
+  user_id: string;
+  full_name: string | null;
+  photo_path: string | null;
+  times_recognized: number;
+}
+
+export interface EventQuickStats {
+  event_id: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  is_active: boolean;
+  member_count: number;
+  recognition_count: number;
+  consent_rate: number;
+}
+
+export interface OrganizerOverview {
+  total_events: number;
+  total_attendees: number;
+  total_recognitions: number;
+  avg_consent_rate: number;
+  events: EventQuickStats[];
+}
+
+export interface AttendeeOverview {
+  total_events: number;
+  total_people_met: number;
+  total_recognitions: number;
+  events: EventQuickStats[];
+}
+
+export interface EventAnalytics {
+  event_id: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  is_active: boolean;
+  indexing_status: string;
+  total_members: number;
+  total_recognitions: number;
+  unique_recognized: number;
+  peak_hour: string | null;
+  consent_breakdown: ConsentBreakdown;
+  recognition_timeline: TimeSeriesBucket[];
+  join_timeline: TimeSeriesBucket[];
+  top_recognized: TopRecognizedUser[];
+}
+
+export interface AttendeeEventAnalytics {
+  event_id: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  total_members: number;
+  your_recognitions: number;
+  unique_people_you_met: number;
+  your_recognition_timeline: TimeSeriesBucket[];
+  people_you_met: TopRecognizedUser[];
+}
+
+export interface LiveEventStatus {
+  event_id: string;
+  name: string;
+  current_members: number;
+  recognitions_last_5min: number;
+  total_recognitions: number;
+  active_observers: number;
+  recent_matches: TopRecognizedUser[];
+}
+
+export interface EventComparison {
+  event_a: EventQuickStats;
+  event_b: EventQuickStats;
+}
+
+export interface PostEventReport {
+  event_id: string;
+  event_name: string;
+  event_date: string | null;
+  total_attendees: number;
+  people_you_met: number;
+  times_you_were_recognized: number;
+  connections: TopRecognizedUser[];
+  networking_score: number;
+  networking_summary: string | null;
 }

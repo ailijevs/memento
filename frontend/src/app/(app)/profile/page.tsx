@@ -22,6 +22,7 @@ import {
   Link2,
   Trash2,
 } from "lucide-react";
+import { signOutUser } from "@/lib/signout";
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -41,8 +42,7 @@ export default function ProfilePage() {
   const { photoUrl, handleImageError } = useProfilePhotoUrl(profile?.photo_path ?? null);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutUser();
     router.push("/");
     router.refresh();
   }
