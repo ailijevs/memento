@@ -126,6 +126,8 @@ def get_authed_supabase_client(
 ) -> Client:
     """Dependency to get a Supabase client bound to the caller's JWT (RLS-bound)."""
     return get_supabase_client(current_user.access_token)
+
+
 def get_notification_dal(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
 ) -> NotificationDAL:
