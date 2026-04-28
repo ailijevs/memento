@@ -165,18 +165,18 @@ function StatCard({
 }: {
   label: string;
   value: string | number;
-  icon: React.ElementType;
+  icon?: React.ElementType;
 }) {
   return (
     <div
-      className="rounded-2xl p-4"
+      className="flex flex-col items-center rounded-2xl p-4 text-center"
       style={{
         background: "oklch(1 0 0 / 4%)",
         border: "1px solid oklch(1 0 0 / 8%)",
       }}
     >
-      <div className="flex items-center gap-2 text-white/40">
-        <Icon className="h-3.5 w-3.5" />
+      <div className="flex items-center justify-center gap-1.5 text-white/40">
+        {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
         <span className="text-[10px] font-medium uppercase tracking-[0.1em]">{label}</span>
       </div>
       <p className="mt-2 text-[28px] font-light tracking-tight text-white/90">{value}</p>
@@ -249,7 +249,7 @@ function AttendeeView({
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-3">
         <StatCard label="Events" value={data.total_events} icon={CalendarDays} />
-        <StatCard label="People Met" value={data.total_people_met} icon={Handshake} />
+        <StatCard label="People Met" value={data.total_people_met} />
         <StatCard label="Recognitions" value={data.total_recognitions} icon={Eye} />
       </div>
 
