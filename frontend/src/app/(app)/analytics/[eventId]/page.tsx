@@ -232,7 +232,7 @@ function SmallStat({
 }) {
   return (
     <div
-      className="rounded-2xl p-3"
+      className="flex flex-col items-center rounded-2xl p-3 text-center"
       style={{
         background: "oklch(1 0 0 / 4%)",
         border: "1px solid oklch(1 0 0 / 8%)",
