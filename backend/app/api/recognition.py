@@ -4,12 +4,14 @@ import logging
 import math
 import time
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.auth.dependencies import CurrentUser, get_current_user
 from app.auth.service_auth import verify_recognition_api_key
 from app.config import get_settings
+from app.dals.analytics_dal import AnalyticsDAL
 from app.dals.event_dal import EventDAL
 from app.db.supabase import get_admin_client
 from app.schemas import (
@@ -114,6 +116,19 @@ async def detect_faces_in_frame(
 
         processing_time = (time.perf_counter() - start_time) * 1000
 
+        # Log successful matches for analytics (best-effort, deduplicated)
+        try:
+            analytics_dal = AnalyticsDAL(admin_client)
+            for card in profile_cards:
+                await analytics_dal.log_recognition_match(
+                    event_id=request.event_id,
+                    recognized_user_id=UUID(card.user_id),
+                    observer_user_id=current_user.id,
+                    confidence=card.face_similarity,
+                )
+        except Exception as analytics_err:
+            logger.warning("Failed to log analytics: %s", analytics_err)
+
         return FrameDetectionResponse(
             matches=profile_cards,
             processing_time_ms=round(processing_time, 2),
@@ -173,6 +188,7 @@ def _attach_presigned_profile_photo_urls(
 def _resolve_presigned_url_ttl_seconds(event_end_time: datetime | None) -> int:
     """Return URL TTL in seconds based on event time, defaulting to 10 minutes."""
     fallback_seconds = 600
+    max_presigned_url_ttl_seconds = 604799
     if event_end_time is None:
         return fallback_seconds
 
@@ -185,4 +201,4 @@ def _resolve_presigned_url_ttl_seconds(event_end_time: datetime | None) -> int:
     if remaining_seconds <= 0:
         return fallback_seconds
 
-    return remaining_seconds
+    return min(remaining_seconds, max_presigned_url_ttl_seconds)

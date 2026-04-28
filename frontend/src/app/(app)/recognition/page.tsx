@@ -5,13 +5,15 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   api,
+  isApiErrorWithStatus,
   type ConsentResponse,
   type ProfileResponse,
   type CompatibilityResponse,
 } from "@/lib/api";
 import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import { Aurora } from "@/components/aurora";
-import { Camera, LogOut, ScanFace, Square } from "lucide-react";
+import { signOutUser } from "@/lib/signout";
+import { Camera, Heart, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -70,11 +72,15 @@ export default function RecognitionPage() {
     return process.env.NEXT_PUBLIC_RECOGNITION_EVENT_ID?.trim() ?? null;
   }, [searchParams]);
   const [results, setResults] = useState<RecognitionResult[]>(loadCachedResults);
+  const [searchText, setSearchText] = useState("");
+  const [sortMode, setSortMode] = useState<"recent" | "compatible">("recent");
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
   const [cameraMode, setCameraMode] = useState(false);
   const [consentWarning, setConsentWarning] = useState<string | null>(null);
+  const [likedUserIds, setLikedUserIds] = useState<Set<string>>(new Set());
+  const [likePendingUserIds, setLikePendingUserIds] = useState<Set<string>>(new Set());
   const socketRef = useRef<SocketClient | null>(null);
   const mountIdRef = useRef(`dashboard-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -125,8 +131,21 @@ export default function RecognitionPage() {
 
       accessTokenRef.current = session.access_token;
       api.setToken(session.access_token);
+      try {
+        const likes = await api.getMyProfileLikes();
+        setLikedUserIds(new Set(likes.map((like) => like.liked_profile_id)));
+      } catch (error) {
+        console.error("[Recognition] Failed to load likes:", error);
+      }
       socket.connect(session.access_token);
       setLoading(false);
+
+      // Fetch compat for any results already in the cache
+      for (const result of loadCachedResults()) {
+        if (result.matched_user_id && !result.compatibility) {
+          void attachCompatibility(result.matched_user_id);
+        }
+      }
     }
 
     void init();
@@ -356,11 +375,88 @@ export default function RecognitionPage() {
   }
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutUser();
     router.push("/");
     router.refresh();
   }
+
+  async function toggleLike(userId: string) {
+    if (likePendingUserIds.has(userId)) return;
+    const currentlyLiked = likedUserIds.has(userId);
+    if (!currentlyLiked && !selectedEventId) return;
+
+    setLikePendingUserIds((prev) => {
+      const next = new Set(prev);
+      next.add(userId);
+      return next;
+    });
+
+    setLikedUserIds((prev) => {
+      const next = new Set(prev);
+      if (currentlyLiked) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+
+    try {
+      if (currentlyLiked) {
+        await api.unlikeProfile(userId);
+      } else {
+        await api.likeProfile(userId, selectedEventId!);
+      }
+    } catch (error) {
+      // 409 means the like already exists; keep liked state.
+      if (!(isApiErrorWithStatus(error, 409) && !currentlyLiked)) {
+        setLikedUserIds((prev) => {
+          const next = new Set(prev);
+          if (currentlyLiked) next.add(userId);
+          else next.delete(userId);
+          return next;
+        });
+      }
+    } finally {
+      setLikePendingUserIds((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    }
+  }
+
+  const filteredAndSortedResults = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    const filtered = query
+      ? results.filter((result) => {
+          const profile = result.profile;
+          const haystack = [
+            profile?.full_name ?? "",
+            profile?.headline ?? "",
+            profile?.company ?? "",
+            profile?.major ?? "",
+            profile?.location ?? "",
+          ]
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(query);
+        })
+      : [...results];
+
+    if (sortMode === "compatible") {
+      filtered.sort((a, b) => {
+        const aScore = a.compatibility?.score ?? -1;
+        const bScore = b.compatibility?.score ?? -1;
+        if (aScore !== bScore) return bScore - aScore;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      return filtered;
+    }
+
+    filtered.sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+    );
+    return filtered;
+  }, [results, searchText, sortMode]);
 
   return (
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
@@ -483,7 +579,29 @@ export default function RecognitionPage() {
           <EmptyState />
         ) : (
           <div className="space-y-3">
-            {results.map((result, i) => (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={searchText}
+                onChange={(event) => setSearchText(event.target.value)}
+                placeholder="Search recognized profiles..."
+                className="h-9 w-full rounded-full border border-white/10 bg-white/[0.04] px-3 text-[13px] text-white placeholder:text-white/30 outline-none"
+              />
+              <button
+                type="button"
+                onClick={() => setSortMode((prev) => (prev === "recent" ? "compatible" : "recent"))}
+                className="h-9 shrink-0 rounded-full border border-white/10 bg-white/[0.04] px-3 text-[11px] font-medium uppercase tracking-[0.08em] text-white/70 transition-colors hover:text-white"
+                title="Toggle sort mode"
+              >
+                {sortMode === "recent" ? "Recent" : "Compatible"}
+              </button>
+            </div>
+
+            {filteredAndSortedResults.length === 0 ? (
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] px-4 py-6 text-center text-[13px] text-white/40">
+                No recognized profiles match your search.
+              </div>
+            ) : filteredAndSortedResults.map((result, i) => (
               <RecognitionCard
                 key={result.id}
                 result={result}
@@ -494,7 +612,23 @@ export default function RecognitionPage() {
                   if (r.profile) {
                     sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(r.profile));
                   }
-                  router.push(`/profile/${userId}`);
+                  const params = new URLSearchParams();
+                  if (selectedEventId) {
+                    params.set("event_id", selectedEventId);
+                  }
+                  if (r.confidence != null) {
+                    params.set("accuracy", String(Math.round(r.confidence)));
+                  }
+                  const qs = params.toString();
+                  router.push(`/profile/${userId}${qs ? `?${qs}` : ""}`);
+                }}
+                liked={Boolean(result.matched_user_id && likedUserIds.has(result.matched_user_id))}
+                likePending={Boolean(
+                  result.matched_user_id && likePendingUserIds.has(result.matched_user_id),
+                )}
+                canLike={Boolean(result.matched_user_id && selectedEventId)}
+                onToggleLike={(targetUserId) => {
+                  void toggleLike(targetUserId);
                 }}
               />
             ))}
@@ -545,25 +679,35 @@ function RecognitionCard({
   result,
   index,
   onSelect,
+  liked,
+  likePending,
+  canLike,
+  onToggleLike,
 }: {
   result: RecognitionResult;
   index: number;
   onSelect: (result: RecognitionResult) => void;
+  liked: boolean;
+  likePending: boolean;
+  canLike: boolean;
+  onToggleLike: (userId: string) => void;
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const profile = result.profile;
   const compat = result.compatibility;
   const name = profile?.full_name ?? "Unknown person";
   const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
-  const confidencePct = result.confidence != null ? Math.round(result.confidence) : null;
   const photoUrl = resolvePhotoUrl(profile?.photo_path ?? null);
+  const confidencePct = result.confidence != null ? Math.round(result.confidence) : null;
 
   const sharedThings = [
   ...(compat?.shared_companies ?? []),
   ...(compat?.shared_schools ?? []),
   ...(compat?.shared_fields ?? []),
 ];
-const firstStarter = compat?.conversation_starters?.[0];
+const firstStarter =
+    compat?.conversation_starters?.[0] ??
+    (profile ? `Hi ${profile.full_name ?? name}, great to meet you — what brings you to this event?` : undefined);
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr);
@@ -614,19 +758,7 @@ const firstStarter = compat?.conversation_starters?.[0];
               <div className="flex items-center gap-2">
                 <p className="truncate text-[15px] font-semibold text-white">{name}</p>
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {confidencePct != null && (
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-                      style={{
-                        background: "oklch(0.35 0.12 275 / 40%)",
-                        border: "1px solid oklch(0.5 0.15 275 / 25%)",
-                        color: "oklch(0.8 0.1 275)",
-                      }}
-                    >
-                      {confidencePct}%
-                    </span>
-                  )}
-                  {compat && compat.score > 0 && (
+                  {compat ? (
                     <span
                       className="rounded-full px-2 py-0.5 text-[10px] font-medium"
                       style={{
@@ -636,6 +768,17 @@ const firstStarter = compat?.conversation_starters?.[0];
                       }}
                     >
                       {Math.round(compat.score)}% match
+                    </span>
+                  ) : (
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+                      style={{
+                        background: "oklch(0.30 0.12 145 / 40%)",
+                        border: "1px solid oklch(0.5 0.15 145 / 30%)",
+                        color: "oklch(0.78 0.14 145 / 40%)",
+                      }}
+                    >
+                      …% match
                     </span>
                   )}
                 </div>
@@ -659,7 +802,28 @@ const firstStarter = compat?.conversation_starters?.[0];
                 </p>
               )}
             </div>
-            <p className="shrink-0 text-[11px] text-white/22 pt-0.5">{formatTime(result.created_at)}</p>
+            <div className="shrink-0 flex items-center gap-2 pt-0.5">
+              {result.matched_user_id ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleLike(result.matched_user_id!);
+                  }}
+                  disabled={likePending || (!liked && !canLike)}
+                  className="group rounded-full p-1.5 transition-all active:scale-90 disabled:opacity-40"
+                  title={!liked && !canLike ? "Event context required to like" : "Toggle like"}
+                  aria-label={liked ? "Unlike profile" : "Like profile"}
+                >
+                  <Heart
+                    className={`h-4 w-4 transition-all ${
+                      liked ? "fill-red-500 text-red-500 scale-110" : "text-white/40 group-hover:text-white/60"
+                    }`}
+                  />
+                </button>
+              ) : null}
+              <p className="text-[11px] text-white/22">{formatTime(result.created_at)}</p>
+            </div>
           </div>
         </div>
       </div>

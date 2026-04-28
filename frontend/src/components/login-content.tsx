@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { api } from "@/lib/api";
@@ -436,12 +437,20 @@ export function LoginContent({ onBack, onGoSignup, showYouDot = true }: { onBack
           {googleLoading ? <Loader2 className="h-5 w-5 animate-spin text-white/30" /> : <GoogleIcon />}
           Continue with Google
         </button>
-        <p className="mt-5 text-center text-[12px] text-white/18">
-          New here?{" "}
-          <button onClick={onGoSignup} className="font-semibold text-white/35 active:text-white/60">
-            Create an account
-          </button>
-        </p>
+        <div className="mt-5 flex flex-col items-center gap-2">
+          <Link
+            href="/forgot-password"
+            className="text-[12px] text-white/25 active:text-white/50"
+          >
+            Forgot password?
+          </Link>
+          <p className="text-[12px] text-white/18">
+            New here?{" "}
+            <button onClick={onGoSignup} className="font-semibold text-white/35 active:text-white/60">
+              Create an account
+            </button>
+          </p>
+        </div>
       </div>
     </>
   );

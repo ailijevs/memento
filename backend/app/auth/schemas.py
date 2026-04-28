@@ -67,3 +67,23 @@ class OAuthCallbackRequest(BaseModel):
 
     code: str
     code_verifier: str  # The code_verifier from the initial OAuth URL response
+
+
+class PasswordResetRequest(BaseModel):
+    """Request body for POST /auth/reset-password — triggers reset email."""
+
+    email: EmailStr
+    redirect_to: str | None = None
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    """Request body for POST /auth/reset-password/confirm — sets a new password."""
+
+    access_token: str
+    new_password: str
+
+
+class MessageResponse(BaseModel):
+    """Generic message response."""
+
+    message: str

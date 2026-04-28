@@ -15,12 +15,14 @@ import {
 
 const mockGetMyEventConsent = vi.fn();
 const mockGetCompatibility = vi.fn();
+const mockGetMyProfileLikes = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   api: {
     setToken: vi.fn(),
     getMyEventConsent: (...args: unknown[]) => mockGetMyEventConsent(...args),
     getCompatibility: (...args: unknown[]) => mockGetCompatibility(...args),
+    getMyProfileLikes: (...args: unknown[]) => mockGetMyProfileLikes(...args),
   },
 }));
 
@@ -84,6 +86,7 @@ describe("RecognitionPage", () => {
     resetSupabaseMocks();
     mockGetMyEventConsent.mockClear();
     mockGetCompatibility.mockClear();
+    mockGetMyProfileLikes.mockClear().mockResolvedValue([]);
     mockSocketConnect.mockClear();
     mockSocketDisconnect.mockClear();
     mockSocketSend.mockClear();
@@ -160,7 +163,32 @@ describe("RecognitionPage", () => {
     });
   });
 
-  it("displays confidence score on recognition card", async () => {
+  it("displays compatibility score on recognition card", async () => {
+    sessionStorage.setItem(
+      "recognition_results_cache",
+      JSON.stringify([MOCK_RECOGNITION_RESULT]),
+    );
+    mockSessionWith();
+    mockGetMyEventConsent.mockResolvedValue({
+      allow_profile_display: true,
+      allow_recognition: true,
+    });
+    mockGetCompatibility.mockResolvedValue({
+      score: 42,
+      shared_companies: [],
+      shared_schools: [],
+      shared_fields: [],
+      conversation_starters: [],
+    });
+
+    render(<RecognitionPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText("42% match")).toBeInTheDocument();
+    });
+  });
+
+  it("shows zero compatibility score when compat returns 0", async () => {
     sessionStorage.setItem(
       "recognition_results_cache",
       JSON.stringify([MOCK_RECOGNITION_RESULT]),
@@ -181,7 +209,7 @@ describe("RecognitionPage", () => {
     render(<RecognitionPage />);
 
     await waitFor(() => {
-      expect(screen.getByText("93%")).toBeInTheDocument();
+      expect(screen.getByText("0% match")).toBeInTheDocument();
     });
   });
 
@@ -236,7 +264,7 @@ describe("RecognitionPage", () => {
 
     await userEvent.click(screen.getByText("Sarah Chen"));
 
-    expect(mockPush).toHaveBeenCalledWith("/profile/user-abc");
+    expect(mockPush).toHaveBeenCalledWith("/profile/user-abc?accuracy=93");
   });
 
   it("caches profile to sessionStorage when clicking a card", async () => {
@@ -477,6 +505,25 @@ describe("RecognitionPage", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Purdue University/)).toBeInTheDocument();
+    });
+  });
+
+  it("shows fallback conversation starter when compat API fails", async () => {
+    sessionStorage.setItem(
+      "recognition_results_cache",
+      JSON.stringify([MOCK_RECOGNITION_RESULT]),
+    );
+    mockSessionWith();
+    mockGetMyEventConsent.mockResolvedValue({
+      allow_profile_display: true,
+      allow_recognition: true,
+    });
+    mockGetCompatibility.mockRejectedValue(new Error("Network error"));
+
+    render(<RecognitionPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/great to meet you/i)).toBeInTheDocument();
     });
   });
 

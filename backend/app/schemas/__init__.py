@@ -1,5 +1,19 @@
 """Pydantic schemas for request/response validation."""
 
+from .analytics import (
+    AttendeeEventAnalytics,
+    AttendeeExportRow,
+    AttendeeOverview,
+    ConsentBreakdown,
+    EventAnalytics,
+    EventComparison,
+    EventQuickStats,
+    LiveEventStatus,
+    OrganizerOverview,
+    PostEventReport,
+    TimeSeriesBucket,
+    TopRecognizedUser,
+)
 from .consent import (
     ConsentCreate,
     ConsentResponse,
@@ -23,6 +37,14 @@ from .membership import (
     MembershipRole,
     MembershipUpdate,
 )
+from .notification import (
+    NotificationLogCreate,
+    NotificationLogResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+    NotificationStatus,
+    NotificationType,
+)
 from .onboarding import (
     LinkedInOnboardingRequest,
     LinkedInOnboardingResponse,
@@ -31,6 +53,8 @@ from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
     ProfileDirectoryResponse,
+    ProfileLikeCreateRequest,
+    ProfileLikeResponse,
     ProfilePhotoUploadConfirmRequest,
     ProfilePhotoUploadUrlRequest,
     ProfilePhotoUploadUrlResponse,
@@ -61,6 +85,13 @@ __all__ = [
     "MembershipResponse",
     "MembershipRole",
     "MembershipUpdate",
+    # Notification
+    "NotificationLogCreate",
+    "NotificationLogResponse",
+    "NotificationPreferenceResponse",
+    "NotificationPreferenceUpdate",
+    "NotificationStatus",
+    "NotificationType",
     # LinkedIn Enrichment
     "EducationItem",
     "ExperienceItem",
@@ -73,6 +104,8 @@ __all__ = [
     "ProfileCreate",
     "ProfileDirectoryEntry",
     "ProfileDirectoryResponse",
+    "ProfileLikeCreateRequest",
+    "ProfileLikeResponse",
     "ProfilePhotoUploadConfirmRequest",
     "ProfilePhotoUrlResponse",
     "ProfilePhotoUploadUrlRequest",
@@ -84,4 +117,17 @@ __all__ = [
     "FrameDetectionRequest",
     "FrameDetectionResponse",
     "ProfileCard",
+    # Analytics
+    "AttendeeEventAnalytics",
+    "AttendeeExportRow",
+    "AttendeeOverview",
+    "ConsentBreakdown",
+    "EventAnalytics",
+    "EventComparison",
+    "EventQuickStats",
+    "LiveEventStatus",
+    "OrganizerOverview",
+    "PostEventReport",
+    "TimeSeriesBucket",
+    "TopRecognizedUser",
 ]

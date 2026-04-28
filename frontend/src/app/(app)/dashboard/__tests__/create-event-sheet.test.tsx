@@ -1,7 +1,10 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
-import { CreateEventSheetContent } from "../create-event-sheet-content";
+import {
+  CreateEventSheetContent,
+  EditEventSheetContent,
+} from "../create-event-sheet-content";
 
 describe("CreateEventSheetContent", () => {
   it("renders all form fields", () => {
@@ -66,5 +69,93 @@ describe("CreateEventSheetContent", () => {
 
     const requiredMarkers = container.querySelectorAll(".text-red-300");
     expect(requiredMarkers.length).toBe(5);
+  });
+
+  it("autofills end date to match start date for new events", async () => {
+    const { container } = render(
+      <CreateEventSheetContent isSubmitting={false} onSubmit={vi.fn()} />,
+    );
+
+    const startDateInput = container.querySelector<HTMLInputElement>(
+      "#create-event-start-date",
+    );
+    const endDateInput = container.querySelector<HTMLInputElement>(
+      "#create-event-end-date",
+    );
+
+    expect(startDateInput).not.toBeNull();
+    expect(endDateInput).not.toBeNull();
+    fireEvent.change(startDateInput!, { target: { value: "2026-06-10" } });
+
+    expect(endDateInput!).toHaveValue("2026-06-10");
+  });
+
+  it("autofills end time to one hour after start time for new events", async () => {
+    const { container } = render(
+      <CreateEventSheetContent isSubmitting={false} onSubmit={vi.fn()} />,
+    );
+
+    const startTimeInput = container.querySelector<HTMLInputElement>(
+      "#create-event-start-time",
+    );
+    const endTimeInput = container.querySelector<HTMLInputElement>(
+      "#create-event-end-time",
+    );
+
+    expect(startTimeInput).not.toBeNull();
+    expect(endTimeInput).not.toBeNull();
+    fireEvent.change(startTimeInput!, { target: { value: "09:30" } });
+
+    expect(endTimeInput!).toHaveValue("10:30");
+  });
+
+  it("does not overwrite manually edited end time when start time changes", async () => {
+    const { container } = render(
+      <CreateEventSheetContent isSubmitting={false} onSubmit={vi.fn()} />,
+    );
+
+    const startTimeInput = container.querySelector<HTMLInputElement>(
+      "#create-event-start-time",
+    );
+    const endTimeInput = container.querySelector<HTMLInputElement>(
+      "#create-event-end-time",
+    );
+
+    expect(startTimeInput).not.toBeNull();
+    expect(endTimeInput).not.toBeNull();
+
+    fireEvent.change(startTimeInput!, { target: { value: "09:30" } });
+    expect(endTimeInput!).toHaveValue("10:30");
+
+    fireEvent.change(endTimeInput!, { target: { value: "11:15" } });
+    fireEvent.change(startTimeInput!, { target: { value: "10:00" } });
+
+    expect(endTimeInput!).toHaveValue("11:15");
+  });
+});
+
+describe("EditEventSheetContent", () => {
+  it("keeps existing end date/time values for edit mode", () => {
+    const { container } = render(
+      <EditEventSheetContent
+        isSubmitting={false}
+        onSubmit={vi.fn()}
+        initialValues={{
+          name: "Existing Event",
+          starts_at: "2026-06-10T09:30:00",
+          ends_at: "2026-06-10T12:00:00",
+        }}
+      />,
+    );
+
+    const startDateInput = container.querySelector("#edit-event-start-date");
+    const endDateInput = container.querySelector("#edit-event-end-date");
+    const startTimeInput = container.querySelector("#edit-event-start-time");
+    const endTimeInput = container.querySelector("#edit-event-end-time");
+
+    expect(startDateInput).toHaveValue("2026-06-10");
+    expect(endDateInput).toHaveValue("2026-06-10");
+    expect(startTimeInput).toHaveValue("09:30");
+    expect(endTimeInput).toHaveValue("12:00");
   });
 });

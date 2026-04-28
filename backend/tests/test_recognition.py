@@ -648,6 +648,50 @@ class TestDetectEndpoint:
         finally:
             app.dependency_overrides.pop(get_current_user, None)
 
+    @patch("app.api.recognition.ProfileCardBuilder")
+    @patch("app.api.recognition.decode_base64_image")
+    @patch("app.api.recognition.RekognitionService")
+    @patch("app.api.recognition.get_admin_client")
+    @patch("app.auth.service_auth.get_settings")
+    def test_detect_valid_recognition_api_key_allows_request(
+        self,
+        mock_settings,
+        mock_get_admin,
+        mock_service_cls,
+        mock_decode,
+        mock_card_builder_cls,
+        raw_client,
+    ):
+        """Valid X-Recognition-Api-Key + authenticated user allows detection request."""
+        import hashlib
+
+        key_hash = hashlib.sha256(self.RECOGNITION_API_KEY.encode("utf-8")).hexdigest()
+        mock_settings.return_value = MagicMock(
+            hash_to_client={key_hash: "mentra"},
+        )
+        app.dependency_overrides[get_current_user] = lambda: FAKE_USER
+        mock_get_admin.return_value = MagicMock()
+        mock_decode.return_value = b"decoded-image-bytes"
+        svc = MagicMock()
+        svc.search_all_faces_in_frame.return_value = []
+        mock_service_cls.return_value = svc
+        card_builder = MagicMock()
+        card_builder.build_cards = AsyncMock(return_value=[])
+        mock_card_builder_cls.return_value = card_builder
+        try:
+            response = raw_client.post(
+                "/api/v1/recognition/detect",
+                json={
+                    "image_base64": SAMPLE_IMAGE_BASE64,
+                    "event_id": None,
+                },
+                headers={"X-Recognition-Api-Key": self.RECOGNITION_API_KEY},
+            )
+            assert response.status_code == 200
+            assert response.json()["matches"] == []
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)
+
 
 class TestPresignedProfilePhotoUrls:
     """Tests for pre-signed profile photo URL attachment."""
@@ -700,3 +744,8 @@ class TestPresignedProfilePhotoUrls:
     def test_resolve_ttl_defaults_to_ten_minutes_when_event_end_missing(self):
         """Missing event end time uses 10-minute fallback TTL."""
         assert _resolve_presigned_url_ttl_seconds(None) == 600
+
+    def test_resolve_ttl_caps_active_event_to_s3_presign_maximum(self):
+        """Long-running events clamp TTL below S3's 7-day limit."""
+        far_future_end_time = datetime.now(timezone.utc) + timedelta(days=30)
+        assert _resolve_presigned_url_ttl_seconds(far_future_end_time) == 604799
