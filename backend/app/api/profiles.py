@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from postgrest.exceptions import APIError
 from pydantic import BaseModel
 
 from app.auth import CurrentUser, get_current_user
@@ -25,6 +26,8 @@ from app.schemas import (
     ProfileCompletionResponse,
     ProfileCreate,
     ProfileDirectoryResponse,
+    ProfileLikeCreateRequest,
+    ProfileLikeResponse,
     ProfilePhotoUploadConfirmRequest,
     ProfilePhotoUploadUrlRequest,
     ProfilePhotoUploadUrlResponse,
@@ -531,6 +534,89 @@ async def delete_my_profile(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found.",
+        )
+
+
+@router.get("/me/likes", response_model=list[ProfileLikeResponse])
+async def get_my_profile_likes(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> list[ProfileLikeResponse]:
+    """Get all profiles liked by the current user."""
+    return await dal.get_user_profile_likes(user_id=current_user.id)
+
+
+@router.post(
+    "/{user_id}/like",
+    response_model=ProfileLikeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def like_profile(
+    user_id: UUID,
+    data: ProfileLikeCreateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
+    membership_dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
+) -> ProfileLikeResponse:
+    """Like another user's profile for a specific event where users met."""
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot like your own profile.",
+        )
+
+    event = await event_dal.get_by_id(data.event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    membership = await membership_dal.get(event_id=data.event_id, user_id=current_user.id)
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this event.",
+        )
+
+    target_profile = await profile_dal.get_by_user_id(user_id)
+    if target_profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found or not visible.",
+        )
+
+    try:
+        return await profile_dal.create_profile_like(
+            user_id=current_user.id,
+            liked_profile_id=user_id,
+            event_id=data.event_id,
+        )
+    except APIError as exc:
+        if str(exc.code) == "23505":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Profile already liked for this event.",
+            ) from exc
+        raise
+
+
+@router.delete("/{user_id}/like", status_code=status.HTTP_204_NO_CONTENT)
+async def unlike_profile(
+    user_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> None:
+    """Remove a profile like."""
+    deleted = await profile_dal.delete_profile_like(
+        user_id=current_user.id,
+        liked_profile_id=user_id,
+    )
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Like not found.",
         )
 
 

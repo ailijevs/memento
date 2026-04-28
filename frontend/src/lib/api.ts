@@ -162,6 +162,23 @@ class ApiClient {
     return this.request<ProfileDirectoryResponse>(`/api/v1/profiles/directory/${eventId}`);
   }
 
+  async getMyProfileLikes() {
+    return this.request<ProfileLikeResponse[]>("/api/v1/profiles/me/likes");
+  }
+
+  async likeProfile(userId: string, eventId: string) {
+    return this.request<ProfileLikeResponse>(`/api/v1/profiles/${userId}/like`, {
+      method: "POST",
+      body: JSON.stringify({ event_id: eventId }),
+    });
+  }
+
+  async unlikeProfile(userId: string) {
+    return this.request<void>(`/api/v1/profiles/${userId}/like`, {
+      method: "DELETE",
+    });
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",
@@ -434,6 +451,15 @@ export interface ProfileDirectoryResponse {
   entries: ProfileDirectoryEntry[];
   total_count: number;
   hidden_count: number;
+}
+
+export interface ProfileLikeResponse {
+  user_id: string;
+  liked_profile_id: string;
+  event_id: string | null;
+  event_name: string | null;
+  liked_profile: ProfileResponse | null;
+  created_at: string;
 }
 
 export interface ConsentResponse {
