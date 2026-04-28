@@ -162,7 +162,9 @@ def _build_context(
         if schools:
             parts.append(f"Studied at: {', '.join(schools[:2])}.")
     if target.experiences:
-        recent = [str(e.get("company") or "") for e in (target.experiences or []) if e.get("company")]
+        recent = [
+            str(e.get("company") or "") for e in (target.experiences or []) if e.get("company")
+        ]
         if recent:
             parts.append(f"Has worked at: {', '.join(recent[:3])}.")
     if target.profile_one_liner:
@@ -223,13 +225,13 @@ def _get_dspy_predictor(model: str, api_key: str):  # pragma: no cover - runtime
             desc="Profile context: who you are, who you just met, and any shared background."
         )
         compatibility_score = dspy.OutputField(
-            desc="Integer from 0 to 100 representing how valuable this connection would be professionally."
+            desc="Integer from 0 to 100: how valuable this connection would be professionally."
         )
         starter_1 = dspy.OutputField(
-            desc="First conversation starter — one sentence, first-person, specific to this person."
+            desc="First starter — one sentence, first-person, specific to this person."
         )
         starter_2 = dspy.OutputField(
-            desc="Second conversation starter — one sentence, first-person, specific to this person."
+            desc="Second starter — one sentence, first-person, specific to this person."
         )
         starter_3 = dspy.OutputField(
             desc="Third conversation starter — one sentence, first-person, specific to this person."
