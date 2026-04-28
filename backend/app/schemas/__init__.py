@@ -37,6 +37,14 @@ from .membership import (
     MembershipRole,
     MembershipUpdate,
 )
+from .notification import (
+    NotificationLogCreate,
+    NotificationLogResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+    NotificationStatus,
+    NotificationType,
+)
 from .onboarding import (
     LinkedInOnboardingRequest,
     LinkedInOnboardingResponse,
@@ -45,6 +53,8 @@ from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
     ProfileDirectoryResponse,
+    ProfileLikeCreateRequest,
+    ProfileLikeResponse,
     ProfilePhotoUploadConfirmRequest,
     ProfilePhotoUploadUrlRequest,
     ProfilePhotoUploadUrlResponse,
@@ -75,6 +85,13 @@ __all__ = [
     "MembershipResponse",
     "MembershipRole",
     "MembershipUpdate",
+    # Notification
+    "NotificationLogCreate",
+    "NotificationLogResponse",
+    "NotificationPreferenceResponse",
+    "NotificationPreferenceUpdate",
+    "NotificationStatus",
+    "NotificationType",
     # LinkedIn Enrichment
     "EducationItem",
     "ExperienceItem",
@@ -87,6 +104,8 @@ __all__ = [
     "ProfileCreate",
     "ProfileDirectoryEntry",
     "ProfileDirectoryResponse",
+    "ProfileLikeCreateRequest",
+    "ProfileLikeResponse",
     "ProfilePhotoUploadConfirmRequest",
     "ProfilePhotoUrlResponse",
     "ProfilePhotoUploadUrlRequest",

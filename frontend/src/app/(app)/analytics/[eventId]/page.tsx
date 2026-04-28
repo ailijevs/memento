@@ -228,18 +228,18 @@ function SmallStat({
 }: {
   label: string;
   value: string | number;
-  icon: React.ElementType;
+  icon?: React.ElementType;
 }) {
   return (
     <div
-      className="rounded-2xl p-3"
+      className="flex flex-col items-center rounded-2xl p-3 text-center"
       style={{
         background: "oklch(1 0 0 / 4%)",
         border: "1px solid oklch(1 0 0 / 8%)",
       }}
     >
-      <div className="flex items-center gap-1.5 text-white/40">
-        <Icon className="h-3 w-3" />
+      <div className="flex items-center justify-center gap-1.5 text-white/40">
+        {Icon ? <Icon className="h-3 w-3" /> : null}
         <span className="text-[9px] font-medium uppercase tracking-[0.1em]">{label}</span>
       </div>
       <p className="mt-1.5 text-[22px] font-light tracking-tight text-white/90">{value}</p>
@@ -473,7 +473,7 @@ function AttendeeEventView({
     <div className="space-y-6">
       <div className="grid grid-cols-3 gap-3">
         <SmallStat label="Recognitions" value={data.your_recognitions} icon={Eye} />
-        <SmallStat label="People Met" value={data.unique_people_you_met} icon={Handshake} />
+        <SmallStat label="People Met" value={data.unique_people_you_met} />
         <SmallStat label="Attendees" value={data.total_members} icon={Users} />
       </div>
 
@@ -569,7 +569,6 @@ function AttendeeEventView({
                 <SmallStat
                   label="People Met"
                   value={report.people_you_met}
-                  icon={Handshake}
                 />
                 <SmallStat
                   label="Recognized"

@@ -9,20 +9,25 @@ from urllib.parse import urlparse
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from postgrest.exceptions import APIError
 from pydantic import BaseModel
 
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
-from app.dals import ConsentDAL, EventDAL, MembershipDAL, ProfileDAL
+from app.dals import ConsentDAL, EventDAL, MembershipDAL, NotificationDAL, ProfileDAL
 from app.db import get_admin_client, get_supabase_client
 from app.schemas import (
     LinkedInEnrichmentRequest,
     LinkedInEnrichmentResponse,
     LinkedInOnboardingRequest,
     LinkedInOnboardingResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
     ProfileCompletionResponse,
     ProfileCreate,
     ProfileDirectoryResponse,
+    ProfileLikeCreateRequest,
+    ProfileLikeResponse,
     ProfilePhotoUploadConfirmRequest,
     ProfilePhotoUploadUrlRequest,
     ProfilePhotoUploadUrlResponse,
@@ -46,6 +51,46 @@ from app.services.resume_parser import ResumeData, ResumeParser
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
+
+
+def _resolve_renderable_profile_photo(
+    profile: ProfileResponse,
+    *,
+    expires_in_seconds: int = 600,
+) -> ProfileResponse:
+    """Return profile with a renderable photo_path when storage-backed."""
+    photo_path = (profile.photo_path or "").strip()
+    if not photo_path:
+        return profile
+
+    if photo_path.startswith("http://") or photo_path.startswith("https://"):
+        return profile
+
+    settings = get_settings()
+    if not settings.s3_bucket_name:
+        logger.warning(
+            "Profile image storage is not configured; returning raw photo_path for user_id=%s",
+            profile.user_id,
+        )
+        return profile
+
+    s3_service = S3Service()
+    try:
+        photo_url = s3_service.get_profile_picture_presigned_url(
+            s3_key=photo_path,
+            bucket_name=settings.s3_bucket_name,
+            expires_in_seconds=expires_in_seconds,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to pre-sign profile photo for user_id=%s and key=%s: %s",
+            profile.user_id,
+            photo_path,
+            exc,
+        )
+        return profile
+
+    return profile.model_copy(update={"photo_path": photo_url})
 
 
 def get_profile_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> ProfileDAL:
@@ -77,6 +122,14 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     """Dependency to get ConsentDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ConsentDAL(client)
+
+
+def get_notification_dal(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> NotificationDAL:
+    """Dependency to get NotificationDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return NotificationDAL(client)
 
 
 @router.get("/me", response_model=ProfileResponse)
@@ -142,6 +195,51 @@ async def update_my_profile(
             detail="Profile not found. Please create one first.",
         )
     return await _refresh_generated_profile_summary(dal, profile)
+
+
+@router.patch("/me/notification-preferences", response_model=NotificationPreferenceResponse)
+async def update_my_notification_preferences(
+    data: NotificationPreferenceUpdate,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[NotificationDAL, Depends(get_notification_dal)],
+) -> NotificationPreferenceResponse:
+    """Update the current user's notification preferences."""
+    if (
+        data.email_notifications is None
+        and data.event_updates is None
+        and data.host_messages is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one preference field must be provided.",
+        )
+
+    updated = await dal.upsert_preferences(current_user.id, data)
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update notification preferences.",
+        )
+    return updated
+
+
+@router.get("/me/notification-preferences", response_model=NotificationPreferenceResponse)
+async def get_my_notification_preferences(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[NotificationDAL, Depends(get_notification_dal)],
+) -> NotificationPreferenceResponse:
+    """Get the current user's notification preferences."""
+    preferences = await dal.get_preferences_by_user_id(current_user.id)
+    if preferences:
+        return preferences
+
+    created = await dal.upsert_preferences(current_user.id, NotificationPreferenceUpdate())
+    if not created:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load notification preferences.",
+        )
+    return created
 
 
 @router.get("/me/photo-url", response_model=ProfilePhotoUrlResponse)
@@ -444,6 +542,89 @@ async def delete_my_profile(
         )
 
 
+@router.get("/me/likes", response_model=list[ProfileLikeResponse])
+async def get_my_profile_likes(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> list[ProfileLikeResponse]:
+    """Get all profiles liked by the current user."""
+    return await dal.get_user_profile_likes(user_id=current_user.id)
+
+
+@router.post(
+    "/{user_id}/like",
+    response_model=ProfileLikeResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def like_profile(
+    user_id: UUID,
+    data: ProfileLikeCreateRequest,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
+    membership_dal: Annotated[MembershipDAL, Depends(get_membership_dal)],
+) -> ProfileLikeResponse:
+    """Like another user's profile for a specific event where users met."""
+    if user_id == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You cannot like your own profile.",
+        )
+
+    event = await event_dal.get_by_id(data.event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    membership = await membership_dal.get(event_id=data.event_id, user_id=current_user.id)
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not a member of this event.",
+        )
+
+    target_profile = await profile_dal.get_by_user_id(user_id)
+    if target_profile is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Profile not found or not visible.",
+        )
+
+    try:
+        return await profile_dal.create_profile_like(
+            user_id=current_user.id,
+            liked_profile_id=user_id,
+            event_id=data.event_id,
+        )
+    except APIError as exc:
+        if str(exc.code) == "23505":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Profile already liked for this event.",
+            ) from exc
+        raise
+
+
+@router.delete("/{user_id}/like", status_code=status.HTTP_204_NO_CONTENT)
+async def unlike_profile(
+    user_id: UUID,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+) -> None:
+    """Remove a profile like."""
+    deleted = await profile_dal.delete_profile_like(
+        user_id=current_user.id,
+        liked_profile_id=user_id,
+    )
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Like not found.",
+        )
+
+
 @router.get("/{user_id}", response_model=ProfileResponse)
 async def get_profile(
     user_id: UUID,
@@ -459,7 +640,7 @@ async def get_profile(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Profile not found or not visible.",
         )
-    return profile
+    return _resolve_renderable_profile_photo(profile)
 
 
 class CompatibilityResponse(BaseModel):
