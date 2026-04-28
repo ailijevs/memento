@@ -172,6 +172,12 @@ class LinkedInEnrichmentService:
         """Map People Data Labs payload into a stable internal enrichment shape."""
         raw_data = payload.get("data")
         profile_data: dict[str, Any] = raw_data if isinstance(raw_data, dict) else payload
+        print(f"[PDL-DEBUG] profile_data keys: {list(profile_data.keys())}")
+        raw_exp_key = "experience" if "experience" in profile_data else "experiences"
+        raw_exp_data = profile_data.get(raw_exp_key, []) or []
+        print(f"[PDL-DEBUG] experience key={raw_exp_key!r}, count={len(raw_exp_data)}")
+        if raw_exp_data and isinstance(raw_exp_data[0], dict):
+            print(f"[PDL-DEBUG] first exp keys: {list(raw_exp_data[0].keys())}")
 
         location = profile_data.get("location_name")
         if not isinstance(location, str) or not location.strip():
@@ -190,7 +196,8 @@ class LinkedInEnrichmentService:
             )
 
         experiences: list[dict[str, Any]] = []
-        for item in profile_data.get("experience", []) or []:
+        raw_exp = profile_data.get("experience") or profile_data.get("experiences") or []
+        for item in raw_exp:
             if not isinstance(item, dict):
                 continue
             title = LinkedInEnrichmentService._as_text(item.get("title"), keys=["name"])
@@ -210,7 +217,8 @@ class LinkedInEnrichmentService:
             )
 
         education: list[dict[str, Any]] = []
-        for item in profile_data.get("education", []) or []:
+        raw_edu = profile_data.get("education") or profile_data.get("educations") or []
+        for item in raw_edu:
             if not isinstance(item, dict):
                 continue
 
@@ -288,6 +296,18 @@ class LinkedInEnrichmentService:
         return None
 
     @staticmethod
+    def _strip_markdown(text: str) -> str:
+        """Remove common markdown formatting from Exa-scraped LinkedIn text."""
+        cleaned = re.sub(r"#{1,6}\s*", "", text)
+        cleaned = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", cleaned)
+        cleaned = re.sub(r"\*{1,2}([^*]+)\*{1,2}", r"\1", cleaned)
+        cleaned = re.sub(r"__([^_]+)__", r"\1", cleaned)
+        cleaned = re.sub(r"`([^`]+)`", r"\1", cleaned)
+        cleaned = re.sub(r"^[>\-*]\s+", "", cleaned, flags=re.MULTILINE)
+        cleaned = re.sub(r"\n{3,}", "\n\n", cleaned)
+        return cleaned.strip()
+
+    @staticmethod
     def _map_exa_payload(payload: dict[str, Any], linkedin_url: str) -> dict[str, Any]:
         """Map Exa contents payload into the internal enrichment shape."""
         results = payload.get("results", [])
@@ -295,7 +315,8 @@ class LinkedInEnrichmentService:
             raise LinkedInEnrichmentError("No Exa results available.", status_code=404)
 
         row = results[0]
-        text = row.get("text") or ""
+        raw_text = row.get("text") or ""
+        text = LinkedInEnrichmentService._strip_markdown(raw_text)
         summary = row.get("summary")
 
         name = row.get("author") or LinkedInEnrichmentService._extract_name_from_title(
@@ -393,9 +414,16 @@ class LinkedInEnrichmentService:
             ):
                 break
 
+            non_title_words = {"student", "studying", "attended", "alumni", "member"}
             if " at " in lines[i] and not lower.startswith(("http", "see ")):
                 parts = re.split(r"\s+at\s+", lines[i], maxsplit=1, flags=re.IGNORECASE)
-                if len(parts) == 2 and len(parts[0]) < 100 and len(parts[1]) < 100:
+                title_lower = parts[0].strip().lower() if len(parts) == 2 else ""
+                if (
+                    len(parts) == 2
+                    and len(parts[0]) < 100
+                    and len(parts[1]) < 100
+                    and title_lower not in non_title_words
+                ):
                     dates = LinkedInEnrichmentService._extract_date_range(
                         lines[i + 1] if i + 1 < len(lines) else ""
                     )
@@ -465,7 +493,9 @@ class LinkedInEnrichmentService:
             is_school_line = any(token in lines[i] for token in school_tokens)
 
             if is_school_line and len(lines[i]) < 120:
-                school = lines[i]
+                school_text = lines[i]
+                at_match = re.match(r".+?\s+at\s+(.+)", school_text, re.IGNORECASE)
+                school = at_match.group(1).strip() if at_match else school_text
                 degree = None
                 field_of_study = None
                 dates: tuple[str | None, str | None] = (None, None)
