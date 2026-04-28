@@ -46,7 +46,9 @@ from app.services import (
     S3Service,
     calculate_profile_completion,
 )
+from app.services.account_deletion import delete_current_account
 from app.services.resume_parser import ResumeData, ResumeParser
+from supabase import Client
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +119,13 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     """Dependency to get ConsentDAL with authenticated client."""
     client = get_supabase_client(current_user.access_token)
     return ConsentDAL(client)
+
+
+def get_authed_supabase_client(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> Client:
+    """Dependency to get a Supabase client bound to the caller's JWT (RLS-bound)."""
+    return get_supabase_client(current_user.access_token)
 
 
 def get_notification_dal(
@@ -524,17 +533,36 @@ async def onboard_from_linkedin_url(
 
 
 @router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_my_profile(
+async def delete_my_account(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
-    dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    profile_dal: Annotated[ProfileDAL, Depends(get_profile_dal)],
+    event_dal: Annotated[EventDAL, Depends(get_event_dal)],
+    client: Annotated[Client, Depends(get_authed_supabase_client)],
 ) -> None:
-    """Delete the current user's profile."""
-    deleted = await dal.delete(current_user.id)
-    if not deleted:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Profile not found.",
+    """
+    Permanently delete the current user's account.
+
+    Performs best-effort AWS cleanup (Rekognition collections / face entries
+    and the profile photo in S3), then invokes the ``delete_my_account``
+    SECURITY DEFINER RPC under the caller's own JWT to atomically delete the
+    events they created and their ``auth.users`` row (which cascades the
+    profile, memberships, consents, and auth-side session/token rows).
+
+    No service-role key is used.
+    """
+    try:
+        await delete_current_account(
+            user_id=current_user.id,
+            client=client,
+            profile_dal=profile_dal,
+            event_dal=event_dal,
         )
+    except Exception as exc:
+        logger.exception("Account deletion failed for user_id=%s", current_user.id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Could not complete account deletion. Please try again or contact support.",
+        ) from exc
 
 
 @router.get("/me/likes", response_model=list[ProfileLikeResponse])

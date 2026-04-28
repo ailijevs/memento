@@ -42,7 +42,7 @@ class NotificationDAL(BaseDAL):
             .maybe_single()
             .execute()
         )
-        if response.data:
+        if response and response.data:
             return NotificationPreferenceResponse(**response.data)
         return None
 

@@ -128,6 +128,12 @@ class ApiClient {
     });
   }
 
+  async deleteMyAccount() {
+    return this.request<void>("/api/v1/profiles/me", {
+      method: "DELETE",
+    });
+  }
+
   async updateEvent(eventId: string, data: EventUpdateRequest) {
     return this.request<EventResponse>(`/api/v1/events/${eventId}`, {
       method: "PATCH",
