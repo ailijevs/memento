@@ -494,7 +494,12 @@ export default function RecognitionPage() {
                   if (r.profile) {
                     sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(r.profile));
                   }
-                  router.push(`/profile/${userId}`);
+                  const params = new URLSearchParams();
+                  if (r.confidence != null) {
+                    params.set("accuracy", String(Math.round(r.confidence)));
+                  }
+                  const qs = params.toString();
+                  router.push(`/profile/${userId}${qs ? `?${qs}` : ""}`);
                 }}
               />
             ))}
