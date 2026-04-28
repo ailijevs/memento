@@ -570,7 +570,9 @@ function RecognitionCard({
   ...(compat?.shared_schools ?? []),
   ...(compat?.shared_fields ?? []),
 ];
-const firstStarter = compat?.conversation_starters?.[0];
+const firstStarter =
+    compat?.conversation_starters?.[0] ??
+    (profile ? `Hi ${profile.full_name ?? name}, great to meet you — what brings you to this event?` : undefined);
 
   function formatTime(dateStr: string) {
     const date = new Date(dateStr);

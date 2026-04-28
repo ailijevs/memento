@@ -505,6 +505,25 @@ describe("RecognitionPage", () => {
     });
   });
 
+  it("shows fallback conversation starter when compat API fails", async () => {
+    sessionStorage.setItem(
+      "recognition_results_cache",
+      JSON.stringify([MOCK_RECOGNITION_RESULT]),
+    );
+    mockSessionWith();
+    mockGetMyEventConsent.mockResolvedValue({
+      allow_profile_display: true,
+      allow_recognition: true,
+    });
+    mockGetCompatibility.mockRejectedValue(new Error("Network error"));
+
+    render(<RecognitionPage />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/great to meet you/i)).toBeInTheDocument();
+    });
+  });
+
   it("displays conversation starter when available", async () => {
     const resultWithStarter = {
       ...MOCK_RECOGNITION_RESULT,
