@@ -15,13 +15,11 @@ import { Aurora } from "@/components/aurora";
 import {
   ArrowLeft,
   BarChart3,
-  CalendarDays,
   ChevronRight,
   Clock,
   Eye,
   Handshake,
   Loader2,
-  MapPin,
   Radio,
   Trophy,
   Users,
@@ -288,10 +286,9 @@ function OrganizerEventView({
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <SmallStat label="Members" value={data.total_members} icon={Users} />
-        <SmallStat label="Recognitions" value={data.total_recognitions} icon={Eye} />
-        <SmallStat label="Unique Recognized" value={data.unique_recognized} icon={Handshake} />
+        <SmallStat label="Total Connections" value={data.unique_recognized} icon={Handshake} />
       </div>
 
       {data.peak_hour ? (
@@ -311,49 +308,26 @@ function OrganizerEventView({
         <h2 className="mb-3 text-[12px] font-medium uppercase tracking-[0.1em] text-white/50">
           Consent Breakdown
         </h2>
-        <div className="grid grid-cols-2 gap-3">
-          <div
-            className="rounded-2xl p-3"
-            style={{
-              background: "oklch(1 0 0 / 3%)",
-              border: "1px solid oklch(1 0 0 / 6%)",
-            }}
-          >
-            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
-              Recognition
-            </p>
-            <div className="mt-2 flex items-baseline gap-2">
+        <div
+          className="rounded-2xl p-4 text-center"
+          style={{
+            background: "oklch(1 0 0 / 3%)",
+            border: "1px solid oklch(1 0 0 / 6%)",
+          }}
+        >
+          <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
+            Recognition
+          </p>
+          <div className="mt-2 flex items-center justify-center gap-6">
+            <div className="flex items-baseline gap-2">
               <span className="text-[20px] font-light text-green-400/80">
                 {data.consent_breakdown.recognition_opted_in}
               </span>
               <span className="text-[11px] text-white/30">opted in</span>
             </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-[16px] font-light text-red-400/60">
+            <div className="flex items-baseline gap-2">
+              <span className="text-[20px] font-light text-red-400/60">
                 {data.consent_breakdown.recognition_opted_out}
-              </span>
-              <span className="text-[11px] text-white/30">opted out</span>
-            </div>
-          </div>
-          <div
-            className="rounded-2xl p-3"
-            style={{
-              background: "oklch(1 0 0 / 3%)",
-              border: "1px solid oklch(1 0 0 / 6%)",
-            }}
-          >
-            <p className="text-[10px] font-medium uppercase tracking-[0.1em] text-white/40">
-              Profile Display
-            </p>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="text-[20px] font-light text-green-400/80">
-                {data.consent_breakdown.display_opted_in}
-              </span>
-              <span className="text-[11px] text-white/30">opted in</span>
-            </div>
-            <div className="mt-1 flex items-baseline gap-2">
-              <span className="text-[16px] font-light text-red-400/60">
-                {data.consent_breakdown.display_opted_out}
               </span>
               <span className="text-[11px] text-white/30">opted out</span>
             </div>
@@ -473,9 +447,8 @@ function AttendeeEventView({
 }) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3">
-        <SmallStat label="Recognitions" value={data.your_recognitions} icon={Eye} />
-        <SmallStat label="People Met" value={data.unique_people_you_met} />
+      <div className="grid grid-cols-2 gap-3">
+        <SmallStat label="People Met" value={data.unique_people_you_met} icon={Handshake} />
         <SmallStat label="Attendees" value={data.total_members} icon={Users} />
       </div>
 
@@ -567,15 +540,11 @@ function AttendeeEventView({
                 ) : null}
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <SmallStat
                   label="People Met"
                   value={report.people_you_met}
-                />
-                <SmallStat
-                  label="Recognized"
-                  value={report.times_you_were_recognized}
-                  icon={Eye}
+                  icon={Handshake}
                 />
                 <SmallStat
                   label="Attendees"
