@@ -99,7 +99,7 @@ class TestResumeUploadFieldPersistence:
     """
 
     @pytest.fixture
-    def mock_resume_data(self):
+    def mock_resume_data(self) -> ResumeData:
         """Full ResumeData with all fields populated."""
         return ResumeData(
             full_name="Marty",
@@ -118,10 +118,10 @@ class TestResumeUploadFieldPersistence:
             education=[{"school": "Purdue University", "degree": "BS CS"}],
         )
 
-    def test_update_data_includes_all_fields(self, mock_resume_data):
+    def test_update_data_includes_all_fields(self, mock_resume_data: ResumeData) -> None:
         """When updating an existing profile, all extracted fields
         are included in the update dict (the core #195 fix)."""
-        update_data: dict = {}
+        update_data: dict[str, object] = {}
         rd = mock_resume_data
 
         if rd.full_name:

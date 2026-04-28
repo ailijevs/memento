@@ -84,6 +84,25 @@ class ProfileDirectoryResponse(BaseModel):
     hidden_count: int
 
 
+class ProfileLikeCreateRequest(BaseModel):
+    """Request payload for liking a profile in the context of an event."""
+
+    event_id: UUID
+
+
+class ProfileLikeResponse(BaseModel):
+    """Schema for profile-like rows."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: UUID
+    liked_profile_id: UUID
+    event_id: UUID | None
+    event_name: str | None = None
+    liked_profile: ProfileResponse | None = None
+    created_at: datetime
+
+
 class ProfilePhotoUploadUrlRequest(BaseModel):
     """Payload for requesting a direct profile photo upload URL."""
 

@@ -16,6 +16,7 @@ describe("BottomTabBar", () => {
   it("renders all tab labels", () => {
     render(<BottomTabBar />);
     expect(screen.getByText("Dashboard")).toBeInTheDocument();
+    expect(screen.getByText("Favorites")).toBeInTheDocument();
     expect(screen.getByText("Profile")).toBeInTheDocument();
   });
 
@@ -37,6 +38,14 @@ describe("BottomTabBar", () => {
     expect(profileBtn.style.color).toContain("0.95");
   });
 
+  it("highlights Favorites tab when on /favorites path", () => {
+    mockPathname.mockReturnValue("/favorites");
+    const { container } = render(<BottomTabBar />);
+    const buttons = container.querySelectorAll("button");
+    const favoritesBtn = buttons[1];
+    expect(favoritesBtn.style.color).toContain("0.95");
+  });
+
   it("highlights tab for nested paths", () => {
     mockPathname.mockReturnValue("/dashboard/some-sub-page");
     const { container } = render(<BottomTabBar />);
@@ -49,6 +58,12 @@ describe("BottomTabBar", () => {
     render(<BottomTabBar />);
     await userEvent.click(screen.getByText("Profile"));
     expect(mockPush).toHaveBeenCalledWith("/profile");
+  });
+
+  it("navigates to /favorites when Favorites tab is clicked", async () => {
+    render(<BottomTabBar />);
+    await userEvent.click(screen.getByText("Favorites"));
+    expect(mockPush).toHaveBeenCalledWith("/favorites");
   });
 
   it("navigates to /dashboard when Dashboard tab is clicked", async () => {
