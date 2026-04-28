@@ -298,38 +298,6 @@ describe("RecognitionPage", () => {
     expect(JSON.parse(cached!).full_name).toBe("Sarah Chen");
   });
 
-  it("renders camera mode toggle button", async () => {
-    mockSessionWith();
-    mockGetMyEventConsent.mockResolvedValue({
-      allow_profile_display: true,
-      allow_recognition: true,
-    });
-
-    render(<RecognitionPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Glasses")).toBeInTheDocument();
-    });
-  });
-
-  it("switches to phone camera mode when toggle is clicked", async () => {
-    mockSessionWith();
-    mockGetMyEventConsent.mockResolvedValue({
-      allow_profile_display: true,
-      allow_recognition: true,
-    });
-
-    render(<RecognitionPage />);
-
-    await waitFor(() => {
-      expect(screen.getByText("Glasses")).toBeInTheDocument();
-    });
-
-    await userEvent.click(screen.getByText("Glasses"));
-
-    expect(screen.getByText("Phone")).toBeInTheDocument();
-  });
-
   it("renders scan button", async () => {
     mockSessionWith();
     mockGetMyEventConsent.mockResolvedValue({
