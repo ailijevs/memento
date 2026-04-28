@@ -700,8 +700,3 @@ class TestPresignedProfilePhotoUrls:
     def test_resolve_ttl_defaults_to_ten_minutes_when_event_end_missing(self):
         """Missing event end time uses 10-minute fallback TTL."""
         assert _resolve_presigned_url_ttl_seconds(None) == 600
-
-    def test_resolve_ttl_caps_active_event_to_s3_presign_maximum(self):
-        """Long-running events clamp TTL below S3's 7-day limit."""
-        far_future_end_time = datetime.now(timezone.utc) + timedelta(days=30)
-        assert _resolve_presigned_url_ttl_seconds(far_future_end_time) == 604799

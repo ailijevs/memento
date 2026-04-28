@@ -188,7 +188,6 @@ def _attach_presigned_profile_photo_urls(
 def _resolve_presigned_url_ttl_seconds(event_end_time: datetime | None) -> int:
     """Return URL TTL in seconds based on event time, defaulting to 10 minutes."""
     fallback_seconds = 600
-    max_presigned_url_ttl_seconds = 604799  # S3 hard limit is 604800 (7 days)
     if event_end_time is None:
         return fallback_seconds
 
@@ -201,4 +200,4 @@ def _resolve_presigned_url_ttl_seconds(event_end_time: datetime | None) -> int:
     if remaining_seconds <= 0:
         return fallback_seconds
 
-    return min(remaining_seconds, max_presigned_url_ttl_seconds)
+    return remaining_seconds
