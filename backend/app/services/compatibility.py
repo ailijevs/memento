@@ -191,6 +191,7 @@ def _generate_with_dspy(
 ) -> tuple[float | None, list[str]]:
     """Return (score_or_None, starters). Score is None if DSPy couldn't parse it."""
     import dspy
+
     lm, predictor = _get_dspy_predictor(model, api_key)
     context = _build_context(viewer, target, shared_companies, shared_schools, shared_fields)
     with dspy.context(lm=lm):

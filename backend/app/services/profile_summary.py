@@ -67,6 +67,7 @@ class ProfileSummaryService:
 
         try:
             import dspy
+
             lm, predictor = _get_dspy_predictor(model, api_key)
             with dspy.context(lm=lm):
                 prediction = predictor(profile_context=context)
