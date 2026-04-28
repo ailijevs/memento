@@ -11,6 +11,7 @@ import {
 } from "@/lib/api";
 import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import { Aurora } from "@/components/aurora";
+import { signOutUser } from "@/lib/signout";
 import { Camera, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
@@ -356,8 +357,7 @@ export default function RecognitionPage() {
   }
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutUser();
     router.push("/");
     router.refresh();
   }
@@ -494,7 +494,12 @@ export default function RecognitionPage() {
                   if (r.profile) {
                     sessionStorage.setItem(`profile_cache_${userId}`, JSON.stringify(r.profile));
                   }
-                  router.push(`/profile/${userId}`);
+                  const params = new URLSearchParams();
+                  if (r.confidence != null) {
+                    params.set("accuracy", String(Math.round(r.confidence)));
+                  }
+                  const qs = params.toString();
+                  router.push(`/profile/${userId}${qs ? `?${qs}` : ""}`);
                 }}
               />
             ))}

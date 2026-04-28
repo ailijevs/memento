@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { type EventResponse } from "@/lib/api";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import {
   Archive,
+  BarChart3,
   CalendarDays,
   Loader2,
   MapPin,
@@ -65,6 +67,7 @@ export function OrganizerContent({
   onUnarchiveEvent,
   onDeleteEvent,
 }: OrganizerContentProps) {
+  const router = useRouter();
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmArchiveEvent, setConfirmArchiveEvent] = useState<EventResponse | null>(null);
   const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<EventResponse | null>(null);
@@ -233,6 +236,16 @@ export function OrganizerContent({
                           RSVP List
                         </button>
                         <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            router.push(`/analytics/${event.event_id}`);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          Analytics
+                        </button>
+                        <button
                           onClick={() => handleArchiveEventClick(event)}
                           className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
                         >
@@ -335,6 +348,16 @@ export function OrganizerContent({
                         >
                           <Users className="h-3.5 w-3.5" />
                           RSVP List
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            router.push(`/analytics/${event.event_id}`);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          Analytics
                         </button>
                         <button
                           onClick={() => void handleUnarchiveEvent(event)}
