@@ -177,6 +177,7 @@ export function SignupContent({ onBack, onGoLogin, showYouDot = true }: { onBack
       },
     });
     if (error) { setError(error.message); setLoading(false); return; }
+    // TODO: new changes needed to revert later
     // if (data?.session === null) {
     //   router.replace("/signup?verify=pending");
     // } else {
