@@ -58,6 +58,27 @@ class ApiClient {
     });
   }
 
+  async requestProfilePhotoUploadUrl(data: ProfilePhotoUploadUrlRequest) {
+    return this.request<ProfilePhotoUploadUrlResponse>(
+      "/api/v1/profiles/me/photo-upload-url",
+      {
+        method: "POST",
+        body: JSON.stringify(data),
+      }
+    );
+  }
+
+  async confirmProfilePhotoUpload(data: ProfilePhotoUploadConfirmRequest) {
+    return this.request<ProfileResponse>("/api/v1/profiles/me/photo-upload-confirm", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getMyProfilePhotoUrl() {
+    return this.request<ProfilePhotoUrlResponse>("/api/v1/profiles/me/photo-url");
+  }
+
   async getProfileById(userId: string) {
     return this.request<ProfileResponse>(`/api/v1/profiles/${userId}`);
   }
@@ -110,6 +131,21 @@ class ApiClient {
     });
   }
 
+  async getMyEventConsent(eventId: string) {
+    return this.request<ConsentResponse>(`/api/v1/events/${eventId}/consents/me`);
+  }
+
+  async updateMyEventConsent(eventId: string, data: ConsentUpdateRequest) {
+    return this.request<ConsentResponse>(`/api/v1/events/${eventId}/consents/me`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  async getEventDirectory(eventId: string) {
+    return this.request<ProfileDirectoryResponse>(`/api/v1/profiles/directory/${eventId}`);
+  }
+
   async onboardFromLinkedIn(linkedinUrl: string) {
     return this.request<LinkedInOnboardingResponse>(
       "/api/v1/profiles/onboard-from-linkedin-url",
@@ -118,6 +154,38 @@ class ApiClient {
         body: JSON.stringify({ linkedin_url: linkedinUrl }),
       }
     );
+  }
+
+  // ── Analytics ───────────────────────────────────────────────────────────
+
+  async getOrganizerOverview() {
+    return this.request<OrganizerOverview>("/api/v1/analytics/overview/organizer");
+  }
+
+  async getAttendeeOverview() {
+    return this.request<AttendeeOverview>("/api/v1/analytics/overview/attendee");
+  }
+
+  async getEventAnalyticsOrganizer(eventId: string) {
+    return this.request<EventAnalytics>(`/api/v1/analytics/events/${eventId}/organizer`);
+  }
+
+  async getEventAnalyticsAttendee(eventId: string) {
+    return this.request<AttendeeEventAnalytics>(`/api/v1/analytics/events/${eventId}/attendee`);
+  }
+
+  async getLiveEventStatus(eventId: string) {
+    return this.request<LiveEventStatus>(`/api/v1/analytics/events/${eventId}/live`);
+  }
+
+  async compareEvents(eventA: string, eventB: string) {
+    return this.request<EventComparison>(
+      `/api/v1/analytics/compare?event_a=${eventA}&event_b=${eventB}`
+    );
+  }
+
+  async getPostEventReport(eventId: string) {
+    return this.request<PostEventReport>(`/api/v1/analytics/events/${eventId}/report`);
   }
 
   async uploadResume(file: File) {
@@ -201,6 +269,8 @@ export interface EventCreateRequest {
   starts_at?: string;
   ends_at?: string;
   location?: string;
+  description?: string;
+  max_participants?: number;
   is_active?: boolean;
 }
 
@@ -209,7 +279,25 @@ export interface EventUpdateRequest {
   starts_at?: string;
   ends_at?: string;
   location?: string;
+  description?: string;
+  max_participants?: number;
   is_active?: boolean;
+}
+
+export interface ConsentUpdateRequest {
+  allow_profile_display?: boolean;
+  allow_recognition?: boolean;
+}
+
+export type ProfilePhotoUploadSource = "onboarding" | "linkedin";
+
+export interface ProfilePhotoUploadUrlRequest {
+  content_type: string;
+  source?: ProfilePhotoUploadSource;
+}
+
+export interface ProfilePhotoUploadConfirmRequest {
+  s3_key: string;
 }
 
 // ─── Response types ───────────────────────────────────────────────────────────
@@ -231,6 +319,17 @@ export interface ProfileResponse {
   profile_summary: string | null;
   // created_at: string;
   // updated_at: string;
+}
+
+export interface ProfilePhotoUploadUrlResponse {
+  upload_url: string;
+  s3_key: string;
+  content_type: string;
+}
+
+export interface ProfilePhotoUrlResponse {
+  photo_url: string | null;
+  expires_at: string | null;
 }
 
 export interface Experience {
@@ -276,6 +375,8 @@ export interface EventResponse {
   starts_at: string | null;
   ends_at: string | null;
   location: string | null;
+  description: string | null;
+  max_participants: number | null;
   is_active: boolean;
   indexing_status: "pending" | "in_progress" | "completed" | "failed";
   cleanup_status: "pending" | "in_progress" | "completed" | "failed";
@@ -295,4 +396,136 @@ export interface CompatibilityResponse {
   shared_schools: string[];
   shared_fields: string[];
   conversation_starters: string[];
+}
+
+export interface ProfileDirectoryEntry {
+  user_id: string;
+  full_name: string;
+  headline: string | null;
+  company: string | null;
+  school: string | null;
+  major: string | null;
+  photo_path: string | null;
+}
+
+export interface ProfileDirectoryResponse {
+  entries: ProfileDirectoryEntry[];
+  total_count: number;
+  hidden_count: number;
+}
+
+export interface ConsentResponse {
+  event_id: string;
+  user_id: string;
+  allow_profile_display: boolean;
+  allow_recognition: boolean;
+  consented_at: string | null;
+  revoked_at: string | null;
+  updated_at: string;
+}
+
+// ─── Analytics types ─────────────────────────────────────────────────────────
+
+export interface TimeSeriesBucket {
+  timestamp: string;
+  count: number;
+}
+
+export interface ConsentBreakdown {
+  recognition_opted_in: number;
+  recognition_opted_out: number;
+  display_opted_in: number;
+  display_opted_out: number;
+}
+
+export interface TopRecognizedUser {
+  user_id: string;
+  full_name: string | null;
+  photo_path: string | null;
+  times_recognized: number;
+}
+
+export interface EventQuickStats {
+  event_id: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  is_active: boolean;
+  member_count: number;
+  recognition_count: number;
+  consent_rate: number;
+}
+
+export interface OrganizerOverview {
+  total_events: number;
+  total_attendees: number;
+  total_recognitions: number;
+  avg_consent_rate: number;
+  events: EventQuickStats[];
+}
+
+export interface AttendeeOverview {
+  total_events: number;
+  total_people_met: number;
+  total_recognitions: number;
+  events: EventQuickStats[];
+}
+
+export interface EventAnalytics {
+  event_id: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  is_active: boolean;
+  indexing_status: string;
+  total_members: number;
+  total_recognitions: number;
+  unique_recognized: number;
+  peak_hour: string | null;
+  consent_breakdown: ConsentBreakdown;
+  recognition_timeline: TimeSeriesBucket[];
+  join_timeline: TimeSeriesBucket[];
+  top_recognized: TopRecognizedUser[];
+}
+
+export interface AttendeeEventAnalytics {
+  event_id: string;
+  name: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  location: string | null;
+  total_members: number;
+  your_recognitions: number;
+  unique_people_you_met: number;
+  your_recognition_timeline: TimeSeriesBucket[];
+  people_you_met: TopRecognizedUser[];
+}
+
+export interface LiveEventStatus {
+  event_id: string;
+  name: string;
+  current_members: number;
+  recognitions_last_5min: number;
+  total_recognitions: number;
+  active_observers: number;
+  recent_matches: TopRecognizedUser[];
+}
+
+export interface EventComparison {
+  event_a: EventQuickStats;
+  event_b: EventQuickStats;
+}
+
+export interface PostEventReport {
+  event_id: string;
+  event_name: string;
+  event_date: string | null;
+  total_attendees: number;
+  people_you_met: number;
+  times_you_were_recognized: number;
+  connections: TopRecognizedUser[];
+  networking_score: number;
+  networking_summary: string | null;
 }

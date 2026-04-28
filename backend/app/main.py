@@ -14,6 +14,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import (
+    analytics_router,
     consents_router,
     events_router,
     memberships_router,
@@ -57,7 +58,7 @@ def create_app() -> FastAPI:
             "1. Share at least one event membership\n"
             "2. Have consent from the profile owner for that event"
         ),
-        version="1.0.0",
+        version=settings.app_version,
         lifespan=lifespan,
     )
 
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(memberships_router, prefix="/api/v1/events")
     app.include_router(consents_router, prefix="/api/v1/events")
     app.include_router(recognition_router, prefix="/api/v1")
+    app.include_router(analytics_router, prefix="/api/v1")
 
     @app.get("/")
     async def root():
@@ -89,7 +91,7 @@ def create_app() -> FastAPI:
         return {
             "status": "healthy",
             "service": settings.app_name,
-            "version": "1.0.0",
+            "version": settings.app_version,
         }
 
     return app

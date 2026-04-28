@@ -4,24 +4,22 @@
 |-------|-------|
 | **Report ID** | MT-009 |
 | **Date** | 2026-04-26 |
-| **Tester** | Sasha |
+| **Tester** | Noddie Mgbodille + external student testers |
 | **Test Case ID** | MT-09 |
-| **Requirement ID** | FR-4.3 (Compatibility scoring), FR-4.1 (Profile card display) |
+| **Requirement ID** | FR-3.1, FR-3.2 (Event creation, update, deletion, and membership flow) |
 
 ---
 
 ## Test Steps
 
-1. Start the backend locally: `cd backend && uvicorn app.main:app --reload`
-2. Start the frontend locally: `cd frontend && npm run dev`
-3. Log in as a test attendee who has joined an active event
-4. Navigate to the event dashboard and open the profile directory
-5. Verify that profile cards are sorted by descending compatibility score (highest match shown first)
-6. Check that a card for a user sharing the same company shows a higher score than a card for a user with no overlap
-7. Enter a name in the search field and confirm that only matching profiles are shown
-8. Toggle the sort to "Recent" and confirm the order changes to show most-recently-enrolled profiles first
-9. Confirm that users with `allow_profile_display = false` do not appear in any sort order
-10. Clear the search field and confirm all visible profiles return
+1. Share the deployed application URL with two external student testers.
+2. Have each tester create an account and sign in normally.
+3. Ask one tester to create an event with standard required fields and verify it appears in their dashboard.
+4. Ask the event creator to edit the event details and verify the updated values persist in the UI.
+5. Ask a second tester to join the event and confirm the event appears in their event list.
+6. Ask the second tester to leave the event and verify the membership state updates correctly.
+7. Ask the event creator to delete the event and verify it is removed from active views.
+8. Repeat the flow with small variations in event data to surface validation or state bugs.
 
 ---
 
@@ -29,12 +27,11 @@
 
 | Expected | Actual | Match? |
 |----------|--------|--------|
-| Profiles are sorted by compatibility score descending by default | Cards appear in descending score order; shared-company card ranked first | Yes |
-| Shared-company card shows score badge ≥ 30 | Score badge shows "30% match" for a user sharing only company | Yes |
-| Search filters cards by name substring | Entering partial name reduces the displayed cards to matching entries only | Yes |
-| Toggling to "Recent" reorders cards by join date | Cards reordered with most recent enrollees first; scores still visible but not used for sort | Yes |
-| Consent-gated profiles (`allow_profile_display = false`) are excluded | No cards appeared for the test user with display consent disabled | Yes |
-| Clearing search restores full list | All consented profiles reappear after clearing the search input | Yes |
+| New users can create accounts and reach the event dashboard | Testers were able to sign up and access the event dashboard successfully | Yes |
+| Event creation should succeed and persist correctly | Initial manual run exposed event creation issues in some cases; these were fixed and the flow was re-tested successfully | Yes, after fix |
+| Event edits should persist and show updated details in the UI | Updated event details appeared correctly after save | Yes |
+| Joining and leaving an event should update membership state correctly | Testers were able to join and leave the event, and state changes were reflected in the UI | Yes |
+| Event deletion should remove the event from active views | Creator was able to delete the event and it no longer appeared in active event lists | Yes |
 
 ---
 
@@ -47,13 +44,13 @@
 
 ## Logs / Screenshots / Evidence
 
-Manual test executed locally with the backend at `http://localhost:8000` and frontend at `http://localhost:3000`. The profile directory endpoint used is `GET /api/v1/profiles/directory/{event_id}`, which is covered by automated integration tests in `backend/tests/test_profiles_event_directory.py` and `backend/tests/test_consents_update.py`.
-
-Compatibility scoring for each directory entry is driven by `GET /api/v1/profiles/{user_id}/compatibility`, tested in `backend/tests/test_compatibility_endpoint.py`.
+- Live tester feedback from external student users during account creation and event workflow execution.
+- Local bug-fix verification after issues were found in event creation behavior.
+- Supporting automated regression coverage: [`backend/tests/test_event_time_guards.py`](../../../backend/tests/test_event_time_guards.py)
 
 ---
 
 ## Next Steps
 
-- Automated regression tests for the directory endpoint and compatibility scoring are in place in CI.
-- Edge case to add: test sort stability when two profiles have identical compatibility scores.
+1. Keep event creation and membership flows in regression coverage whenever event validation or lifecycle logic changes.
+2. Add more automated route-level coverage for event CRUD edge cases found during manual testing.

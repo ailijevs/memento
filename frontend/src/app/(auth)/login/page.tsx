@@ -544,15 +544,23 @@ export default function LoginPage() {
           Continue with Google
         </button>
 
-        <p className="animate-fade-in delay-600 mt-5 text-center text-[12px] text-white/18">
-          New here?{" "}
+        <div className="animate-fade-in delay-600 mt-5 flex flex-col items-center gap-2">
           <Link
-            href="/signup"
-            className="font-semibold text-white/35 active:text-white/60"
+            href="/forgot-password"
+            className="text-[12px] text-white/25 active:text-white/50"
           >
-            Create an account
+            Forgot password?
           </Link>
-        </p>
+          <p className="text-[12px] text-white/18">
+            New here?{" "}
+            <Link
+              href="/signup"
+              className="font-semibold text-white/35 active:text-white/60"
+            >
+              Create an account
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

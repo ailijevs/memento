@@ -1,5 +1,19 @@
 """Pydantic schemas for request/response validation."""
 
+from .analytics import (
+    AttendeeEventAnalytics,
+    AttendeeExportRow,
+    AttendeeOverview,
+    ConsentBreakdown,
+    EventAnalytics,
+    EventComparison,
+    EventQuickStats,
+    LiveEventStatus,
+    OrganizerOverview,
+    PostEventReport,
+    TimeSeriesBucket,
+    TopRecognizedUser,
+)
 from .consent import (
     ConsentCreate,
     ConsentResponse,
@@ -30,6 +44,11 @@ from .onboarding import (
 from .profile import (
     ProfileCreate,
     ProfileDirectoryEntry,
+    ProfileDirectoryResponse,
+    ProfilePhotoUploadConfirmRequest,
+    ProfilePhotoUploadUrlRequest,
+    ProfilePhotoUploadUrlResponse,
+    ProfilePhotoUrlResponse,
     ProfileResponse,
     ProfileUpdate,
 )
@@ -67,6 +86,11 @@ __all__ = [
     # Profile
     "ProfileCreate",
     "ProfileDirectoryEntry",
+    "ProfileDirectoryResponse",
+    "ProfilePhotoUploadConfirmRequest",
+    "ProfilePhotoUrlResponse",
+    "ProfilePhotoUploadUrlRequest",
+    "ProfilePhotoUploadUrlResponse",
     "ProfileResponse",
     "ProfileUpdate",
     # Recognition
@@ -74,4 +98,17 @@ __all__ = [
     "FrameDetectionRequest",
     "FrameDetectionResponse",
     "ProfileCard",
+    # Analytics
+    "AttendeeEventAnalytics",
+    "AttendeeExportRow",
+    "AttendeeOverview",
+    "ConsentBreakdown",
+    "EventAnalytics",
+    "EventComparison",
+    "EventQuickStats",
+    "LiveEventStatus",
+    "OrganizerOverview",
+    "PostEventReport",
+    "TimeSeriesBucket",
+    "TopRecognizedUser",
 ]

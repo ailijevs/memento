@@ -9,6 +9,8 @@ export interface EventFormInput {
   starts_at?: string;
   ends_at?: string;
   location?: string;
+  description?: string;
+  max_participants?: number;
 }
 
 export type CreateEventInput = EventFormInput;
@@ -19,6 +21,8 @@ export interface EventFormInitialValues {
   starts_at?: string | null;
   ends_at?: string | null;
   location?: string | null;
+  description?: string | null;
+  max_participants?: number | null;
 }
 
 interface CreateEventSheetContentProps {
@@ -79,6 +83,8 @@ function EventFormSheetContent({
   const [endDate, setEndDate] = useState("");
   const [endTime, setEndTime] = useState("");
   const [location, setLocation] = useState("");
+  const [description, setDescription] = useState("");
+  const [maxParticipants, setMaxParticipants] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingPayload, setPendingPayload] = useState<EventFormInput | null>(null);
@@ -89,6 +95,8 @@ function EventFormSheetContent({
     }
     setName(initialValues.name ?? "");
     setLocation(initialValues.location ?? "");
+    setDescription(initialValues.description ?? "");
+    setMaxParticipants(initialValues.max_participants != null ? String(initialValues.max_participants) : "");
     setStartDate(toDateInputValue(initialValues.starts_at));
     setStartTime(toTimeInputValue(initialValues.starts_at));
     setEndDate(toDateInputValue(initialValues.ends_at));
@@ -138,11 +146,15 @@ function EventFormSheetContent({
       return;
     }
 
+    const parsedMax = maxParticipants.trim() ? Number.parseInt(maxParticipants.trim(), 10) : undefined;
+
     const payload: EventFormInput = {
       name: name.trim(),
       starts_at: startsAtDate.toISOString(),
       ends_at: endsAtDate.toISOString(),
       location: location.trim() || undefined,
+      description: description.trim() || undefined,
+      max_participants: parsedMax && parsedMax > 0 ? parsedMax : undefined,
     };
 
     if (requiresConfirmation) {
@@ -164,6 +176,8 @@ function EventFormSheetContent({
         setEndDate("");
         setEndTime("");
         setLocation("");
+        setDescription("");
+        setMaxParticipants("");
       }
     } catch (submitError) {
       const message =
@@ -207,6 +221,36 @@ function EventFormSheetContent({
             value={location}
             onChange={(event) => setLocation(event.target.value)}
             placeholder="Austin Convention Center"
+            className="h-10 w-full min-w-0 max-w-full rounded-xl bg-transparent px-3 text-[16px] text-white outline-none placeholder:text-white/35"
+            style={{
+              background: "oklch(1 0 0 / 4%)",
+              border: "1px solid oklch(1 0 0 / 10%)",
+            }}
+          />
+
+          <FieldLabel htmlFor={`${mode}-event-description`}>Description</FieldLabel>
+          <textarea
+            id={`${mode}-event-description`}
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            placeholder="Tell attendees what this event is about..."
+            rows={3}
+            maxLength={2000}
+            className="w-full min-w-0 max-w-full resize-none rounded-xl bg-transparent px-3 py-2.5 text-[16px] text-white outline-none placeholder:text-white/35"
+            style={{
+              background: "oklch(1 0 0 / 4%)",
+              border: "1px solid oklch(1 0 0 / 10%)",
+            }}
+          />
+
+          <FieldLabel htmlFor={`${mode}-event-max-participants`}>Max Participants</FieldLabel>
+          <input
+            id={`${mode}-event-max-participants`}
+            type="number"
+            min="1"
+            value={maxParticipants}
+            onChange={(event) => setMaxParticipants(event.target.value)}
+            placeholder="No limit"
             className="h-10 w-full min-w-0 max-w-full rounded-xl bg-transparent px-3 text-[16px] text-white outline-none placeholder:text-white/35"
             style={{
               background: "oklch(1 0 0 / 4%)",

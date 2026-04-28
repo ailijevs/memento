@@ -1,9 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { type EventResponse } from "@/lib/api";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
-import { Archive, CalendarDays, Loader2, MapPin, MoreHorizontal, Pencil, Plus, Trash2, Undo2 } from "lucide-react";
+import {
+  Archive,
+  BarChart3,
+  CalendarDays,
+  Loader2,
+  MapPin,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  Undo2,
+  Users,
+} from "lucide-react";
 
 interface OrganizerControlsProps {
   onCreateEvent: () => void;
@@ -33,7 +46,9 @@ interface OrganizerContentProps {
   deletingEventId: string | null;
   archivingEventId: string | null;
   unarchivingEventId: string | null;
+  onViewEventDetail: (event: EventResponse) => void;
   onEditEventRequest: (event: EventResponse) => void;
+  onViewRsvpList: (event: EventResponse) => void;
   onArchiveEvent: (event: EventResponse) => Promise<void>;
   onUnarchiveEvent: (event: EventResponse) => Promise<void>;
   onDeleteEvent: (event: EventResponse) => Promise<void>;
@@ -45,11 +60,14 @@ export function OrganizerContent({
   deletingEventId,
   archivingEventId,
   unarchivingEventId,
+  onViewEventDetail,
   onEditEventRequest,
+  onViewRsvpList,
   onArchiveEvent,
   onUnarchiveEvent,
   onDeleteEvent,
 }: OrganizerContentProps) {
+  const router = useRouter();
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmArchiveEvent, setConfirmArchiveEvent] = useState<EventResponse | null>(null);
   const [confirmDeleteEvent, setConfirmDeleteEvent] = useState<EventResponse | null>(null);
@@ -153,7 +171,11 @@ export function OrganizerContent({
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => onViewEventDetail(event)}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <h3 className="text-[17px] font-medium text-white/90">{event.name}</h3>
                     <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/45">
                       {event.starts_at ? (
@@ -169,7 +191,7 @@ export function OrganizerContent({
                         </span>
                       ) : null}
                     </div>
-                  </div>
+                  </button>
                   <div
                     className="relative"
                     ref={openEventMenuId === event.event_id ? openMenuContainerRef : null}
@@ -202,6 +224,26 @@ export function OrganizerContent({
                         >
                           <Pencil className="h-3.5 w-3.5" />
                           Edit Event
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            onViewRsvpList(event);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          RSVP List
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            router.push(`/analytics/${event.event_id}`);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          Analytics
                         </button>
                         <button
                           onClick={() => handleArchiveEventClick(event)}
@@ -243,7 +285,11 @@ export function OrganizerContent({
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
+                  <button
+                    type="button"
+                    onClick={() => onViewEventDetail(event)}
+                    className="min-w-0 flex-1 text-left"
+                  >
                     <h3 className="text-[17px] font-medium text-white/90">{event.name}</h3>
                     <div className="mt-1 flex flex-wrap gap-2 text-[12px] text-white/45">
                       {event.starts_at ? (
@@ -259,7 +305,7 @@ export function OrganizerContent({
                         </span>
                       ) : null}
                     </div>
-                  </div>
+                  </button>
                   <div
                     className="relative"
                     ref={openEventMenuId === event.event_id ? openMenuContainerRef : null}
@@ -292,6 +338,26 @@ export function OrganizerContent({
                         >
                           <Pencil className="h-3.5 w-3.5" />
                           Edit Event
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            onViewRsvpList(event);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <Users className="h-3.5 w-3.5" />
+                          RSVP List
+                        </button>
+                        <button
+                          onClick={() => {
+                            setOpenEventMenuId(null);
+                            router.push(`/analytics/${event.event_id}`);
+                          }}
+                          className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-left text-[11px] font-medium uppercase tracking-[0.08em] text-white/80 transition-all duration-150 hover:bg-white/5 active:scale-[0.99] active:bg-white/15"
+                        >
+                          <BarChart3 className="h-3.5 w-3.5" />
+                          Analytics
                         </button>
                         <button
                           onClick={() => void handleUnarchiveEvent(event)}

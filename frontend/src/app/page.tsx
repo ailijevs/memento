@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Aurora } from "@/components/aurora";
 import { SignupContent } from "@/components/signup-content";
 import { LoginContent } from "@/components/login-content";
@@ -8,6 +9,14 @@ import { LoginContent } from "@/components/login-content";
 type Screen = "welcome" | "signup" | "login";
 
 export default function App() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash && hash.includes("type=recovery")) {
+      router.replace(`/reset-password${hash}`);
+    }
+  }, [router]);
   const [screen, setScreen] = useState<Screen>("welcome");
   const [prevScreen, setPrevScreen] = useState<Screen>("welcome");
   const [contentVisible, setContentVisible] = useState(true);

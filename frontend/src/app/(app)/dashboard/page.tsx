@@ -3,25 +3,43 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, isApiErrorWithStatus, type EventResponse } from "@/lib/api";
+import {
+  ApiError,
+  api,
+  isApiErrorWithStatus,
+  type ConsentResponse,
+  type EventResponse,
+  type ProfileDirectoryResponse,
+} from "@/lib/api";
 import { Aurora } from "@/components/aurora";
+import { signOutUser } from "@/lib/signout";
 import { ModalBottomSheet } from "@/components/modal-bottom-sheet";
+import { ConfirmationDialog } from "@/components/confirmation-dialog";
 import { AttendeeContent, AttendeeControls, type AttendeeEventItem } from "./attendee-dashboard";
 import { DiscoverEventsSheetContent, type DiscoverEventItem } from "./discover-events-sheet-content";
+import { EventDetailSheetContent } from "./event-detail-sheet-content";
 import { OrganizerContent, OrganizerControls } from "./organizer-dashboard";
+import { RsvpListSheetContent } from "./rsvp-list-sheet-content";
+import { EventConsentsSheetContent } from "./event-consents-sheet-content";
+import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import {
   CreateEventSheetContent,
   EditEventSheetContent,
   type CreateEventInput,
   type EditEventInput,
 } from "./create-event-sheet-content";
-import { CalendarDays, LogOut, Plus } from "lucide-react";
+import { CalendarDays, Loader2, LogOut, Plus, UserMinus } from "lucide-react";
 
 type DashboardTab = "attendee" | "organizer";
+type ConsentUpdateDialogState = {
+  title: string;
+  message: string;
+};
 
 export default function DashboardPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [myEvents, setMyEvents] = useState<EventResponse[]>([]);
   const [organizedEvents, setOrganizedEvents] = useState<EventResponse[]>([]);
   const [searchText, setSearchText] = useState("");
@@ -39,9 +57,27 @@ export default function DashboardPage() {
   const [unarchivingOrganizedEventId, setUnarchivingOrganizedEventId] = useState<string | null>(null);
   const [joiningDiscoverEventId, setJoiningDiscoverEventId] = useState<string | null>(null);
   const [leavingEventId, setLeavingEventId] = useState<string | null>(null);
+  const [confirmLeaveEvent, setConfirmLeaveEvent] = useState<EventResponse | null>(null);
   const [openEventMenuId, setOpenEventMenuId] = useState<string | null>(null);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [detailEvent, setDetailEvent] = useState<EventResponse | null>(null);
+  const [isRsvpListOpen, setIsRsvpListOpen] = useState(false);
+  const [rsvpListLoading, setRsvpListLoading] = useState(false);
+  const [rsvpListEventName, setRsvpListEventName] = useState<string>("");
+  const [rsvpListData, setRsvpListData] = useState<ProfileDirectoryResponse>({
+    entries: [],
+    total_count: 0,
+    hidden_count: 0,
+  });
+  const [showRsvpConsentOffNotice, setShowRsvpConsentOffNotice] = useState(false);
+  const [isEditConsentsOpen, setIsEditConsentsOpen] = useState(false);
+  const [editingConsentsEvent, setEditingConsentsEvent] = useState<EventResponse | null>(null);
+  const [consentsLoading, setConsentsLoading] = useState(false);
+  const [consentsSaving, setConsentsSaving] = useState(false);
+  const [editingConsent, setEditingConsent] = useState<ConsentResponse | null>(null);
+  const [consentUpdateDialog, setConsentUpdateDialog] = useState<ConsentUpdateDialogState | null>(null);
+  const [joinedEventPrompt, setJoinedEventPrompt] = useState<EventResponse | null>(null);
   const openMenuContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -56,6 +92,7 @@ export default function DashboardPage() {
         return;
       }
 
+      setCurrentUserId(session.user.id);
       api.setToken(session.access_token);
       try {
         const [events, organized] = await Promise.all([
@@ -152,18 +189,11 @@ export default function DashboardPage() {
         const haystack = [event.name, event.location ?? ""].join(" ").toLowerCase();
         return haystack.includes(query);
       })
-      .map((event) => {
-        const startsAt = Date.parse(event.starts_at ?? "");
-        return {
-          event,
-          canStillJoin: Number.isFinite(startsAt) && startsAt - now >= 20 * 60 * 1000,
-        };
-      });
+      .map((event) => ({ event }));
   }, [discoverEvents, discoverSearchText, myEvents]);
 
   async function handleSignOut() {
-    const supabase = createClient();
-    await supabase.auth.signOut();
+    await signOutUser();
     router.push("/");
     router.refresh();
   }
@@ -278,11 +308,16 @@ export default function DashboardPage() {
         }
         return [...previous, event];
       });
+      setJoinedEventPrompt(event);
     } catch (error) {
       console.error("Failed to join event:", error);
     } finally {
       setJoiningDiscoverEventId(null);
     }
+  }
+
+  function handleViewEventDetail(event: EventResponse) {
+    setDetailEvent(event);
   }
 
   function handleStartRecognition(event: EventResponse) {
@@ -309,10 +344,135 @@ export default function DashboardPage() {
     }
   }
 
-  function handleEditConsents(event: EventResponse) {
+  async function handleConfirmLeaveEvent() {
+    if (!confirmLeaveEvent) {
+      return;
+    }
+    await handleLeaveEvent(confirmLeaveEvent);
+    setConfirmLeaveEvent(null);
+  }
+
+  async function handleViewRsvpList(event: EventResponse) {
     setOpenEventMenuId(null);
-    // Intentionally left blank for now.
-    void event;
+    setRsvpListEventName(event.name);
+    setIsRsvpListOpen(true);
+    setRsvpListLoading(true);
+    setRsvpListData({
+      entries: [],
+      total_count: 0,
+      hidden_count: 0,
+    });
+    setShowRsvpConsentOffNotice(false);
+    try {
+      let consent = getCachedEventConsent(event.event_id);
+      if (!consent) {
+        try {
+          consent = await api.getMyEventConsent(event.event_id);
+          setCachedEventConsent(event.event_id, consent);
+        } catch {
+          consent = null;
+        }
+      }
+
+      const isCreator = Boolean(currentUserId && currentUserId === event.created_by);
+      setShowRsvpConsentOffNotice(Boolean(!isCreator && consent && !consent.allow_profile_display));
+
+      const data = await api.getEventDirectory(event.event_id);
+      setRsvpListData(data);
+    } catch (error) {
+      console.error("Failed to load RSVP list:", error);
+      setRsvpListData({
+        entries: [],
+        total_count: 0,
+        hidden_count: 0,
+      });
+      setActionError("Could not load RSVP list right now. Please try again.");
+    } finally {
+      setRsvpListLoading(false);
+    }
+  }
+
+  async function handleEditConsents(event: EventResponse) {
+    setOpenEventMenuId(null);
+    setEditingConsentsEvent(event);
+    setIsEditConsentsOpen(true);
+    setConsentsLoading(true);
+    setActionError(null);
+
+    try {
+      const consent = await api.getMyEventConsent(event.event_id);
+      setEditingConsent(consent);
+      setCachedEventConsent(event.event_id, consent);
+    } catch (error) {
+      console.error("Failed to load event consents:", error);
+      setEditingConsent(null);
+      setActionError("Could not load event consent settings right now. Please try again.");
+    } finally {
+      setConsentsLoading(false);
+    }
+  }
+
+  async function handleConsentUpdate(
+    eventId: string,
+    patch: {
+      allow_profile_display?: boolean;
+      allow_recognition?: boolean;
+    },
+  ) {
+    setConsentsSaving(true);
+    setActionError(null);
+    try {
+      const updated = await api.updateMyEventConsent(eventId, patch);
+      setEditingConsent(updated);
+      setCachedEventConsent(eventId, updated);
+      setConsentUpdateDialog({
+        title: "Consents Updated",
+        message: "Your event consent settings were updated successfully.",
+      });
+    } catch (error) {
+      console.error("Failed to update event consent:", error);
+      if (isApiErrorWithStatus(error, 400) && error.message.toLowerCase().includes("profile photo")) {
+        setConsentUpdateDialog({
+          title: "Profile Photo Required",
+          message: "You must upload a profile photo before allowing recognition.",
+        });
+      } else if (isApiErrorWithStatus(error, 404)) {
+        const detail = error.message.toLowerCase();
+        if (detail.includes("event not found")) {
+          setConsentUpdateDialog({
+            title: "Event Not Found",
+            message: "This event does not exist.",
+          });
+        } else if (detail.includes("consent not found")) {
+          setConsentUpdateDialog({
+            title: "Consent Not Found",
+            message: "Consent settings were not found for this event.",
+          });
+        } else {
+          setConsentUpdateDialog({
+            title: "Not Found",
+            message: "The requested event or consent settings could not be found.",
+          });
+        }
+      } else if (isApiErrorWithStatus(error, 409) || (error instanceof ApiError && error.status >= 500)) {
+        setConsentUpdateDialog({
+          title: "Try Again Later",
+          message: "We could not update your consent right now. Please try again later.",
+        });
+      } else if (error instanceof Error) {
+        setConsentUpdateDialog({
+          title: "Unable to Update Consent",
+          message: error.message,
+        });
+      } else {
+        setConsentUpdateDialog({
+          title: "Unable to Update Consent",
+          message: "Could not update event consent right now. Please try again.",
+        });
+      }
+    } finally {
+      setConsentsSaving(false);
+    }
   }
 
   return (
@@ -416,7 +576,9 @@ export default function DashboardPage() {
             deletingEventId={deletingOrganizedEventId}
             archivingEventId={archivingOrganizedEventId}
             unarchivingEventId={unarchivingOrganizedEventId}
+            onViewEventDetail={handleViewEventDetail}
             onEditEventRequest={handleEditEventRequest}
+            onViewRsvpList={(event) => void handleViewRsvpList(event)}
             onArchiveEvent={handleArchiveOrganizedEvent}
             onUnarchiveEvent={handleUnarchiveOrganizedEvent}
             onDeleteEvent={handleDeleteOrganizedEvent}
@@ -431,8 +593,13 @@ export default function DashboardPage() {
             onToggleEventMenu={(eventId) =>
               setOpenEventMenuId((current) => (current === eventId ? null : eventId))
             }
-            onEditConsents={handleEditConsents}
-            onLeaveEvent={(event) => void handleLeaveEvent(event)}
+            onViewEventDetail={handleViewEventDetail}
+            onViewRsvpList={(event) => void handleViewRsvpList(event)}
+            onEditConsents={(event) => void handleEditConsents(event)}
+            onLeaveEvent={(event) => {
+              setOpenEventMenuId(null);
+              setConfirmLeaveEvent(event);
+            }}
             onStartRecognition={handleStartRecognition}
             formatEventDate={formatEventDate}
           />
@@ -479,6 +646,7 @@ export default function DashboardPage() {
           onSearchTextChange={setDiscoverSearchText}
           events={discoveredUpcomingEvents}
           joiningEventId={joiningDiscoverEventId}
+          onViewEventDetail={handleViewEventDetail}
           onJoinEvent={handleJoinDiscoverEvent}
         />
       </ModalBottomSheet>
@@ -515,6 +683,127 @@ export default function DashboardPage() {
           />
         ) : null}
       </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={Boolean(detailEvent)}
+        onClose={() => setDetailEvent(null)}
+        title="Event Details"
+      >
+        {detailEvent ? (
+          <EventDetailSheetContent
+            event={detailEvent}
+            formatEventDate={formatEventDate}
+          />
+        ) : null}
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={isRsvpListOpen}
+        onClose={() => setIsRsvpListOpen(false)}
+        title={rsvpListEventName ? `RSVP List · ${rsvpListEventName}` : "RSVP List"}
+      >
+        <RsvpListSheetContent
+          loading={rsvpListLoading}
+          entries={rsvpListData.entries}
+          totalCount={rsvpListData.total_count}
+          hiddenCount={rsvpListData.hidden_count}
+          showConsentOffNotice={showRsvpConsentOffNotice}
+        />
+      </ModalBottomSheet>
+
+      <ModalBottomSheet
+        isOpen={isEditConsentsOpen}
+        onClose={() => {
+          if (!consentsSaving) {
+            setIsEditConsentsOpen(false);
+            setEditingConsentsEvent(null);
+            setEditingConsent(null);
+          }
+        }}
+        title={editingConsentsEvent ? `Edit Consents · ${editingConsentsEvent.name}` : "Edit Consents"}
+      >
+        <EventConsentsSheetContent
+          loading={consentsLoading}
+          saving={consentsSaving}
+          consent={editingConsent}
+          onToggleProfileDisplay={(next) => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_profile_display: next,
+            });
+          }}
+          onToggleRecognition={(next) => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_recognition: next,
+            });
+          }}
+          onGrantAll={() => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_profile_display: true,
+              allow_recognition: true,
+            });
+          }}
+          onRevokeAll={() => {
+            if (!editingConsentsEvent) return;
+            void handleConsentUpdate(editingConsentsEvent.event_id, {
+              allow_profile_display: false,
+              allow_recognition: false,
+            });
+          }}
+        />
+      </ModalBottomSheet>
+
+      <ConfirmationDialog
+        open={Boolean(consentUpdateDialog)}
+        title={consentUpdateDialog?.title ?? "Consent Update"}
+        message={consentUpdateDialog?.message ?? ""}
+        confirmLabel="OK"
+        hideCancel
+        onConfirm={() => setConsentUpdateDialog(null)}
+        onCancel={() => setConsentUpdateDialog(null)}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(joinedEventPrompt)}
+        title="Joined Event"
+        message={
+          joinedEventPrompt
+            ? `You successfully joined ${joinedEventPrompt.name}. Update your event consents so you can recognize others and be recognized.`
+            : "You successfully joined this event. Update your event consents so you can recognize others and be recognized."
+        }
+        confirmLabel="Update Consents"
+        cancelLabel="Not Now"
+        onConfirm={() => {
+          if (!joinedEventPrompt) return;
+          const joinedEvent = joinedEventPrompt;
+          setJoinedEventPrompt(null);
+          void handleEditConsents(joinedEvent);
+        }}
+        onCancel={() => setJoinedEventPrompt(null)}
+      />
+
+      <ConfirmationDialog
+        open={Boolean(confirmLeaveEvent)}
+        title="Leave Event?"
+        message={
+          confirmLeaveEvent
+            ? `You will leave ${confirmLeaveEvent.name} and lose access to this event.`
+            : "You will leave this event."
+        }
+        confirmLabel="Leave"
+        onConfirm={() => void handleConfirmLeaveEvent()}
+        onCancel={() => setConfirmLeaveEvent(null)}
+        confirmIcon={
+          confirmLeaveEvent && leavingEventId === confirmLeaveEvent.event_id ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <UserMinus className="h-3.5 w-3.5" />
+          )
+        }
+        confirmDisabled={Boolean(confirmLeaveEvent && leavingEventId === confirmLeaveEvent.event_id)}
+      />
     </div>
   );
 }
