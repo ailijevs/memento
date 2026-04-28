@@ -14,6 +14,7 @@ import {
 
 const mockGetProfile = vi.fn();
 const mockUpdateProfile = vi.fn();
+const mockOnboardFromLinkedIn = vi.fn();
 const mockGetMyNotificationPreferences = vi.fn();
 const mockUpdateMyNotificationPreferences = vi.fn();
 
@@ -22,6 +23,7 @@ vi.mock("@/lib/api", () => ({
     setToken: vi.fn(),
     getProfile: (...args: unknown[]) => mockGetProfile(...args),
     updateProfile: (...args: unknown[]) => mockUpdateProfile(...args),
+    onboardFromLinkedIn: (...args: unknown[]) => mockOnboardFromLinkedIn(...args),
     getMyNotificationPreferences: (...args: unknown[]) =>
       mockGetMyNotificationPreferences(...args),
     updateMyNotificationPreferences: (...args: unknown[]) =>
@@ -92,6 +94,7 @@ describe("ProfilePage", () => {
     resetSupabaseMocks();
     mockGetProfile.mockClear();
     mockUpdateProfile.mockClear();
+    mockOnboardFromLinkedIn.mockClear();
     mockGetMyNotificationPreferences.mockClear();
     mockUpdateMyNotificationPreferences.mockClear();
     mockSignOut.mockClear();
@@ -253,6 +256,56 @@ describe("ProfilePage", () => {
     await userEvent.click(screen.getByText("I build things"));
 
     expect(screen.getByDisplayValue("I build things")).toBeInTheDocument();
+  });
+
+  it("disables LinkedIn refresh button when linkedin_url is missing", async () => {
+    mockSessionWith();
+    mockGetProfile.mockResolvedValue({
+      ...MOCK_PROFILE,
+      linkedin_url: null,
+    });
+
+    render(<ProfilePage />);
+
+    const button = await screen.findByRole("button", { name: "Refresh from LinkedIn" });
+    expect(button).toBeDisabled();
+  });
+
+  it("refreshes profile from LinkedIn and shows success status", async () => {
+    mockSessionWith();
+    mockGetProfile.mockResolvedValue(MOCK_PROFILE);
+    const updatedProfile = {
+      ...MOCK_PROFILE,
+      headline: "Updated from LinkedIn",
+    };
+    mockOnboardFromLinkedIn.mockResolvedValue({
+      profile: updatedProfile,
+    });
+
+    render(<ProfilePage />);
+
+    const button = await screen.findByRole("button", { name: "Refresh from LinkedIn" });
+    await userEvent.click(button);
+
+    await waitFor(() => {
+      expect(mockOnboardFromLinkedIn).toHaveBeenCalledWith(MOCK_PROFILE.linkedin_url);
+    });
+
+    expect(await screen.findByText("Profile refreshed from LinkedIn.")).toBeInTheDocument();
+    expect(screen.getByText("Updated from LinkedIn")).toBeInTheDocument();
+  });
+
+  it("shows error status when LinkedIn refresh fails", async () => {
+    mockSessionWith();
+    mockGetProfile.mockResolvedValue(MOCK_PROFILE);
+    mockOnboardFromLinkedIn.mockRejectedValue(new Error("boom"));
+
+    render(<ProfilePage />);
+
+    const button = await screen.findByRole("button", { name: "Refresh from LinkedIn" });
+    await userEvent.click(button);
+
+    expect(await screen.findByText("Could not refresh from LinkedIn. Please try again.")).toBeInTheDocument();
   });
 
   it("shows profile info tab by default and switches to account settings", async () => {

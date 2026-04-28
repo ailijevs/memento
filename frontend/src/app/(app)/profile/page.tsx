@@ -23,6 +23,7 @@ import {
   X,
   Loader2,
   Mail,
+  RefreshCw,
   MapPin,
   Briefcase,
   GraduationCap,
@@ -45,6 +46,9 @@ export default function ProfilePage() {
   const [photoLoading, setPhotoLoading] = useState(false);
   const [photoStatus, setPhotoStatus] = useState<string | null>(null);
   const [photoStatusError, setPhotoStatusError] = useState(false);
+  const [linkedinRefreshing, setLinkedinRefreshing] = useState(false);
+  const [linkedinStatus, setLinkedinStatus] = useState<string | null>(null);
+  const [linkedinStatusError, setLinkedinStatusError] = useState(false);
   const [confirmingSignOut, setConfirmingSignOut] = useState(false);
   const [deletePhase, setDeletePhase] = useState<"closed" | "first" | "second">("closed");
   const [deleteSubmitting, setDeleteSubmitting] = useState(false);
@@ -189,6 +193,24 @@ export default function ProfilePage() {
     } finally {
       e.target.value = "";
       setPhotoLoading(false);
+    }
+  }
+
+  async function handleRefreshFromLinkedIn() {
+    if (!profile?.linkedin_url || linkedinRefreshing) return;
+    setLinkedinRefreshing(true);
+    setLinkedinStatus("Refreshing from LinkedIn...");
+    setLinkedinStatusError(false);
+    try {
+      const updated = await api.onboardFromLinkedIn(profile.linkedin_url);
+      setProfile(updated.profile);
+      setLinkedinStatus("Profile refreshed from LinkedIn.");
+      setLinkedinStatusError(false);
+    } catch {
+      setLinkedinStatus("Could not refresh from LinkedIn. Please try again.");
+      setLinkedinStatusError(true);
+    } finally {
+      setLinkedinRefreshing(false);
     }
   }
 
@@ -442,6 +464,30 @@ export default function ProfilePage() {
                 displayClassName="text-[14px] text-white/60"
                 inputClassName="w-full bg-transparent text-[14px] text-white/80 outline-none"
               />
+              <button
+                type="button"
+                onClick={() => void handleRefreshFromLinkedIn()}
+                disabled={!profile.linkedin_url || linkedinRefreshing}
+                className="mt-3 inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[12px] font-medium text-white/80 transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  background: "rgba(255,255,255,0.08)",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                }}
+              >
+                <RefreshCw
+                  className={`h-3.5 w-3.5 ${linkedinRefreshing ? "animate-spin" : ""}`}
+                />
+                {linkedinRefreshing ? "Refreshing..." : "Refresh from LinkedIn"}
+              </button>
+              {linkedinStatus ? (
+                <p
+                  className={`mt-2 text-[12px] ${
+                    linkedinStatusError ? "text-red-400/80" : "text-emerald-300/80"
+                  }`}
+                >
+                  {linkedinStatus}
+                </p>
+              ) : null}
             </SectionCard>
 
             {/* Work */}
