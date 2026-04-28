@@ -1,5 +1,19 @@
 """Pydantic schemas for request/response validation."""
 
+from .analytics import (
+    AttendeeEventAnalytics,
+    AttendeeExportRow,
+    AttendeeOverview,
+    ConsentBreakdown,
+    EventAnalytics,
+    EventComparison,
+    EventQuickStats,
+    LiveEventStatus,
+    OrganizerOverview,
+    PostEventReport,
+    TimeSeriesBucket,
+    TopRecognizedUser,
+)
 from .consent import (
     ConsentCreate,
     ConsentResponse,
@@ -99,4 +113,17 @@ __all__ = [
     "FrameDetectionRequest",
     "FrameDetectionResponse",
     "ProfileCard",
+    # Analytics
+    "AttendeeEventAnalytics",
+    "AttendeeExportRow",
+    "AttendeeOverview",
+    "ConsentBreakdown",
+    "EventAnalytics",
+    "EventComparison",
+    "EventQuickStats",
+    "LiveEventStatus",
+    "OrganizerOverview",
+    "PostEventReport",
+    "TimeSeriesBucket",
+    "TopRecognizedUser",
 ]
