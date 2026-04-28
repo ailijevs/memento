@@ -157,6 +157,7 @@ def _attach_presigned_profile_photo_urls(
                 bucket_name=settings.s3_bucket_name,
                 expires_in_seconds=expires_in_seconds,
             )
+            print(f"presigned_url: {presigned_url}")
             cards_with_urls.append(card.model_copy(update={"photo_path": presigned_url}))
         except Exception as exc:
             logger.warning(
@@ -173,6 +174,7 @@ def _attach_presigned_profile_photo_urls(
 def _resolve_presigned_url_ttl_seconds(event_end_time: datetime | None) -> int:
     """Return URL TTL in seconds based on event time, defaulting to 10 minutes."""
     fallback_seconds = 600
+    max_presigned_url_ttl_seconds = 604799
     if event_end_time is None:
         return fallback_seconds
 
@@ -185,4 +187,4 @@ def _resolve_presigned_url_ttl_seconds(event_end_time: datetime | None) -> int:
     if remaining_seconds <= 0:
         return fallback_seconds
 
-    return remaining_seconds
+    return min(remaining_seconds, max_presigned_url_ttl_seconds)
