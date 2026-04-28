@@ -13,7 +13,7 @@ import {
 import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import { Aurora } from "@/components/aurora";
 import { signOutUser } from "@/lib/signout";
-import { Camera, Heart, LogOut, ScanFace, Square } from "lucide-react";
+import { Camera, Heart, LogOut, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -77,7 +77,7 @@ export default function RecognitionPage() {
   const [loading, setLoading] = useState(true);
   const [capturing, setCapturing] = useState(false);
   const [captureLoading, setCaptureLoading] = useState(false);
-  const [cameraMode, setCameraMode] = useState(false);
+  const cameraMode = true;
   const [consentWarning, setConsentWarning] = useState<string | null>(null);
   const [likedUserIds, setLikedUserIds] = useState<Set<string>>(new Set());
   const [likePendingUserIds, setLikePendingUserIds] = useState<Set<string>>(new Set());
@@ -361,19 +361,6 @@ export default function RecognitionPage() {
     setCaptureLoading(false);
   }
 
-  function handleModeToggle() {
-    if (capturing) {
-      if (cameraMode) {
-        stopCameraStream();
-      } else {
-        const socket = socketRef.current;
-        if (socket?.isConnected()) socket.send({ type: "stop_recognition" });
-      }
-      setCapturing(false);
-    }
-    setCameraMode((m) => !m);
-  }
-
   async function handleSignOut() {
     await signOutUser();
     router.push("/");
@@ -494,30 +481,6 @@ export default function RecognitionPage() {
           </h1>
 
           <div className="flex items-center gap-2">
-            {/* Mode toggle */}
-            <button
-              onClick={handleModeToggle}
-              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 transition-all active:scale-95"
-              style={{
-                background: cameraMode ? "oklch(0.22 0.12 230 / 60%)" : "oklch(1 0 0 / 5%)",
-                border: cameraMode
-                  ? "1px solid oklch(0.55 0.18 230 / 35%)"
-                  : "1px solid oklch(1 0 0 / 8%)",
-              }}
-              title={cameraMode ? "Switch to glasses mode" : "Switch to phone camera mode"}
-            >
-              <Camera
-                className="h-3.5 w-3.5"
-                style={{ color: cameraMode ? "oklch(0.75 0.15 230)" : "oklch(1 0 0 / 30%)" }}
-              />
-              <span
-                className="text-[10px] font-medium uppercase tracking-[0.1em]"
-                style={{ color: cameraMode ? "oklch(0.75 0.15 230)" : "oklch(1 0 0 / 25%)" }}
-              >
-                {cameraMode ? "Phone" : "Glasses"}
-              </span>
-            </button>
-
             {/* Scan / Stop button */}
             <button
               onClick={toggleCapture}
@@ -543,11 +506,7 @@ export default function RecognitionPage() {
                 </>
               ) : (
                 <>
-                  {cameraMode ? (
-                    <Camera className="h-3.5 w-3.5 text-white/40" />
-                  ) : (
-                    <ScanFace className="h-3.5 w-3.5 text-white/40" />
-                  )}
+                  <Camera className="h-3.5 w-3.5 text-white/40" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
                     Scan
                   </span>

@@ -190,9 +190,12 @@ def _generate_with_dspy(
     shared_fields: list[str],
 ) -> tuple[float | None, list[str]]:
     """Return (score_or_None, starters). Score is None if DSPy couldn't parse it."""
-    predictor = _get_dspy_predictor(model, api_key)
+    import dspy
+
+    lm, predictor = _get_dspy_predictor(model, api_key)
     context = _build_context(viewer, target, shared_companies, shared_schools, shared_fields)
-    prediction = predictor(context=context)
+    with dspy.context(lm=lm):
+        prediction = predictor(context=context)
 
     raw_score = str(getattr(prediction, "compatibility_score", "")).strip()
     dspy_score: float | None = None
@@ -238,8 +241,7 @@ def _get_dspy_predictor(model: str, api_key: str):  # pragma: no cover - runtime
         )
 
     lm = dspy.LM(model=model, api_key=api_key)
-    dspy.configure(lm=lm)
-    return dspy.Predict(CompatibilitySignature)
+    return lm, dspy.Predict(CompatibilitySignature)
 
 
 def _template_starters(
