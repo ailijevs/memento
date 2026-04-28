@@ -13,7 +13,7 @@ import {
 import { getCachedEventConsent, setCachedEventConsent } from "@/lib/consent-cache";
 import { Aurora } from "@/components/aurora";
 import { signOutUser } from "@/lib/signout";
-import { Camera, Heart, LogOut, Square } from "lucide-react";
+import { Camera, Heart, LogOut, ScanFace, Square } from "lucide-react";
 import { SocketClient, type SocketMessage, type ProfileCard } from "@/lib/socket";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -481,6 +481,23 @@ export default function RecognitionPage() {
           </h1>
 
           <div className="flex items-center gap-2">
+            {/* Mode indicator */}
+            <div
+              className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5"
+              style={{
+                background: "oklch(1 0 0 / 5%)",
+                border: "1px solid oklch(1 0 0 / 8%)",
+              }}
+            >
+              <ScanFace className="h-3.5 w-3.5" style={{ color: "oklch(1 0 0 / 30%)" }} />
+              <span
+                className="text-[10px] font-medium uppercase tracking-[0.1em]"
+                style={{ color: "oklch(1 0 0 / 25%)" }}
+              >
+                Glasses
+              </span>
+            </div>
+
             {/* Scan / Stop button */}
             <button
               onClick={toggleCapture}
@@ -506,7 +523,7 @@ export default function RecognitionPage() {
                 </>
               ) : (
                 <>
-                  <Camera className="h-3.5 w-3.5 text-white/40" />
+                  <ScanFace className="h-3.5 w-3.5 text-white/40" />
                   <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-white/30">
                     Scan
                   </span>
