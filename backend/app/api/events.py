@@ -6,17 +6,60 @@ from datetime import datetime, timezone
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 
 from app.auth import CurrentUser, get_current_user
 from app.dals import EventDAL
 from app.db import get_supabase_client
 from app.schemas import EventCreate, EventProcessingStatus, EventResponse, EventUpdate
+from app.services.notification import NotificationRecipient, NotificationService
 from app.services.rekognition import RekognitionError, RekognitionService
 from app.utils.rekognition_helpers import build_event_collection_id
 
 router = APIRouter(prefix="/events", tags=["events"])
 logger = logging.getLogger(__name__)
+
+
+async def _run_update_notifications_task(
+    *,
+    old_event: EventResponse,
+    new_event: EventResponse,
+    actor_user_id: UUID,
+) -> None:
+    try:
+        await NotificationService().notify_event_updated(
+            old_event=old_event,
+            new_event=new_event,
+            actor_user_id=actor_user_id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to process update notifications for event=%s by user=%s: %s",
+            new_event.event_id,
+            actor_user_id,
+            exc,
+        )
+
+
+async def _run_delete_notifications_task(
+    *,
+    deleted_event: EventResponse,
+    actor_user_id: UUID,
+    recipients: list[NotificationRecipient] | None,
+) -> None:
+    try:
+        await NotificationService().notify_event_deleted(
+            deleted_event=deleted_event,
+            actor_user_id=actor_user_id,
+            recipients=recipients,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to process delete notifications for event=%s by user=%s: %s",
+            deleted_event.event_id,
+            actor_user_id,
+            exc,
+        )
 
 
 def get_event_dal(current_user: Annotated[CurrentUser, Depends(get_current_user)]) -> EventDAL:
@@ -84,6 +127,7 @@ async def create_event(
 async def update_event(
     event_id: UUID,
     data: EventUpdate,
+    background_tasks: BackgroundTasks,
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> EventResponse:
@@ -123,12 +167,22 @@ async def update_event(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found or you don't have permission to update.",
         )
+
+    background_tasks.add_task(
+        _run_update_notifications_task,
+        old_event=existing,
+        new_event=event,
+        actor_user_id=current_user.id,
+    )
+
     return event
 
 
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event(
     event_id: UUID,
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
     dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> None:
     """
@@ -174,9 +228,31 @@ async def delete_event(
                 detail="Failed to delete event face collection.",
             ) from exc
 
+    notification_service = NotificationService()
+    recipients_for_delete: list[NotificationRecipient] | None = None
+    try:
+        recipients_for_delete = await notification_service.prepare_event_update_recipients(
+            event_id=event_id,
+            actor_user_id=current_user.id,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to prepare delete notification recipients for event=%s by user=%s: %s",
+            event_id,
+            current_user.id,
+            exc,
+        )
+
     deleted = await dal.delete(event_id)
     if not deleted:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Event not found or you don't have permission to delete.",
         )
+
+    background_tasks.add_task(
+        _run_delete_notifications_task,
+        deleted_event=event,
+        actor_user_id=current_user.id,
+        recipients=recipients_for_delete,
+    )

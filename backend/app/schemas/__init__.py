@@ -37,6 +37,14 @@ from .membership import (
     MembershipRole,
     MembershipUpdate,
 )
+from .notification import (
+    NotificationLogCreate,
+    NotificationLogResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
+    NotificationStatus,
+    NotificationType,
+)
 from .onboarding import (
     LinkedInOnboardingRequest,
     LinkedInOnboardingResponse,
@@ -75,6 +83,13 @@ __all__ = [
     "MembershipResponse",
     "MembershipRole",
     "MembershipUpdate",
+    # Notification
+    "NotificationLogCreate",
+    "NotificationLogResponse",
+    "NotificationPreferenceResponse",
+    "NotificationPreferenceUpdate",
+    "NotificationStatus",
+    "NotificationType",
     # LinkedIn Enrichment
     "EducationItem",
     "ExperienceItem",

@@ -13,13 +13,15 @@ from pydantic import BaseModel
 
 from app.auth import CurrentUser, get_current_user
 from app.config import get_settings
-from app.dals import ConsentDAL, EventDAL, MembershipDAL, ProfileDAL
+from app.dals import ConsentDAL, EventDAL, MembershipDAL, NotificationDAL, ProfileDAL
 from app.db import get_supabase_client
 from app.schemas import (
     LinkedInEnrichmentRequest,
     LinkedInEnrichmentResponse,
     LinkedInOnboardingRequest,
     LinkedInOnboardingResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdate,
     ProfileCompletionResponse,
     ProfileCreate,
     ProfileDirectoryResponse,
@@ -114,6 +116,14 @@ def get_consent_dal(current_user: Annotated[CurrentUser, Depends(get_current_use
     return ConsentDAL(client)
 
 
+def get_notification_dal(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+) -> NotificationDAL:
+    """Dependency to get NotificationDAL with authenticated client."""
+    client = get_supabase_client(current_user.access_token)
+    return NotificationDAL(client)
+
+
 @router.get("/me", response_model=ProfileResponse)
 async def get_my_profile(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
@@ -177,6 +187,51 @@ async def update_my_profile(
             detail="Profile not found. Please create one first.",
         )
     return await _refresh_generated_profile_summary(dal, profile)
+
+
+@router.patch("/me/notification-preferences", response_model=NotificationPreferenceResponse)
+async def update_my_notification_preferences(
+    data: NotificationPreferenceUpdate,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[NotificationDAL, Depends(get_notification_dal)],
+) -> NotificationPreferenceResponse:
+    """Update the current user's notification preferences."""
+    if (
+        data.email_notifications is None
+        and data.event_updates is None
+        and data.host_messages is None
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="At least one preference field must be provided.",
+        )
+
+    updated = await dal.upsert_preferences(current_user.id, data)
+    if not updated:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update notification preferences.",
+        )
+    return updated
+
+
+@router.get("/me/notification-preferences", response_model=NotificationPreferenceResponse)
+async def get_my_notification_preferences(
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[NotificationDAL, Depends(get_notification_dal)],
+) -> NotificationPreferenceResponse:
+    """Get the current user's notification preferences."""
+    preferences = await dal.get_preferences_by_user_id(current_user.id)
+    if preferences:
+        return preferences
+
+    created = await dal.upsert_preferences(current_user.id, NotificationPreferenceUpdate())
+    if not created:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to load notification preferences.",
+        )
+    return created
 
 
 @router.get("/me/photo-url", response_model=ProfilePhotoUrlResponse)
