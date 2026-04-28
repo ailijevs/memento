@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import { useRouter, useParams, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { api, isApiErrorWithStatus, type ProfileResponse } from "@/lib/api";
+import { api, isApiErrorWithStatus, type CompatibilityResponse, type ProfileResponse } from "@/lib/api";
 import { Aurora } from "@/components/aurora";
 import { ConfirmationDialog } from "@/components/confirmation-dialog";
-import { ChevronLeft, MapPin, Briefcase, GraduationCap, ExternalLink, Heart } from "lucide-react";
+import { ChevronLeft, MapPin, Briefcase, GraduationCap, ExternalLink, Heart, MessageSquare } from "lucide-react";
 
 function resolvePhotoUrl(photoPath: string | null): string | null {
   if (!photoPath) return null;
@@ -25,6 +25,7 @@ export default function UserProfilePage() {
   const cameFromFavorites = source === "favorites";
   const accuracy = searchParams.get("accuracy");
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
+  const [compatibility, setCompatibility] = useState<CompatibilityResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [imgFailed, setImgFailed] = useState(false);
   const [liked, setLiked] = useState(false);
@@ -39,6 +40,12 @@ export default function UserProfilePage() {
         setProfile(JSON.parse(cached));
         setLoading(false);
       } catch { /* ignore bad cache */ }
+    }
+
+    // Load cached compatibility (set by recognition page on navigate)
+    const cachedCompat = sessionStorage.getItem(`compat_cache_${userId}`);
+    if (cachedCompat) {
+      try { setCompatibility(JSON.parse(cachedCompat)); } catch { /* ignore */ }
     }
 
     async function load() {
@@ -58,6 +65,15 @@ export default function UserProfilePage() {
         // If fetch fails and we already have cached data, keep showing it
       } finally {
         setLoading(false);
+      }
+
+      // Fetch compatibility if not already cached
+      if (!cachedCompat) {
+        try {
+          const compat = await api.getCompatibility(userId);
+          setCompatibility(compat);
+          sessionStorage.setItem(`compat_cache_${userId}`, JSON.stringify(compat));
+        } catch { /* not available for all viewers — silently skip */ }
       }
     }
     void load();
@@ -237,6 +253,36 @@ export default function UserProfilePage() {
         </div>
 
         <div className="space-y-3">
+          {/* Conversation starters */}
+          {compatibility && compatibility.conversation_starters.length > 0 && (
+            <SectionCard label="Conversation Starters" icon={<MessageSquare className="h-3.5 w-3.5" />}>
+              <div className="space-y-2">
+                {compatibility.conversation_starters.map((starter, i) => (
+                  <p key={i} className="text-[13px] leading-relaxed text-white/60 italic">
+                    &ldquo;{starter}&rdquo;
+                  </p>
+                ))}
+              </div>
+              {compatibility.shared_companies.length > 0 || compatibility.shared_schools.length > 0 || compatibility.shared_fields.length > 0 ? (
+                <div className="mt-3 flex flex-wrap gap-1.5 border-t border-white/[0.06] pt-3">
+                  {[...compatibility.shared_companies, ...compatibility.shared_schools, ...compatibility.shared_fields].map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full px-2 py-0.5 text-[10px]"
+                      style={{
+                        background: "oklch(0.30 0.12 145 / 30%)",
+                        border: "1px solid oklch(0.5 0.15 145 / 25%)",
+                        color: "oklch(0.78 0.14 145)",
+                      }}
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </SectionCard>
+          )}
+
           {/* Summary */}
           {profile.profile_summary && (
             <SectionCard label="Summary" icon={null}>
