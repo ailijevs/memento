@@ -86,7 +86,7 @@ class MementoApp extends AppServer {
 }
 
 const app = new MementoApp({
-  packageName: 'memento-app',
+  packageName: 'memento.app',
   apiKey: process.env.MENTRA_API_KEY || '',
   port,
 });
