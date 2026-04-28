@@ -324,7 +324,7 @@ export default function RecognitionPage() {
           streamRef.current = stream;
           if (videoRef.current) {
             videoRef.current.srcObject = stream;
-            await videoRef.current.play();
+            videoRef.current.play().catch(() => {});
           }
           cameraActiveRef.current = true;
           setCapturing(true);
@@ -449,8 +449,8 @@ export default function RecognitionPage() {
     <div className="relative flex min-h-dvh flex-col overflow-hidden">
       {/* Hidden camera elements for phone camera mode */}
       {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-      <video ref={videoRef} className="hidden" playsInline muted />
-      <canvas ref={canvasRef} className="hidden" />
+      <video ref={videoRef} className="absolute opacity-0 pointer-events-none w-0 h-0" playsInline muted />
+      <canvas ref={canvasRef} className="absolute opacity-0 pointer-events-none w-0 h-0" />
 
       {/* Aurora */}
       <div className="absolute inset-0" style={{ opacity: 0.45 }}>
