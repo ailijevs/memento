@@ -3,8 +3,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ApiError, api, type ProfileResponse, type ProfileUpdateRequest } from "@/lib/api";
 import {
+  ApiError,
   api,
   type NotificationPreferenceResponse,
   type ProfileResponse,
@@ -432,7 +432,6 @@ export default function ProfilePage() {
           }
         />
 
-        {confirmingSignOut ? (
         {activeTab === "profile" ? (
           <div className="space-y-3">
             {/* About */}
