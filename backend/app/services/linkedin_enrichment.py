@@ -389,113 +389,132 @@ class LinkedInEnrichmentService:
         return location_match.group(1).strip() if location_match else None
 
     @staticmethod
+    def _looks_like_date_line(line: str) -> bool:
+        """Return True if the line is primarily a date range or duration."""
+        date_pattern = (
+            r"(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d{4}"
+            r"|\d{4}\s*[-–—]"
+            r"|\d+\s*(months?|years?|mos)"
+            r"|Present"
+        )
+        return bool(re.search(date_pattern, line, re.IGNORECASE))
+
+    @staticmethod
+    def _looks_like_location_line(line: str) -> bool:
+        """Return True if the line looks like a location (City, State pattern)."""
+        return bool(
+            re.match(
+                r"^[A-Z][A-Za-z .'-]+,\s*[A-Z][A-Za-z .'-]+",
+                line.strip(),
+            )
+        )
+
+    @staticmethod
+    def _is_section_header(lower: str) -> bool:
+        """Return True if the line is a LinkedIn section header."""
+        return lower in (
+            "experience",
+            "work experience",
+            "education",
+            "licenses & certifications",
+            "skills",
+            "volunteer experience",
+            "publications",
+            "projects",
+            "honors & awards",
+            "recommendations",
+            "interests",
+            "activity",
+            "about",
+        )
+
+    @staticmethod
+    def _is_noise_line(line: str) -> bool:
+        """Return True for lines that aren't meaningful experience/education data."""
+        lower = line.lower().strip()
+        noise_patterns = [
+            "follower",
+            "connection",
+            "see all",
+            "show all",
+            "http",
+            "more activity",
+            "people also viewed",
+            "join now",
+            "sign in",
+            "report",
+            "skill",
+            "·",
+        ]
+        if any(p in lower for p in noise_patterns):
+            return True
+        if len(line.strip()) < 3:
+            return True
+        return False
+
+    @staticmethod
     def _extract_experiences(text: str) -> list[dict[str, Any]]:
         experiences: list[dict[str, Any]] = []
         lines = [line.strip() for line in text.splitlines() if line.strip()]
+        non_title_words = {"student", "studying", "attended", "alumni", "member"}
 
-        in_experience_section = False
-        i = 0
-        while i < len(lines) and len(experiences) < 10:
-            lower = lines[i].lower()
-
-            if lower in ("experience", "work experience"):
-                in_experience_section = True
-                i += 1
-                continue
-
-            if in_experience_section and lower in (
-                "education",
-                "licenses & certifications",
-                "skills",
-                "volunteer experience",
-                "publications",
-                "projects",
-                "honors & awards",
-            ):
+        for i, line in enumerate(lines):
+            if len(experiences) >= 10:
                 break
-
-            non_title_words = {"student", "studying", "attended", "alumni", "member"}
-            if " at " in lines[i] and not lower.startswith(("http", "see ")):
-                parts = re.split(r"\s+at\s+", lines[i], maxsplit=1, flags=re.IGNORECASE)
-                title_lower = parts[0].strip().lower() if len(parts) == 2 else ""
+            if " at " in line and not line.lower().startswith(("http", "see ")):
+                parts = re.split(r"\s+at\s+", line, maxsplit=1, flags=re.IGNORECASE)
+                if len(parts) != 2:
+                    continue
+                title = parts[0].strip()
+                company = parts[1].strip()
                 if (
-                    len(parts) == 2
-                    and len(parts[0]) < 100
-                    and len(parts[1]) < 100
-                    and title_lower not in non_title_words
+                    len(title) > 100
+                    or len(company) > 100
+                    or title.lower() in non_title_words
+                    or LinkedInEnrichmentService._looks_like_date_line(title)
+                    or LinkedInEnrichmentService._looks_like_location_line(title)
+                    or LinkedInEnrichmentService._is_section_header(company.lower())
+                    or LinkedInEnrichmentService._is_noise_line(title)
                 ):
-                    dates = LinkedInEnrichmentService._extract_date_range(
-                        lines[i + 1] if i + 1 < len(lines) else ""
-                    )
-                    experiences.append(
-                        {
-                            "title": parts[0].strip(),
-                            "company": parts[1].strip(),
-                            "start_date": dates[0],
-                            "end_date": dates[1],
-                            "description": None,
-                        }
-                    )
-
-            elif in_experience_section and len(lines[i]) < 80:
-                if i + 1 < len(lines) and len(lines[i + 1]) < 80:
-                    title_candidate = lines[i]
-                    company_candidate = lines[i + 1]
-                    if not any(
-                        p in title_candidate.lower()
-                        for p in ("follower", "connection", "http", "see ")
-                    ):
-                        dates = LinkedInEnrichmentService._extract_date_range(
-                            lines[i + 2] if i + 2 < len(lines) else ""
-                        )
-                        experiences.append(
-                            {
-                                "title": title_candidate,
-                                "company": company_candidate,
-                                "start_date": dates[0],
-                                "end_date": dates[1],
-                                "description": None,
-                            }
-                        )
-                        i += 2
-
-            i += 1
+                    continue
+                dates = LinkedInEnrichmentService._extract_date_range(
+                    lines[i + 1] if i + 1 < len(lines) else ""
+                )
+                experiences.append(
+                    {
+                        "title": title,
+                        "company": company,
+                        "start_date": dates[0],
+                        "end_date": dates[1],
+                        "description": None,
+                    }
+                )
 
         return experiences
 
     @staticmethod
     def _extract_education(text: str) -> list[dict[str, Any]]:
         education: list[dict[str, Any]] = []
+        seen_schools: set[str] = set()
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         school_tokens = ("University", "College", "Institute", "School", "Academy", "Polytechnic")
 
-        in_education_section = False
         i = 0
         while i < len(lines) and len(education) < 5:
-            lower = lines[i].lower()
-
-            if lower == "education":
-                in_education_section = True
-                i += 1
-                continue
-
-            if in_education_section and lower in (
-                "licenses & certifications",
-                "skills",
-                "volunteer experience",
-                "publications",
-                "projects",
-                "honors & awards",
-                "recommendations",
-            ):
-                break
-
             is_school_line = any(token in lines[i] for token in school_tokens)
 
             if is_school_line and len(lines[i]) < 120:
                 school_text = lines[i]
                 at_match = re.match(r".+?\s+at\s+(.+)", school_text, re.IGNORECASE)
                 school = at_match.group(1).strip() if at_match else school_text
+
+                if school.lower().startswith("at "):
+                    school = school[3:].strip()
+
+                if school.lower() in seen_schools or not any(t in school for t in school_tokens):
+                    i += 1
+                    continue
+                seen_schools.add(school.lower())
                 degree = None
                 field_of_study = None
                 dates: tuple[str | None, str | None] = (None, None)
