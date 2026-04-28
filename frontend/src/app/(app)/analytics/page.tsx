@@ -13,12 +13,10 @@ import { Aurora } from "@/components/aurora";
 import {
   BarChart3,
   CalendarDays,
+  Handshake,
   Loader2,
   MapPin,
-  TrendingUp,
   Users,
-  Eye,
-  Handshake,
 } from "lucide-react";
 
 export default function AnalyticsPage() {
@@ -169,17 +167,17 @@ function StatCard({
 }) {
   return (
     <div
-      className="flex flex-col items-center rounded-2xl p-4 text-center"
+      className="flex flex-col items-center justify-between rounded-2xl p-4 text-center"
       style={{
         background: "oklch(1 0 0 / 4%)",
         border: "1px solid oklch(1 0 0 / 8%)",
       }}
     >
-      <div className="flex items-center justify-center gap-1.5 text-white/40">
+      <div className="flex min-h-[32px] items-center justify-center gap-1.5 text-white/40">
         {Icon ? <Icon className="h-3.5 w-3.5 shrink-0" /> : null}
-        <span className="text-[10px] font-medium uppercase tracking-[0.1em]">{label}</span>
+        <span className="text-[10px] font-medium uppercase leading-tight tracking-[0.1em]">{label}</span>
       </div>
-      <p className="mt-2 text-[28px] font-light tracking-tight text-white/90">{value}</p>
+      <p className="text-[28px] font-light tracking-tight text-white/90">{value}</p>
     </div>
   );
 }
@@ -220,10 +218,6 @@ function EventRow({
           <Users className="h-3 w-3" />
           {event.member_count}
         </span>
-        <span className="inline-flex items-center gap-1">
-          <Eye className="h-3 w-3" />
-          {event.recognition_count}
-        </span>
       </div>
       {extras}
     </button>
@@ -247,10 +241,9 @@ function AttendeeView({
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <StatCard label="Events" value={data.total_events} icon={CalendarDays} />
-        <StatCard label="People Met" value={data.total_people_met} />
-        <StatCard label="Recognitions" value={data.total_recognitions} icon={Eye} />
+        <StatCard label="People Met" value={data.total_people_met} icon={Handshake} />
       </div>
 
       {data.events.length > 0 ? (
@@ -297,12 +290,6 @@ function OrganizerView({
       <div className="grid grid-cols-2 gap-3">
         <StatCard label="Events" value={data.total_events} icon={CalendarDays} />
         <StatCard label="Total Attendees" value={data.total_attendees} icon={Users} />
-        <StatCard label="Recognitions" value={data.total_recognitions} icon={Eye} />
-        <StatCard
-          label="Avg Consent"
-          value={`${data.avg_consent_rate}%`}
-          icon={TrendingUp}
-        />
       </div>
 
       <section>
