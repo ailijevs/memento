@@ -480,22 +480,33 @@ async def onboard_from_linkedin_url(
 
     existing = await dal.get_by_user_id(current_user.id)
     if existing:
+        merged_experiences = _merge_experiences(
+            existing.experiences or [], [item.model_dump() for item in enrichment.experiences]
+        )
+        merged_education = _merge_education(
+            existing.education or [], [item.model_dump() for item in enrichment.education]
+        )
+
         saved_profile = await dal.update(
             current_user.id,
             ProfileUpdate(
                 full_name=existing.full_name or _title_case_name(enrichment.full_name),
-                headline=enrichment.headline,
-                bio=enrichment.bio,
-                location=enrichment.location,
-                company=first_experience.company if first_experience else None,
-                major=first_education.field_of_study if first_education else None,
+                headline=enrichment.headline or existing.headline,
+                bio=enrichment.bio or existing.bio,
+                location=enrichment.location or existing.location,
+                company=(
+                    first_experience.company if first_experience else None
+                ) or existing.company,
+                major=(
+                    first_education.field_of_study if first_education else None
+                ) or existing.major,
                 graduation_year=_parse_graduation_year(
                     first_education.end_date if first_education else None
-                ),
+                ) or existing.graduation_year,
                 linkedin_url=enrichment.linkedin_url,
                 photo_path=photo_path or existing.photo_path,
-                experiences=[item.model_dump() for item in enrichment.experiences],
-                education=[item.model_dump() for item in enrichment.education],
+                experiences=merged_experiences,
+                education=merged_education,
             ),
         )
         if saved_profile is None:
@@ -938,6 +949,71 @@ async def upload_resume(
 # =============================================================================
 # Helper Functions
 # =============================================================================
+
+
+def _normalize_key(value: str | None) -> str:
+    """Lowercase and strip a string for fuzzy-match keying."""
+    return (value or "").strip().lower()
+
+
+def _merge_experiences(
+    existing: list[dict], incoming: list[dict]
+) -> list[dict]:
+    """Merge LinkedIn experiences into existing list, deduplicating by company+title."""
+    seen: set[tuple[str, str]] = set()
+    merged: list[dict] = []
+
+    for exp in existing:
+        key = (_normalize_key(exp.get("company")), _normalize_key(exp.get("title")))
+        seen.add(key)
+        merged.append(exp)
+
+    for exp in incoming:
+        key = (_normalize_key(exp.get("company")), _normalize_key(exp.get("title")))
+        if key not in seen:
+            seen.add(key)
+            merged.append(exp)
+        else:
+            for i, m in enumerate(merged):
+                m_key = (_normalize_key(m.get("company")), _normalize_key(m.get("title")))
+                if m_key == key:
+                    for field in ("start_date", "end_date", "description"):
+                        if exp.get(field) and not m.get(field):
+                            merged[i] = {**m, field: exp[field]}
+                            m = merged[i]
+                    break
+
+    return merged
+
+
+def _merge_education(
+    existing: list[dict], incoming: list[dict]
+) -> list[dict]:
+    """Merge LinkedIn education into existing list, deduplicating by school+degree."""
+    seen: set[tuple[str, str]] = set()
+    merged: list[dict] = []
+
+    for edu in existing:
+        key = (_normalize_key(edu.get("school")), _normalize_key(edu.get("degree")))
+        seen.add(key)
+        merged.append(edu)
+
+    for edu in incoming:
+        key = (_normalize_key(edu.get("school")), _normalize_key(edu.get("degree")))
+        if key not in seen:
+            seen.add(key)
+            merged.append(edu)
+        else:
+            for i, m in enumerate(merged):
+                m_key = (_normalize_key(m.get("school")), _normalize_key(m.get("degree")))
+                if m_key == key:
+                    for field in ("field_of_study", "start_date", "end_date"):
+                        if edu.get(field) and not m.get(field):
+                            merged[i] = {**m, field: edu[field]}
+                            m = merged[i]
+                    break
+
+    return merged
 
 
 def _title_case_name(name: str) -> str:
