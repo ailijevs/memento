@@ -232,17 +232,19 @@ function SmallStat({
 }) {
   return (
     <div
-      className="flex flex-col items-center rounded-2xl p-3 text-center"
+      className="flex flex-col items-center justify-between rounded-2xl p-3 text-center"
       style={{
         background: "oklch(1 0 0 / 4%)",
         border: "1px solid oklch(1 0 0 / 8%)",
       }}
     >
-      <div className="flex items-center justify-center gap-1.5 text-white/40">
-        {Icon ? <Icon className="h-3 w-3" /> : null}
-        <span className="text-[9px] font-medium uppercase tracking-[0.1em]">{label}</span>
+      <div className="flex min-h-[28px] items-center justify-center gap-1.5 text-white/40">
+        {Icon ? <Icon className="h-3 w-3 shrink-0" /> : null}
+        <span className="text-[9px] font-medium uppercase leading-tight tracking-[0.1em]">
+          {label}
+        </span>
       </div>
-      <p className="mt-1.5 text-[22px] font-light tracking-tight text-white/90">{value}</p>
+      <p className="text-[22px] font-light tracking-tight text-white/90">{value}</p>
     </div>
   );
 }
