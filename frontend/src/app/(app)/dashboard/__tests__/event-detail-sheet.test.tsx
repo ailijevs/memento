@@ -1,5 +1,6 @@
 import { render, screen } from "@testing-library/react";
-import { describe, it, expect } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi } from "vitest";
 import { EventDetailSheetContent } from "../event-detail-sheet-content";
 
 const MOCK_EVENT = {
@@ -70,5 +71,30 @@ describe("EventDetailSheetContent", () => {
     const noMax = { ...MOCK_EVENT, max_participants: null };
     render(<EventDetailSheetContent event={noMax} formatEventDate={formatEventDate} />);
     expect(screen.queryByText("Max Participants")).not.toBeInTheDocument();
+  });
+
+  it("shows organizer message button when send handler is provided", () => {
+    render(
+      <EventDetailSheetContent
+        event={MOCK_EVENT}
+        formatEventDate={formatEventDate}
+        onSendMessage={vi.fn()}
+      />
+    );
+    expect(screen.getByText("Send Message to Members")).toBeInTheDocument();
+  });
+
+  it("calls send handler when organizer message button is clicked", async () => {
+    const onSendMessage = vi.fn();
+    render(
+      <EventDetailSheetContent
+        event={MOCK_EVENT}
+        formatEventDate={formatEventDate}
+        onSendMessage={onSendMessage}
+      />
+    );
+
+    await userEvent.click(screen.getByText("Send Message to Members"));
+    expect(onSendMessage).toHaveBeenCalledWith(MOCK_EVENT);
   });
 });

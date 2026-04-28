@@ -1,16 +1,18 @@
 "use client";
 
 import { type EventResponse } from "@/lib/api";
-import { CalendarDays, Clock, MapPin, Text, Users } from "lucide-react";
+import { CalendarDays, Clock, Mail, MapPin, Text, Users } from "lucide-react";
 
 interface EventDetailSheetContentProps {
   event: EventResponse;
   formatEventDate: (value: string) => string;
+  onSendMessage?: (event: EventResponse) => void;
 }
 
 export function EventDetailSheetContent({
   event,
   formatEventDate,
+  onSendMessage,
 }: EventDetailSheetContentProps) {
   return (
     <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1 pb-2">
@@ -83,6 +85,23 @@ export function EventDetailSheetContent({
             >
               {event.description}
             </p>
+          </section>
+        ) : null}
+
+        {onSendMessage ? (
+          <section className="pt-1">
+            <button
+              type="button"
+              onClick={() => onSendMessage(event)}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-3 text-[12px] font-medium uppercase tracking-[0.08em] text-white transition-transform active:scale-[0.99]"
+              style={{
+                background: "linear-gradient(135deg, oklch(0.24 0.08 215) 0%, oklch(0.46 0.15 195) 100%)",
+                border: "1px solid oklch(0.65 0.14 200 / 22%)",
+              }}
+            >
+              <Mail className="h-4 w-4" />
+              Send Message to Members
+            </button>
           </section>
         ) : null}
       </div>

@@ -177,12 +177,13 @@ export function SignupContent({ onBack, onGoLogin, showYouDot = true }: { onBack
       },
     });
     if (error) { setError(error.message); setLoading(false); return; }
-    if (data?.session === null) {
-      router.replace("/signup?verify=pending");
-    } else {
+    // TODO: new changes needed to revert later
+    // if (data?.session === null) {
+    //   router.replace("/signup?verify=pending");
+    // } else {
       router.replace("/onboarding");
       router.refresh();
-    }
+    // }
   }
 
   async function handleGoogle() {

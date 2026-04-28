@@ -11,7 +11,14 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
 from app.auth import CurrentUser, get_current_user
 from app.dals import EventDAL
 from app.db import get_supabase_client
-from app.schemas import EventCreate, EventProcessingStatus, EventResponse, EventUpdate
+from app.schemas import (
+    EventCreate,
+    EventProcessingStatus,
+    EventResponse,
+    EventUpdate,
+    HostMessageRequest,
+    HostMessageResponse,
+)
 from app.services.notification import NotificationRecipient, NotificationService
 from app.services.rekognition import RekognitionError, RekognitionService
 from app.utils.rekognition_helpers import build_event_collection_id
@@ -59,6 +66,48 @@ async def _run_delete_notifications_task(
             deleted_event.event_id,
             actor_user_id,
             exc,
+        )
+
+
+async def _run_host_message_notifications_task(
+    *,
+    event: EventResponse,
+    actor_user_id: UUID,
+    subject: str,
+    message: str,
+    recipients: list[NotificationRecipient],
+) -> None:
+    logger.info(
+        (
+            "Starting host message background task for "
+            "event=%s actor_user=%s recipient_count=%s subject=%r"
+        ),
+        event.event_id,
+        actor_user_id,
+        len(recipients),
+        subject,
+    )
+    try:
+        await NotificationService().notify_host_message(
+            event=event,
+            actor_user_id=actor_user_id,
+            subject=subject,
+            message=message,
+            recipients=recipients,
+        )
+    except Exception as exc:
+        logger.warning(
+            "Failed to process host message for event=%s by user=%s: %s",
+            event.event_id,
+            actor_user_id,
+            exc,
+        )
+    else:
+        logger.info(
+            "Completed host message background task for event=%s actor_user=%s recipient_count=%s",
+            event.event_id,
+            actor_user_id,
+            len(recipients),
         )
 
 
@@ -131,8 +180,8 @@ async def update_event(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> EventResponse:
-    """
-    Update an event.
+    """Update an event.
+
     RLS enforces: only the creator can update.
     """
     existing = await dal.get_by_id(event_id)
@@ -178,6 +227,87 @@ async def update_event(
     return event
 
 
+@router.post(
+    "/{event_id}/message-members",
+    response_model=HostMessageResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def message_event_members(
+    event_id: UUID,
+    data: HostMessageRequest,
+    background_tasks: BackgroundTasks,
+    current_user: Annotated[CurrentUser, Depends(get_current_user)],
+    dal: Annotated[EventDAL, Depends(get_event_dal)],
+) -> HostMessageResponse:
+    """Queue a host-authored email to opted-in members of an event."""
+    trimmed_subject = data.subject.strip()
+    trimmed_message = data.message.strip()
+    logger.info(
+        "Received message-members request for event=%s actor_user=%s subject=%r message_length=%s",
+        event_id,
+        current_user.id,
+        trimmed_subject,
+        len(trimmed_message),
+    )
+
+    event = await dal.get_by_id(event_id)
+    if not event:
+        logger.warning(
+            "message-members request failed: event=%s not found for actor_user=%s",
+            event_id,
+            current_user.id,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found.",
+        )
+
+    if event.created_by != current_user.id:
+        logger.warning(
+            "message-members request forbidden for event=%s actor_user=%s host_user=%s",
+            event_id,
+            current_user.id,
+            event.created_by,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only event hosts can message members.",
+        )
+
+    notification_service = NotificationService()
+    recipients = await notification_service.prepare_host_message_recipients(
+        event_id=event_id,
+        actor_user_id=current_user.id,
+    )
+    logger.info(
+        "Prepared host message recipients for event=%s actor_user=%s recipient_count=%s",
+        event_id,
+        current_user.id,
+        len(recipients),
+    )
+
+    background_tasks.add_task(
+        _run_host_message_notifications_task,
+        event=event,
+        actor_user_id=current_user.id,
+        subject=trimmed_subject,
+        message=trimmed_message,
+        recipients=recipients,
+    )
+    logger.info(
+        "Queued host message background task for event=%s actor_user=%s recipient_count=%s",
+        event_id,
+        current_user.id,
+        len(recipients),
+    )
+
+    return HostMessageResponse(
+        event_id=event_id,
+        recipient_count=len(recipients),
+        subject=trimmed_subject,
+    )
+
+
 @router.delete("/{event_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_event(
     event_id: UUID,
@@ -185,8 +315,8 @@ async def delete_event(
     current_user: Annotated[CurrentUser, Depends(get_current_user)],
     dal: Annotated[EventDAL, Depends(get_event_dal)],
 ) -> None:
-    """
-    Soft delete an event (sets is_active=False).
+    """Soft delete an event (sets is_active=False).
+
     RLS enforces: only the creator can delete.
     """
     event = await dal.get_by_id(event_id)

@@ -23,6 +23,7 @@ const mockDeleteEvent = vi.fn();
 const mockGetMyEventConsent = vi.fn();
 const mockUpdateMyEventConsent = vi.fn();
 const mockGetEventDirectory = vi.fn();
+const mockSendHostMessage = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   api: {
@@ -38,6 +39,7 @@ vi.mock("@/lib/api", () => ({
     updateMyEventConsent: (...args: unknown[]) => mockUpdateMyEventConsent(...args),
     updateEvent: vi.fn(),
     getEventDirectory: (...args: unknown[]) => mockGetEventDirectory(...args),
+    sendHostMessage: (...args: unknown[]) => mockSendHostMessage(...args),
   },
   ApiError: class extends Error {
     status: number;
@@ -91,6 +93,7 @@ describe("DashboardPage", () => {
     mockGetMyEvents.mockClear();
     mockGetMyOrganizedEvents.mockClear();
     mockGetEvents.mockClear();
+    mockSendHostMessage.mockClear();
     mockSignOut.mockClear();
   });
 
@@ -234,4 +237,42 @@ describe("DashboardPage", () => {
       expect(plusIcons.length).toBeGreaterThan(0);
     });
   });
+
+  it("lets organizers open the message composer from event details and send a message", async () => {
+    mockSessionWith();
+    mockGetMyEvents.mockResolvedValue([]);
+    mockGetMyOrganizedEvents.mockResolvedValue([MOCK_ORGANIZED_EVENT]);
+    mockSendHostMessage.mockResolvedValue({
+      event_id: MOCK_ORGANIZED_EVENT.event_id,
+      recipient_count: 3,
+      subject: "Update for My Organized Event",
+      queued: true,
+    });
+
+    render(<DashboardPage />);
+
+    await userEvent.click(await screen.findByText("Organizer"));
+    await userEvent.click(await screen.findByText("My Organized Event"));
+    await userEvent.click(await screen.findByText("Send Message to Members"));
+
+    const messageBox = await screen.findByLabelText("Message");
+    await userEvent.type(messageBox, "Please arrive 10 minutes early.");
+    await userEvent.click(screen.getByText("Send to Members"));
+
+    await waitFor(() => {
+      expect(mockSendHostMessage).toHaveBeenCalledWith(MOCK_ORGANIZED_EVENT.event_id, {
+        subject: "Update for My Organized Event",
+        message: "Please arrive 10 minutes early.",
+      });
+    });
+
+    expect(await screen.findByText("Message sent successfully.")).toBeInTheDocument();
+
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Message sent successfully.")).not.toBeInTheDocument();
+      },
+      { timeout: 7000 }
+    );
+  }, 12000);
 });

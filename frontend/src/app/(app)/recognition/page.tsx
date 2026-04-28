@@ -305,8 +305,8 @@ export default function RecognitionPage() {
       setResults((prev) =>
         prev.map((r) => (r.matched_user_id === userId ? { ...r, compatibility: compat } : r))
       );
-    } catch {
-      // Not fatal — compatibility is a nice-to-have
+    } catch (err) {
+      console.warn("[Compatibility] Failed for", userId, err);
     }
   }
 
@@ -618,6 +618,9 @@ export default function RecognitionPage() {
                   }
                   if (r.confidence != null) {
                     params.set("accuracy", String(Math.round(r.confidence)));
+                  }
+                  if (r.compatibility) {
+                    sessionStorage.setItem(`compat_cache_${userId}`, JSON.stringify(r.compatibility));
                   }
                   const qs = params.toString();
                   router.push(`/profile/${userId}${qs ? `?${qs}` : ""}`);
