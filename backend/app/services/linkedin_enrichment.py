@@ -326,13 +326,25 @@ class LinkedInEnrichmentService:
 
     @staticmethod
     def _extract_bio(text: str) -> str | None:
+        noise_patterns = [
+            "follower",
+            "connection",
+            "experience",
+            "education",
+            "see all",
+            "show all",
+            "people also viewed",
+            "more activity",
+            "join now",
+            "sign in",
+            "agree & join",
+            "mutual connection",
+            "report this profile",
+        ]
         lines = [line.strip() for line in text.splitlines() if line.strip()]
         for line in lines:
-            if (
-                len(line) > 40
-                and "experience" not in line.lower()
-                and "education" not in line.lower()
-            ):
+            lower = line.lower()
+            if len(line) > 40 and not any(p in lower for p in noise_patterns):
                 return line
         return None
 
@@ -359,37 +371,169 @@ class LinkedInEnrichmentService:
     def _extract_experiences(text: str) -> list[dict[str, Any]]:
         experiences: list[dict[str, Any]] = []
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        for line in lines:
-            if " at " in line and len(experiences) < 10:
-                parts = re.split(r"\s+at\s+", line, maxsplit=1, flags=re.IGNORECASE)
-                if len(parts) == 2:
+
+        in_experience_section = False
+        i = 0
+        while i < len(lines) and len(experiences) < 10:
+            lower = lines[i].lower()
+
+            if lower in ("experience", "work experience"):
+                in_experience_section = True
+                i += 1
+                continue
+
+            if in_experience_section and lower in (
+                "education",
+                "licenses & certifications",
+                "skills",
+                "volunteer experience",
+                "publications",
+                "projects",
+                "honors & awards",
+            ):
+                break
+
+            if " at " in lines[i] and not lower.startswith(("http", "see ")):
+                parts = re.split(r"\s+at\s+", lines[i], maxsplit=1, flags=re.IGNORECASE)
+                if len(parts) == 2 and len(parts[0]) < 100 and len(parts[1]) < 100:
+                    dates = LinkedInEnrichmentService._extract_date_range(
+                        lines[i + 1] if i + 1 < len(lines) else ""
+                    )
                     experiences.append(
                         {
                             "title": parts[0].strip(),
                             "company": parts[1].strip(),
-                            "start_date": None,
-                            "end_date": None,
+                            "start_date": dates[0],
+                            "end_date": dates[1],
                             "description": None,
                         }
                     )
+
+            elif in_experience_section and len(lines[i]) < 80:
+                if i + 1 < len(lines) and len(lines[i + 1]) < 80:
+                    title_candidate = lines[i]
+                    company_candidate = lines[i + 1]
+                    if not any(
+                        p in title_candidate.lower()
+                        for p in ("follower", "connection", "http", "see ")
+                    ):
+                        dates = LinkedInEnrichmentService._extract_date_range(
+                            lines[i + 2] if i + 2 < len(lines) else ""
+                        )
+                        experiences.append(
+                            {
+                                "title": title_candidate,
+                                "company": company_candidate,
+                                "start_date": dates[0],
+                                "end_date": dates[1],
+                                "description": None,
+                            }
+                        )
+                        i += 2
+
+            i += 1
+
         return experiences
 
     @staticmethod
     def _extract_education(text: str) -> list[dict[str, Any]]:
         education: list[dict[str, Any]] = []
         lines = [line.strip() for line in text.splitlines() if line.strip()]
-        for line in lines:
-            if (
-                any(token in line for token in ["University", "College", "Institute"])
-                and len(education) < 5
+        school_tokens = ("University", "College", "Institute", "School", "Academy", "Polytechnic")
+
+        in_education_section = False
+        i = 0
+        while i < len(lines) and len(education) < 5:
+            lower = lines[i].lower()
+
+            if lower == "education":
+                in_education_section = True
+                i += 1
+                continue
+
+            if in_education_section and lower in (
+                "licenses & certifications",
+                "skills",
+                "volunteer experience",
+                "publications",
+                "projects",
+                "honors & awards",
+                "recommendations",
             ):
+                break
+
+            is_school_line = any(token in lines[i] for token in school_tokens)
+
+            if is_school_line and len(lines[i]) < 120:
+                school = lines[i]
+                degree = None
+                field_of_study = None
+                dates: tuple[str | None, str | None] = (None, None)
+
+                if i + 1 < len(lines):
+                    next_line = lines[i + 1]
+                    next_lower = next_line.lower()
+                    if any(
+                        d in next_lower
+                        for d in (
+                            "bachelor",
+                            "master",
+                            "associate",
+                            "doctor",
+                            "b.s.",
+                            "b.a.",
+                            "m.s.",
+                            "m.a.",
+                            "ph.d",
+                            "mba",
+                            "bs,",
+                            "ba,",
+                            "ms,",
+                        )
+                    ):
+                        degree_parts = next_line.split(",", 1)
+                        degree = degree_parts[0].strip()
+                        if len(degree_parts) > 1:
+                            field_of_study = degree_parts[1].strip()
+                        i += 1
+
+                if i + 1 < len(lines):
+                    dates = LinkedInEnrichmentService._extract_date_range(lines[i + 1])
+                    if dates[0]:
+                        i += 1
+
                 education.append(
                     {
-                        "school": line,
-                        "degree": None,
-                        "field_of_study": None,
-                        "start_date": None,
-                        "end_date": None,
+                        "school": school,
+                        "degree": degree,
+                        "field_of_study": field_of_study,
+                        "start_date": dates[0],
+                        "end_date": dates[1],
                     }
                 )
+
+            i += 1
+
         return education
+
+    @staticmethod
+    def _extract_date_range(line: str) -> tuple[str | None, str | None]:
+        """Try to pull a date range like 'Jan 2020 - Present' from a line."""
+        date_pattern = r"((?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\w*\.?\s+\d{4}|\d{4})"
+        present_pattern = r"(Present|Current|Now)"
+        match = re.search(
+            rf"{date_pattern}\s*[-–—]\s*(?:{date_pattern}|{present_pattern})",
+            line,
+            re.IGNORECASE,
+        )
+        if match:
+            start = match.group(1)
+            end = match.group(2) or match.group(3)
+            return (
+                start,
+                end if end and end.lower() not in ("present", "current", "now") else None,
+            )
+        single = re.search(date_pattern, line, re.IGNORECASE)
+        if single:
+            return (single.group(1), None)
+        return (None, None)
